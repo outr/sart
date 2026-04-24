@@ -1,0 +1,57 @@
+name: Pages
+
+# Builds the example Flutter web bundle (the Showcase launcher) and
+# publishes it to GitHub Pages at https://outr.github.io/sart/. Runs on
+# pushes to the default branch and can be triggered manually.
+#
+# Setup (one-time, in repo settings → Pages): set Source to
+# "GitHub Actions". No branch configuration needed.
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+# Standard token scopes for the deploy-pages action.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deploy at a time; cancel in-flight on new pushes.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: coursier/cache-action@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      # Flutter project sites live at /<repo>/, so every asset URL in
+      # the emitted bundle needs that prefix. `sart.web.baseHref` is the
+      # sbt-side hook that forwards this to `flutter build web --base-href`.
+      - run: sbt -Dsbt.color=false -Dsart.web.baseHref=/sart/ sartWeb
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out/build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

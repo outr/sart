@@ -190,7 +190,11 @@ object SartPlugin extends AutoPlugin {
       sartEmit.value
       val outDir = sartOutDir.value
       sbtSartScaffold("web", outDir, normalizedName.value, log)
-      sbtSartBuild("web", Seq.empty, outDir, log)
+      // `-Dsart.web.baseHref=/foo/` lets consumers pin the asset root
+      // for project-site deploys (e.g. GitHub Pages under a subpath).
+      val extra = sys.props.get("sart.web.baseHref").filter(_.nonEmpty)
+        .map(h => Seq(s"--base-href=$h")).getOrElse(Seq.empty)
+      sbtSartBuild("web", extra, outDir, log)
       val bundle = outDir / "build" / "web"
       log.info(s"sbt-sart: built web bundle at $bundle")
       bundle

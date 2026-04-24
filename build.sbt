@@ -178,7 +178,12 @@ lazy val root = (project in file("."))
       sartEmit.value
       val outDir = baseDirectory.value / "out"
       scaffoldPlatform("web", outDir, log)
-      buildPlatform("web", Seq.empty, outDir, log)
+      // `sart.web.baseHref` lets CI pin the asset root so the bundle works
+      // under GitHub Pages project URLs (e.g. `/sart/`). Must include the
+      // trailing slash; Flutter enforces that.
+      val extra = sys.props.get("sart.web.baseHref").filter(_.nonEmpty)
+        .map(h => Seq(s"--base-href=$h")).getOrElse(Seq.empty)
+      buildPlatform("web", extra, outDir, log)
       val bundle = outDir / "build" / "web"
       log.info(s"sart: built web bundle at $bundle")
       bundle
