@@ -11,7 +11,7 @@ ThisBuild / version      := "0.1.0-SNAPSHOT"
 ThisBuild / organizationName := "OUTR"
 ThisBuild / organizationHomepage := Some(url("https://outr.com"))
 ThisBuild / homepage := Some(url("https://github.com/outr/sart"))
-ThisBuild / licenses := Seq("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0"))
+ThisBuild / licenses := Seq("MIT" -> url("https://opensource.org/licenses/MIT"))
 ThisBuild / scmInfo := Some(ScmInfo(
   url("https://github.com/outr/sart"),
   "scm:git:git@github.com:outr/sart.git"
