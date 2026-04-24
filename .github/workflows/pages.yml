@@ -33,6 +33,7 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: coursier/cache-action@v6
+      - uses: sbt/setup-sbt@v1
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
