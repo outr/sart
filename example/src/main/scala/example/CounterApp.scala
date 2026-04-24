@@ -1,10 +1,10 @@
 package example
 
-import flutter.runApp
 import flutter.material.*
 
-@main def sartMain(): Unit =
-  runApp(MyApp())
+// The classic Flutter counter. Kept as its own reachable demo (launched
+// from `LauncherApp`) so the repo still has a minimal reference app.
+// The `@main` entry now lives in `LauncherApp.scala`.
 
 class MyApp extends StatelessWidget:
   override def build(context: BuildContext): Widget =

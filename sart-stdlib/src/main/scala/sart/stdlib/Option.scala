@@ -24,6 +24,10 @@ abstract class Option[+T]:
   def fold[R](ifEmpty: R)(f: T => R): R         = native.value
   def isDefined: Boolean                        = native.value
   def isEmpty: Boolean                          = native.value
+  // For side-effecting operations (like `opt.foreach(t => t.cancel())`)
+  // where the lambda returns Unit. Avoids the `R extends Object`
+  // generic constraint on `.map` that the Dart shim uses.
+  def foreach(f: T => Unit): Unit               = native.value
 
 @native
 object Some:

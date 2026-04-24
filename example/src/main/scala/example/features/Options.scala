@@ -12,8 +12,15 @@ class OptionExample:
   def lookup(id: Int): Option[String] =
     if id == 0 then None else Some("found")
 
-  // `isDefined`, `.map`, etc. require the Dart shim (follow-up work).
-  // Until then, we express presence checks using the underlying nullable
-  // representation: an `Option[T]` is a `T?` in Dart, so `!= null` works.
-  def describe(present: Boolean): String =
-    if present then "present" else "absent"
+  // Native-operator translations: these map to Dart's `??`, `!= null`,
+  // `== null` at emit time — no shim library needed.
+  def valueOrZero(o: Option[Int]): Int     = o.getOrElse(0)
+  def isPresent(o: Option[String]): Boolean = o.isDefined
+  def isAbsent(o: Option[String]): Boolean  = o.isEmpty
+
+  // Shim-backed method translations. Each of these dispatches to the
+  // Dart extension in `lib/sart_option.dart` that the emitter drops
+  // alongside main.dart whenever Option appears in the output.
+  def addOne(o: Option[Int]): Option[Int]    = o.map(x => x + 1)
+  def chain(o: Option[Int]): Option[Int]     = o.flatMap(x => Some(x * 2))
+  def describe(o: Option[Int]): String       = o.fold("nothing")(x => "got " + x.toString)

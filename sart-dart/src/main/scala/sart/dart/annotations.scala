@@ -2,6 +2,20 @@ package sart.dart
 
 import scala.annotation.StaticAnnotation
 
+// ─── Public API surface (stable for 1.0) ────────────────────────────────
+//
+// The annotations defined in this file — `@native`, `@DartName`,
+// `@DartImport`, `@DartPackage`, `@DartPubspec`, `@DartTopLevel` — and
+// the `native.value` sentinel are the stable Sart API. Sart guarantees
+// they keep their current names, parameters, and semantics across
+// future patch and minor releases.
+//
+// Everything in `sart.compiler.*` is internal to the emitter and may
+// change without notice between minor versions. Integrators (e.g. sbt
+// plugins) depend on `sart.compiler.Main`'s CLI contract, not its
+// classes directly.
+// ────────────────────────────────────────────────────────────────────────
+
 // ─── @native: the core facade marker ───────────────────────────────────────
 //
 // The class + companion object must live together in the same compilation
@@ -62,3 +76,19 @@ final class DartPackage(
  *  manifests, build-flag stanzas.
  */
 final class DartPubspec(val yaml: String) extends StaticAnnotation
+
+/** Marks a Scala facade `object` whose methods correspond to Dart
+ *  **top-level** functions rather than methods on a class. The emitter
+ *  drops the Scala-side object qualifier at call sites, so
+ *  `math.sqrt(x)` in Scala becomes `sqrt(x)` in Dart (matching how
+ *  `dart:math` actually exports its API).
+ *
+ *  Typical use:
+ *  {{{
+ *  @native @DartImport("dart:math") @DartTopLevel
+ *  object math:
+ *    def sqrt(x: Double): Double = native.value
+ *    val pi: Double = native.value
+ *  }}}
+ */
+final class DartTopLevel extends StaticAnnotation

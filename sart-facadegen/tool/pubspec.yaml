@@ -1,0 +1,9 @@
+# Standalone Dart project for the facade-generator's helper. Invoked as a
+# subprocess by sart-facadegen's Scala CLI.
+name: sart_facadegen_tool
+description: Dart-side helper for Sart's facade generator.
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  analyzer: ^7.0.0

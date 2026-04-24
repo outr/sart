@@ -15,6 +15,8 @@ class TryExample:
     catch
       case _: Exception => fallback
 
+  def failing(): Int = throw new Exception("boom")
+
   def recoverBound(): String =
     try
       "ok"
