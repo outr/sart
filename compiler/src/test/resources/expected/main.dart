@@ -27,10 +27,11 @@ class Demo {
   String toString() =>
       'Demo(title: $title, subtitle: $subtitle, build: $build)';
 
-  Demo copyWith(
-          {String? title,
-          String? subtitle,
-          Widget Function(BuildContext)? build}) =>
+  Demo copyWith({
+    String? title,
+    String? subtitle,
+    Widget Function(BuildContext)? build,
+  }) =>
       Demo(title ?? this.title, subtitle ?? this.subtitle, build ?? this.build);
 }
 
@@ -45,11 +46,13 @@ class LauncherApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-        title: 'Sart Showcase',
-        theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-            useMaterial3: true),
-        home: LauncherHome());
+      title: 'Sart Showcase',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
+      home: LauncherHome(),
+    );
   }
 }
 
@@ -61,26 +64,29 @@ class LauncherHome extends StatelessWidget {
     Demo('Todos', 'TextField + list + state', (ctx) => TodoApp()),
     Demo('Dice', 'Random + history + Navigator', (ctx) => DiceApp()),
     Demo('Stopwatch', 'Timer.periodic', (ctx) => ClockApp()),
-    Demo('Two-screen', 'Navigator.push demo', (ctx) => HomeScreen())
+    Demo('Two-screen', 'Navigator.push demo', (ctx) => HomeScreen()),
   ];
 
   /// Source: example/src/main/scala/example/LauncherApp.scala:40
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
-            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-            title: Text('Sart Demos')),
-        body: ListView.builder(
-            itemCount: demos.length,
-            itemBuilder: (ctx, i) => ListTile(
-                leading: Icon(Icons.menu),
-                title: Text(demos[i].title),
-                subtitle: Text(demos[i].subtitle),
-                onTap: () {
-                  Navigator.of(ctx)
-                      .push(MaterialPageRoute(builder: demos[i].build));
-                })));
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Text('Sart Demos'),
+      ),
+      body: ListView.builder(
+        itemCount: demos.length,
+        itemBuilder: (ctx, i) => ListTile(
+          leading: Icon(Icons.menu),
+          title: Text(demos[i].title),
+          subtitle: Text(demos[i].subtitle),
+          onTap: () {
+            Navigator.of(ctx).push(MaterialPageRoute(builder: demos[i].build));
+          },
+        ),
+      ),
+    );
   }
 }
 
@@ -90,11 +96,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-        title: 'Flutter Demo',
-        theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-            useMaterial3: true),
-        home: MyHomePage('Flutter Demo Home Page'));
+      title: 'Flutter Demo',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
+      home: MyHomePage('Flutter Demo Home Page'),
+    );
   }
 }
 
@@ -125,19 +133,25 @@ class MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
-            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-            title: Text(widget.title)),
-        body: Center(
-            child:
-                Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text('You have pushed the button this many times:'),
-          Text('$counter', style: Theme.of(context).textTheme.headlineMedium)
-        ])),
-        floatingActionButton: FloatingActionButton(
-            onPressed: () => incrementCounter(),
-            tooltip: 'Increment',
-            child: Icon(Icons.add)));
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Text(widget.title),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('You have pushed the button this many times:'),
+            Text('$counter', style: Theme.of(context).textTheme.headlineMedium),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => incrementCounter(),
+        tooltip: 'Increment',
+        child: Icon(Icons.add),
+      ),
+    );
   }
 }
 
@@ -177,10 +191,11 @@ class ClockAppState extends State<ClockApp> {
   void start() {
     setState(() {
       timer = Timer.periodic(
-          Duration(seconds: 1),
-          (t) => setState(() {
-                seconds = seconds + 1;
-              }));
+        Duration(seconds: 1),
+        (t) => setState(() {
+          seconds = seconds + 1;
+        }),
+      );
     });
   }
 
@@ -203,17 +218,24 @@ class ClockAppState extends State<ClockApp> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: Text('Stopwatch')),
-        body: Center(
-            child:
-                Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text('Elapsed: ' + seconds.toString() + 's'),
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            ElevatedButton(onPressed: () => start(), child: Text('Start')),
-            ElevatedButton(onPressed: () => stop(), child: Text('Stop')),
-            ElevatedButton(onPressed: () => reset(), child: Text('Reset'))
-          ])
-        ])));
+      appBar: AppBar(title: Text('Stopwatch')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Elapsed: ' + seconds.toString() + 's'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton(onPressed: () => start(), child: Text('Start')),
+                ElevatedButton(onPressed: () => stop(), child: Text('Stop')),
+                ElevatedButton(onPressed: () => reset(), child: Text('Reset')),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -244,8 +266,9 @@ class DetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: Text('Detail')),
-        body: Center(child: Text('You made it!')));
+      appBar: AppBar(title: Text('Detail')),
+      body: Center(child: Text('You made it!')),
+    );
   }
 }
 
@@ -265,8 +288,10 @@ class DiceAppState extends State<DiceApp> {
 
   /// Source: example/src/main/scala/example/apps/DiceApp.scala:33
   void roll() {
-    setState(() =>
-        history = [...history, Roll(rng.nextInt(6) + 1, history.length + 1)]);
+    setState(
+      () =>
+          history = [...history, Roll(rng.nextInt(6) + 1, history.length + 1)],
+    );
   }
 
   /// Source: example/src/main/scala/example/apps/DiceApp.scala:39
@@ -290,35 +315,48 @@ class DiceAppState extends State<DiceApp> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
-            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-            title: Text('Dice')),
-        body: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Text('Dice'),
+      ),
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
           Center(
-              child: Container(
-                  width: 120.0,
-                  height: 120.0,
-                  decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16.0),
-                      boxShadow: [
-                        BoxShadow(color: Colors.grey, blurRadius: 8.0)
-                      ]),
-                  child: Center(child: Text(faceLabel(latestRoll))))),
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            ElevatedButton(onPressed: () => roll(), child: Text('Roll')),
-            ElevatedButton(
-                onPressed: () => clearHistory(), child: Text('Clear'))
-          ]),
-          Text('Rolled ' + history.length.toString() + ' times')
-        ]),
-        floatingActionButton: FloatingActionButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                  MaterialPageRoute(builder: (ctx) => HistoryScreen(history)));
-            },
-            tooltip: 'History',
-            child: Icon(Icons.menu)));
+            child: Container(
+              width: 120.0,
+              height: 120.0,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16.0),
+                boxShadow: [BoxShadow(color: Colors.grey, blurRadius: 8.0)],
+              ),
+              child: Center(child: Text(faceLabel(latestRoll))),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton(onPressed: () => roll(), child: Text('Roll')),
+              ElevatedButton(
+                onPressed: () => clearHistory(),
+                child: Text('Clear'),
+              ),
+            ],
+          ),
+          Text('Rolled ' + history.length.toString() + ' times'),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (ctx) => HistoryScreen(history)));
+        },
+        tooltip: 'History',
+        child: Icon(Icons.menu),
+      ),
+    );
   }
 }
 
@@ -331,13 +369,16 @@ class HistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: Text('History')),
-        body: ListView.builder(
-            itemCount: history.length,
-            itemBuilder: (ctx, i) => ListTile(
-                leading: Icon(Icons.check),
-                title: Text('Roll #' + history[i].index.toString()),
-                trailing: Text(history[i].face.toString()))));
+      appBar: AppBar(title: Text('History')),
+      body: ListView.builder(
+        itemCount: history.length,
+        itemBuilder: (ctx, i) => ListTile(
+          leading: Icon(Icons.check),
+          title: Text('Roll #' + history[i].index.toString()),
+          trailing: Text(history[i].face.toString()),
+        ),
+      ),
+    );
   }
 }
 
@@ -347,14 +388,18 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: Text('Home')),
-        body: Center(
-            child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                      MaterialPageRoute(builder: (ctx) => DetailScreen()));
-                },
-                child: Text('Go to detail'))));
+      appBar: AppBar(title: Text('Home')),
+      body: Center(
+        child: ElevatedButton(
+          onPressed: () {
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (ctx) => DetailScreen()));
+          },
+          child: Text('Go to detail'),
+        ),
+      ),
+    );
   }
 }
 
@@ -417,7 +462,7 @@ class ShowcaseAppState extends State<ShowcaseApp> {
   final List<Contact> contacts = [
     Contact('Ada', '+44 20 1234 5678'),
     Contact('Grace', '+1 212 555 0100'),
-    Contact('Alan', '+44 20 7946 0018')
+    Contact('Alan', '+44 20 7946 0018'),
   ];
   final List<ShapeKind> shapes = [CircleK(3.0), SquareK(4.0), RectK(3.0, 5.0)];
   int counter = 0;
@@ -441,7 +486,7 @@ class ShowcaseAppState extends State<ShowcaseApp> {
     return switch (s) {
       CircleK(radius: var r) => (3.14159 * r) * r,
       SquareK(side: var a) => a * a,
-      RectK(w: var w, h: var h) => w * h
+      RectK(w: var w, h: var h) => w * h,
     };
   }
 
@@ -451,18 +496,22 @@ class ShowcaseAppState extends State<ShowcaseApp> {
       CircleK(radius: var r) => 'Circle(r=' + r.toString() + ')',
       SquareK(side: var a) => 'Square(side=' + a.toString() + ')',
       RectK(w: var w, h: var h) =>
-        'Rect(' + w.toString() + 'x' + h.toString() + ')'
+        'Rect(' + w.toString() + 'x' + h.toString() + ')',
     };
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:67
   void runLookup(String query) {
-    setState(() => lookupResult =
-        (contacts.where((c) => c.name == query).toList().isEmpty
-                ? null
-                : contacts.where((c) => c.name == query).toList().first)
-            .fold('no match for \'' + query.toString() + '\'',
-                (c) => c.name.toString() + ' → ' + c.phone.toString()));
+    setState(
+      () => lookupResult =
+          (contacts.where((c) => c.name == query).toList().isEmpty
+                  ? null
+                  : contacts.where((c) => c.name == query).toList().first)
+              .fold(
+                'no match for \'' + query.toString() + '\'',
+                (c) => c.name.toString() + ' → ' + c.phone.toString(),
+              ),
+    );
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:75
@@ -485,7 +534,7 @@ class ShowcaseAppState extends State<ShowcaseApp> {
       divideResult = switch (tryDivide(divisor)) {
         Success<double>(value: var n) =>
           '100 / ' + divisor.toString() + ' = ' + n.toString(),
-        Failure<double>(error: _) => 'failed on divisor ' + divisor.toString()
+        Failure<double>(error: _) => 'failed on divisor ' + divisor.toString(),
       };
       divisor = (divisor + 1) % 4;
     });
@@ -502,149 +551,203 @@ class ShowcaseAppState extends State<ShowcaseApp> {
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:97
   Widget section(String title, Widget body) {
     return Card(
-        child: Padding(
-            padding: EdgeInsets.all(12.0),
-            child:
-                Column(mainAxisAlignment: MainAxisAlignment.start, children: [
-              Text(title, style: Theme.of(context).textTheme.titleMedium),
-              SizedBox(height: 8.0),
-              body
-            ])));
+      child: Padding(
+        padding: EdgeInsets.all(12.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            SizedBox(height: 8.0),
+            body,
+          ],
+        ),
+      ),
+    );
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:112
   Widget get counterCard {
     return section(
-        'setState counter',
-        Row(mainAxisAlignment: MainAxisAlignment.start, children: [
+      'setState counter',
+      Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
           Text('value: ' + counter.toString()),
           SizedBox(width: 12.0),
           ElevatedButton(
-              onPressed: () => setState(() {
-                    counter = counter + 1;
-                  }),
-              child: Text('+')),
+            onPressed: () => setState(() {
+              counter = counter + 1;
+            }),
+            child: Text('+'),
+          ),
           SizedBox(width: 8.0),
           ElevatedButton(
-              onPressed: () => setState(() {
-                    counter = counter - 1;
-                  }),
-              child: Text('-'))
-        ]));
+            onPressed: () => setState(() {
+              counter = counter - 1;
+            }),
+            child: Text('-'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:133
   Widget get diceCard {
     return section(
-        'Random + unicode',
-        Row(mainAxisAlignment: MainAxisAlignment.start, children: [
+      'Random + unicode',
+      Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
           Text(faceGlyph(face).toString() + '  (' + face.toString() + ')'),
           SizedBox(width: 12.0),
           ElevatedButton(
-              onPressed: () => setState(() {
-                    face = rng.nextInt(6) + 1;
-                  }),
-              child: Text('Roll'))
-        ]));
+            onPressed: () => setState(() {
+              face = rng.nextInt(6) + 1;
+            }),
+            child: Text('Roll'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:149
   Widget get shapeCard {
     return section(
-        'Sealed trait + match',
-        Column(mainAxisAlignment: MainAxisAlignment.start, children: [
-          Text(shapeLabel(shapes[shapeIdx]).toString() +
-              '  area = ' +
-              area(shapes[shapeIdx]).toString()),
+      'Sealed trait + match',
+      Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Text(
+            shapeLabel(shapes[shapeIdx]).toString() +
+                '  area = ' +
+                area(shapes[shapeIdx]).toString(),
+          ),
           SizedBox(height: 6.0),
           ElevatedButton(
-              onPressed: () => setState(() {
-                    shapeIdx = (shapeIdx + 1) % shapes.length;
-                  }),
-              child: Text('Next shape'))
-        ]));
+            onPressed: () => setState(() {
+              shapeIdx = (shapeIdx + 1) % shapes.length;
+            }),
+            child: Text('Next shape'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:168
   Widget get lookupCard {
     return section(
-        'Option via List.filter.headOption',
-        Column(mainAxisAlignment: MainAxisAlignment.start, children: [
+      'Option via List.filter.headOption',
+      Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
           TextField(
-              controller: lookupCtrl,
-              decoration:
-                  InputDecoration(labelText: 'name (try Ada, Grace, Alan)'),
-              onChanged: (s) => runLookup(s)),
+            controller: lookupCtrl,
+            decoration: InputDecoration(
+              labelText: 'name (try Ada, Grace, Alan)',
+            ),
+            onChanged: (s) => runLookup(s),
+          ),
           SizedBox(height: 6.0),
-          Text(lookupResult)
-        ]));
+          Text(lookupResult),
+        ],
+      ),
+    );
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:187
   Widget get tryCard {
     return section(
-        'Try + throw + pattern match',
-        Column(mainAxisAlignment: MainAxisAlignment.start, children: [
+      'Try + throw + pattern match',
+      Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
           Text('next divisor: ' + divisor.toString()),
           SizedBox(height: 6.0),
           ElevatedButton(
-              onPressed: () => runDivide(),
-              child: Text('Compute 100 / divisor')),
+            onPressed: () => runDivide(),
+            child: Text('Compute 100 / divisor'),
+          ),
           SizedBox(height: 6.0),
-          Text(divideResult)
-        ]));
+          Text(divideResult),
+        ],
+      ),
+    );
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:205
   Widget get tableCard {
     return section(
-        'for-comprehension (4×4 times-table)',
-        Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [1, 2, 3, 4]
-                .map((r) => Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [1, 2, 3, 4]
-                        .map((c) => SizedBox(
-                            width: 40.0, child: Text((r * c).toString())))
-                        .toList()))
-                .toList()));
+      'for-comprehension (4×4 times-table)',
+      Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [1, 2, 3, 4]
+            .map(
+              (r) => Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [1, 2, 3, 4]
+                    .map(
+                      (c) => SizedBox(
+                        width: 40.0,
+                        child: Text((r * c).toString()),
+                      ),
+                    )
+                    .toList(),
+              ),
+            )
+            .toList(),
+      ),
+    );
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:220
   Widget get emailCard {
     return section(
-        'Regex email validator',
-        Column(mainAxisAlignment: MainAxisAlignment.start, children: [
+      'Regex email validator',
+      Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
           TextField(
-              controller: emailCtrl,
-              decoration: InputDecoration(labelText: 'email'),
-              onChanged: (s) => runEmail(s)),
+            controller: emailCtrl,
+            decoration: InputDecoration(labelText: 'email'),
+            onChanged: (s) => runEmail(s),
+          ),
           SizedBox(height: 6.0),
-          Text(!emailTyped
-              ? '— type something —'
-              : emailValid
-                  ? '✓ looks like an email'
-                  : '✗ not a valid email')
-        ]));
+          Text(
+            !emailTyped
+                ? '— type something —'
+                : emailValid
+                ? '✓ looks like an email'
+                : '✗ not a valid email',
+          ),
+        ],
+      ),
+    );
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:241
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
-            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-            title: Text('Showcase')),
-        body: ListView(padding: EdgeInsets.all(8.0), children: [
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Text('Showcase'),
+      ),
+      body: ListView(
+        padding: EdgeInsets.all(8.0),
+        children: [
           counterCard,
           diceCard,
           shapeCard,
           lookupCard,
           tryCard,
           tableCard,
-          emailCard
-        ]));
+          emailCard,
+        ],
+      ),
+    );
   }
 }
 
@@ -704,7 +807,7 @@ class TodoAppState extends State<TodoApp> {
     return [
       ...todos.sublist(0, i),
       TodoItem('done', true),
-      ...todos.sublist(i + 1)
+      ...todos.sublist(i + 1),
     ];
   }
 
@@ -712,26 +815,43 @@ class TodoAppState extends State<TodoApp> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: Text('Todos')),
-        body: Column(mainAxisAlignment: MainAxisAlignment.start, children: [
+      appBar: AppBar(title: Text('Todos')),
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
           Padding(
-              padding: EdgeInsets.all(8.0),
-              child: TextField(
-                  controller: controller,
-                  decoration: InputDecoration(labelText: 'What needs doing?'))),
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            ElevatedButton(onPressed: () => addTodoItem(), child: Text('Add')),
-            SizedBox(width: 8.0),
-            ElevatedButton(
-                onPressed: () => clearAll(), child: Text('Clear all'))
-          ]),
+            padding: EdgeInsets.all(8.0),
+            child: TextField(
+              controller: controller,
+              decoration: InputDecoration(labelText: 'What needs doing?'),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton(
+                onPressed: () => addTodoItem(),
+                child: Text('Add'),
+              ),
+              SizedBox(width: 8.0),
+              ElevatedButton(
+                onPressed: () => clearAll(),
+                child: Text('Clear all'),
+              ),
+            ],
+          ),
           Expanded(
-              child: ListView.builder(
-                  itemCount: todos.length,
-                  itemBuilder: (ctx, i) => ListTile(
-                      leading: Icon(todos[i].done ? Icons.check : Icons.edit),
-                      title: Text(todos[i].text))))
-        ]));
+            child: ListView.builder(
+              itemCount: todos.length,
+              itemBuilder: (ctx, i) => ListTile(
+                leading: Icon(todos[i].done ? Icons.check : Icons.edit),
+                title: Text(todos[i].text),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -761,14 +881,17 @@ class AsyncBuildersExample {
   /// Source: example/src/main/scala/example/features/AsyncBuilders.scala:10
   Widget futureWidget(Future<String> f) {
     return FutureBuilder(
-        future: f, builder: (ctx, snap) => Text((snap.data ?? 'loading…')));
+      future: f,
+      builder: (ctx, snap) => Text((snap.data ?? 'loading…')),
+    );
   }
 
   /// Source: example/src/main/scala/example/features/AsyncBuilders.scala:17
   Widget streamWidget(Stream<int> s) {
     return StreamBuilder(
-        stream: s,
-        builder: (ctx, snap) => Text(snap.data.fold('-', (n) => n.toString())));
+      stream: s,
+      builder: (ctx, snap) => Text(snap.data.fold('-', (n) => n.toString())),
+    );
   }
 
   /// Source: example/src/main/scala/example/features/AsyncBuilders.scala:24
@@ -847,7 +970,7 @@ class CtorPatternsExample {
       Vec(x: 0, y: 0) => 'origin',
       Vec(x: 0, y: _) => 'on y-axis',
       Vec(x: _, y: 0) => 'on x-axis',
-      Vec(x: var a, y: var b) => '(' + a.toString() + ', ' + b.toString() + ')'
+      Vec(x: var a, y: var b) => '(' + a.toString() + ', ' + b.toString() + ')',
     };
   }
 
@@ -855,7 +978,7 @@ class CtorPatternsExample {
   int recover(Try<int> t) {
     return switch (t) {
       Success<int>(value: var v) => v,
-      Failure<int>(error: _) => -1
+      Failure<int>(error: _) => -1,
     };
   }
 
@@ -863,7 +986,7 @@ class CtorPatternsExample {
   String eitherToString(Either<String, int> e) {
     return switch (e) {
       Left<String, int>(value: var err) => 'err: ' + err,
-      Right<String, int>(value: var v) => 'ok: ' + v.toString()
+      Right<String, int>(value: var v) => 'ok: ' + v.toString(),
     };
   }
 }
@@ -892,16 +1015,21 @@ class DecorationsExample extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-        width: 200.0,
-        height: 120.0,
-        decoration: BoxDecoration(
-            color: Color.fromARGB(255, 200, 230, 255),
-            borderRadius: BorderRadius.circular(12.0),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.grey, offset: Offset(0.0, 4.0), blurRadius: 8.0)
-            ]),
-        child: Center(child: Text('Hello, styled world')));
+      width: 200.0,
+      height: 120.0,
+      decoration: BoxDecoration(
+        color: Color.fromARGB(255, 200, 230, 255),
+        borderRadius: BorderRadius.circular(12.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey,
+            offset: Offset(0.0, 4.0),
+            blurRadius: 8.0,
+          ),
+        ],
+      ),
+      child: Center(child: Text('Hello, styled world')),
+    );
   }
 }
 
@@ -925,7 +1053,9 @@ class EitherExampleSart {
   /// Source: example/src/main/scala/example/features/TryEither.scala:25
   String extract(Either<String, int> e) {
     return e.fold(
-        (err) => 'error: ' + err.toString(), (n) => 'ok: ' + n.toString());
+      (err) => 'error: ' + err.toString(),
+      (n) => 'ok: ' + n.toString(),
+    );
   }
 }
 
@@ -1099,17 +1229,21 @@ class LayoutFacadesExample extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-        elevation: 2.0,
-        child: Stack(children: [
+      elevation: 2.0,
+      child: Stack(
+        children: [
           Image.network('https://flutter.dev/assets/logo.png'),
           Positioned(
-              child: Align(
-                  alignment: Alignment.bottomLeft,
-                  child: GestureDetector(
-                      onTap: () => null, child: Text('tap me'))),
-              left: 16.0,
-              bottom: 16.0)
-        ]));
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: GestureDetector(onTap: () => null, child: Text('tap me')),
+            ),
+            left: 16.0,
+            bottom: 16.0,
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1269,7 +1403,11 @@ class Pair<A, B> {
 class PatternMatchExample {
   /// Source: example/src/main/scala/example/features/PatternMatching.scala:6
   String label(int n) {
-    return switch (n) { 0 => 'zero', 1 => 'one', _ => 'other' };
+    return switch (n) {
+      0 => 'zero',
+      1 => 'one',
+      _ => 'other',
+    };
   }
 
   /// Source: example/src/main/scala/example/features/PatternMatching.scala:12
@@ -1277,7 +1415,7 @@ class PatternMatchExample {
     return switch (f) {
       Filter.All => 'all',
       Filter.Active => 'active',
-      Filter.Completed => 'completed'
+      Filter.Completed => 'completed',
     };
   }
 
@@ -1286,13 +1424,17 @@ class PatternMatchExample {
     return switch (n) {
       var x when x > 0 => 'positive',
       0 => 'zero',
-      _ => 'negative'
+      _ => 'negative',
     };
   }
 
   /// Source: example/src/main/scala/example/features/PatternMatching.scala:24
   String typeClassify(Object x) {
-    return switch (x) { String _ => 'string', int _ => 'int', _ => 'other' };
+    return switch (x) {
+      String _ => 'string',
+      int _ => 'int',
+      _ => 'other',
+    };
   }
 }
 

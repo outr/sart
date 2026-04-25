@@ -146,6 +146,10 @@ lazy val root = (project in file("."))
         // Run `dart format` on the emitted lib/ so the output is
         // idiomatic multi-line Dart instead of a wall of inline calls.
         // Non-fatal if the toolchain isn't available — we only log.
+        // Language version is discovered from the stub
+        // `.dart_tool/package_config.json` the emitter writes alongside
+        // pubspec.yaml, so formatting is reproducible regardless of
+        // whether `flutter pub get` has run.
         val libDir = outDir / "lib"
         if (libDir.exists()) {
           try {

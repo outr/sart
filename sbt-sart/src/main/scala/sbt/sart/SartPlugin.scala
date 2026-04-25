@@ -158,6 +158,10 @@ object SartPlugin extends AutoPlugin {
       if (rc != 0) sys.error(s"sart.compiler.Main exited $rc")
 
       // Run dart format on the lib/ dir if dart is available. Non-fatal.
+      // Language version is discovered from the stub
+      // `.dart_tool/package_config.json` the emitter writes alongside
+      // pubspec.yaml, so output is identical regardless of whether
+      // `flutter pub get` has run.
       val libDir = outDir / "lib"
       if (libDir.exists()) {
         try {
