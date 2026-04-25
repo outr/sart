@@ -1669,6 +1669,35 @@ class DartEmitter(
       // `xs.count(p)` → `xs.where(p).length`.
       listCall("count")(c => s"${c.qualExpr}.where(${c.args}).length"),
 
+      // ── List/Iterable: structural ops ──────────────────────────────
+      // `xss.flatten` → `xss.expand((x) => x).toList()`.
+      // TASTy preserves the `implicit ev: A => IterableOnce[B]` as an
+      // explicit arg, so cover both the getter and method shapes; the
+      // method form ignores args entirely.
+      listGetExpr("flatten")(q => s"$q.expand((x) => x).toList()"),
+      listCall("flatten")(c => s"${c.qualExpr}.expand((x) => x).toList()"),
+      // `xs.distinct` — go through Set to dedupe; Dart's Set preserves
+      // insertion order, matching Scala's `distinct` semantics.
+      listGetExpr("distinct")(q => s"$q.toSet().toList()"),
+      // `xs.sorted` — Dart's `sort()` mutates in place; cascade syntax
+      // returns the materialised receiver. The Scala variant takes an
+      // implicit Ordering; we ignore it and rely on Dart's Comparable.
+      // Caught here as a getter-style entry; fall-through table also
+      // covers the `Apply(Select, List(implicitOrd))` shape if TASTy
+      // preserves the implicit as an explicit arg.
+      listGetExpr("sorted")(q => s"($q.toList()..sort())"),
+      listCall("sorted")(c => s"(${c.qualExpr}.toList()..sort())"),
+      // `xs.sortBy(f)` — sort by extracted key. `f` may get called twice
+      // per comparison; acceptable for MVP. Implicit Ordering ignored.
+      listCall("sortBy")(c =>
+        s"(${c.qualExpr}.toList()..sort((a, b) => Comparable.compare(" +
+        s"(${c.argList(0)})(a) as Comparable, (${c.argList(0)})(b) as Comparable)))"),
+      // `xs.foldRight(z)(op)` — reverse the list, then foldLeft with
+      // swapped lambda args (`op` expects `(A, B)`, Dart's fold passes
+      // `(acc, elem)`).
+      listCall("foldRight")(c =>
+        s"${c.qualExpr}.reversed.fold(${c.argList(0)}, (acc, a) => (${c.argList(1)})(a, acc))"),
+
       // ── String ─────────────────────────────────────────────────────
       // All three are parameterless Scala `def`s (callable without
       // parens), so they reach `emitMemberAccess` — `isGetter = true`.

@@ -71,3 +71,10 @@ class FxStringOps:
   def parseInt(s: String): Int       = s.toInt
   def parseDouble(s: String): Double = s.toDouble
   def stripped(s: String): String    = s.stripMargin
+
+class FxListStructural:
+  def flat(xss: List[List[Int]]): List[Int] = xss.flatten
+  def uniq(xs: List[Int]): List[Int]        = xs.distinct
+  def asc(xs: List[Int]): List[Int]         = xs.sorted
+  def byLen(xs: List[String]): List[String] = xs.sortBy(_.length)
+  def rfold(xs: List[Int], z: Int): Int     = xs.foldRight(z)((a, acc) => a - acc)

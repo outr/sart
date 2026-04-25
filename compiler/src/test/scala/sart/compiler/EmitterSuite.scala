@@ -222,6 +222,35 @@ class EmitterSuite extends FunSuite:
     assert(body.contains("RegExp(") && body.contains("multiLine: true"), body)
   }
 
+  test("List.flatten polyfills via expand((x) => x)") {
+    val body = classBody("FxListStructural")
+    assert(body.contains("xss.expand((x) => x).toList()"), body)
+  }
+
+  test("List.distinct goes through Set to dedupe") {
+    val body = classBody("FxListStructural")
+    assert(body.contains("xs.toSet().toList()"), body)
+  }
+
+  test("List.sorted uses Dart's cascade-mutate-and-return idiom") {
+    val body = classBody("FxListStructural")
+    assert(body.contains("..sort()"), body)
+  }
+
+  test("List.sortBy passes a key extractor through Comparable.compare") {
+    val body = classBody("FxListStructural")
+    assert(body.contains("Comparable.compare"), body)
+    assert(body.contains("..sort("),            body)
+  }
+
+  test("List.foldRight reverses and swaps lambda arg order") {
+    val body = classBody("FxListStructural")
+    assert(body.contains("xs.reversed.fold("), body)
+    // Args swapped: Scala op(a, acc) → Dart fold passes (acc, a),
+    // so the wrapping lambda calls userOp(a, acc).
+    assert(body.contains("(a, acc)"), body)
+  }
+
   test("strict-mode invariant: no /* TODO */ markers in fixture emission") {
     // Catches regressions where a previously-handled tree shape starts
     // falling through to the unhandled-case branch.
