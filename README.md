@@ -154,7 +154,6 @@ the matching host OS to actually run `flutter build`.
 ## Not yet
 - Full scala3-library TASTy compile-through (the "Layer B" of Phase 2).
 - Maven Central publishing (artifacts available locally via `sartPublishLocalAll`).
-- Benchmark port of a real sample app.
 
 ## Design principles
 
