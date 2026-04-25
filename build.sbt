@@ -123,7 +123,16 @@ lazy val example = (project in file("example"))
 lazy val compiler = (project in file("compiler"))
   .settings(
     name := "sart-compiler",
-    libraryDependencies += "org.scala-lang" %% "scala3-tasty-inspector" % scalaVersion.value,
+    libraryDependencies ++= Seq(
+      "org.scala-lang" %% "scala3-tasty-inspector" % scalaVersion.value,
+      "org.scalameta" %% "munit" % "1.0.4" % Test
+    ),
+    // Test fixtures live under `src/test/scala/sart/compiler/fixtures/`.
+    // Retain trees so the inspector can read their TASTy.
+    Test / scalacOptions += "-Yretain-trees",
+    // Tests don't fork — the suite reads the inspector classpath via
+    // `java.class.path`, which only matches the JVM's own classpath.
+    Test / fork := false,
     fork := true
   )
 

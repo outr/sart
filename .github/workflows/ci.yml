@@ -25,7 +25,7 @@ jobs:
         with:
           flutter-version: '3.41.7'
           channel: stable
-      - run: sbt -Dsbt.color=false sartGoldenVerify
+      - run: sbt -Dsbt.color=false "compiler/test" sartGoldenVerify
 
   # Per-platform build matrix. Each job is the full chain
   #   compile → emit → scaffold → flutter build
