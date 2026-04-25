@@ -212,28 +212,12 @@ class DartEmitter(
     val pubspec = renderPubspec()
     Files.writeString(outDir.resolve("pubspec.yaml"), pubspec, StandardCharsets.UTF_8)
 
-    // Write a stub `.dart_tool/package_config.json` declaring the project's
-    // language version. `dart format` walks up from each source file looking
-    // for this file to discover the language version of the enclosing
-    // package; without it the formatter falls back to whatever default the
-    // installed Dart toolchain ships with, which differs across releases
-    // and breaks reproducibility on a fresh checkout. A real `pub get`
-    // would overwrite this with full dependency entries — that's fine,
-    // we just need the language version to be correct for the format step.
-    val pkgConfigDir = outDir.resolve(".dart_tool")
-    Files.createDirectories(pkgConfigDir)
-    Files.writeString(
-      pkgConfigDir.resolve("package_config.json"),
-      renderPackageConfig(),
-      StandardCharsets.UTF_8
-    )
-
   /** Lower-bound Dart SDK version the emitter targets. Single source of
-   *  truth: drives both the pubspec's `environment.sdk` constraint and the
-   *  language version stamped into `.dart_tool/package_config.json`.
-   *  Bump this to roll forward to a newer Dart language version. */
-  private val sdkFloor      = "3.11.0"
-  private def languageMinor: String = sdkFloor.split('.').take(2).mkString(".")
+   *  truth: drives the pubspec's `environment.sdk` constraint, and the
+   *  format step extracts the major.minor from the written pubspec to
+   *  pass as `dart format --language-version`. Bump this to roll forward
+   *  to a newer Dart language version. */
+  private val sdkFloor = "3.11.0"
 
   private def renderPubspec(): String =
     val b = new StringBuilder
@@ -260,21 +244,6 @@ class DartEmitter(
         b.append(normalized)
         if !normalized.endsWith("\n") then b.append('\n')
     b.toString
-
-  private def renderPackageConfig(): String =
-    s"""{
-       |  "configVersion": 2,
-       |  "packages": [
-       |    {
-       |      "name": "$projectName",
-       |      "rootUri": "../",
-       |      "packageUri": "lib/",
-       |      "languageVersion": "$languageMinor"
-       |    }
-       |  ],
-       |  "generator": "sart"
-       |}
-       |""".stripMargin
 
   /** Produce a canonical indentation for a `@DartPubspec` block so a
    *  sloppily-written annotation (`"""` with surrounding blank lines or

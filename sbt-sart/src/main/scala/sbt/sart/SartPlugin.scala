@@ -25,6 +25,20 @@ object SartPlugin extends AutoPlugin {
   override def requires: Plugins = JvmPlugin
   override def trigger: PluginTrigger = noTrigger
 
+  // Extract `--language-version=<major.minor>` from the SDK lower bound
+  // in the emitted pubspec, so `dart format` produces deterministic
+  // output regardless of which Dart version is on PATH or whether
+  // `pub get` has populated `.dart_tool/package_config.json`.
+  private[sart] def dartLanguageArgs(pubspec: File): Seq[String] = {
+    if (!pubspec.exists()) Seq.empty
+    else {
+      val sdkRe = """sdk:\s*['"]?>=(\d+\.\d+)""".r
+      sdkRe.findFirstMatchIn(IO.read(pubspec))
+        .map(m => Seq(s"--language-version=${m.group(1)}"))
+        .getOrElse(Seq.empty)
+    }
+  }
+
   // Hidden Ivy configurations that carry Sart's compile-time and facade
   // artifacts separately from the user's main classpath. Keeps the Sart
   // compiler off the user's compile/runtime path — it's only used by the
@@ -158,14 +172,14 @@ object SartPlugin extends AutoPlugin {
       if (rc != 0) sys.error(s"sart.compiler.Main exited $rc")
 
       // Run dart format on the lib/ dir if dart is available. Non-fatal.
-      // Language version is discovered from the stub
-      // `.dart_tool/package_config.json` the emitter writes alongside
-      // pubspec.yaml, so output is identical regardless of whether
-      // `flutter pub get` has run.
+      // Pin --language-version to the major.minor extracted from the
+      // emitted pubspec's SDK floor so output is identical regardless of
+      // whether `flutter pub get` has populated package_config.json.
       val libDir = outDir / "lib"
       if (libDir.exists()) {
         try {
-          sys.process.Process(Seq("dart", "format", libDir.getAbsolutePath)).!
+          val langArgs = SartPlugin.dartLanguageArgs(outDir / "pubspec.yaml")
+          sys.process.Process(Seq("dart", "format") ++ langArgs :+ libDir.getAbsolutePath).!
         } catch {
           case _: java.io.IOException =>
             log.warn("dart not on PATH; skipping auto-format")

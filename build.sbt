@@ -55,6 +55,22 @@ val sartMacOS         = taskKey[File]("Build a Flutter macOS bundle (requires a 
 val sartWindows       = taskKey[File]("Build a Flutter Windows bundle (requires a Windows host)")
 val sartIOS           = taskKey[File]("Build a Flutter iOS bundle — no-codesign (requires a macOS host + Xcode)")
 
+// Extract `--language-version=<major.minor>` from the SDK lower bound in
+// the emitted pubspec, so `dart format` produces deterministic output
+// regardless of which Dart version is on PATH or whether `pub get` has
+// populated `.dart_tool/package_config.json`. Returns an empty Seq if the
+// pubspec is missing or the floor can't be parsed (the format step then
+// falls back to the toolchain default — drift, but not a hard failure).
+def sartDartLanguageArgs(pubspec: File): Seq[String] = {
+  if (!pubspec.exists()) Seq.empty
+  else {
+    val sdkRe = """sdk:\s*['"]?>=(\d+\.\d+)""".r
+    sdkRe.findFirstMatchIn(IO.read(pubspec))
+      .map(m => Seq(s"--language-version=${m.group(1)}"))
+      .getOrElse(Seq.empty)
+  }
+}
+
 // The facade-support library: annotations + sentinel values that facades
 // depend on. Analogous to `scalajs-library` providing `@js.native`, etc.
 lazy val `sart-dart` = (project in file("sart-dart"))
@@ -146,14 +162,17 @@ lazy val root = (project in file("."))
         // Run `dart format` on the emitted lib/ so the output is
         // idiomatic multi-line Dart instead of a wall of inline calls.
         // Non-fatal if the toolchain isn't available — we only log.
-        // Language version is discovered from the stub
-        // `.dart_tool/package_config.json` the emitter writes alongside
-        // pubspec.yaml, so formatting is reproducible regardless of
-        // whether `flutter pub get` has run.
+        // Pin --language-version to the major.minor extracted from the
+        // emitted pubspec's SDK floor. This keeps formatter output
+        // reproducible regardless of whether `flutter pub get` has
+        // populated `.dart_tool/package_config.json`. The pubspec is
+        // the single source of truth — bump `sdkFloor` in DartEmitter
+        // and this picks it up automatically.
         val libDir = outDir / "lib"
         if (libDir.exists()) {
+          val langArgs = sartDartLanguageArgs(outDir / "pubspec.yaml")
           try {
-            val rc = sys.process.Process(Seq("dart", "format", libDir.getAbsolutePath)).!
+            val rc = sys.process.Process(Seq("dart", "format") ++ langArgs :+ libDir.getAbsolutePath).!
             if (rc != 0) log.warn(s"dart format exited $rc (emission succeeded)")
           } catch {
             case _: java.io.IOException =>
