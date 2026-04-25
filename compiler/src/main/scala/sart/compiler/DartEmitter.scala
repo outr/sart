@@ -1416,11 +1416,10 @@ class DartEmitter(
       case Assign(_, _)                                    => true
       case _                                               => false
 
-    /** No-argument member access (`Select(qual, name)`). Handles Scala→Dart
-     *  name renames for list-like receivers. The few with structural
-     *  differences (e.g. `xs.reverse` → `xs.reversed.toList()`,
-     *  `xs.headOption` → `xs.isEmpty ? null : xs.first`) get a direct
-     *  emit rather than going through a rename.
+    /** No-argument member access (`Select(qual, name)`). Consults the
+     *  `StdlibRewrite` table for getter-style mappings (e.g. `xs.size` →
+     *  `xs.length`, `xs.headOption` → `xs.isEmpty ? null : xs.first`),
+     *  falling back to a direct `qual.name` emission.
      */
     private def emitMemberAccess(qual: Term, name: String): String =
       // @DartTopLevel facade field / constant → drop the qualifier so
@@ -1434,25 +1433,14 @@ class DartEmitter(
       if dartMethodNamesNeedingParens(name) then
         return s"${selectPrefix(qual)}$name()"
 
-      val recvIsListLike = isListLikeReceiver(qual)
-      (recvIsListLike, name) match
-        case (true, "size")        => s"${selectPrefix(qual)}length"
-        case (true, "head")        => s"${selectPrefix(qual)}first"
-        case (true, "nonEmpty")    => s"${selectPrefix(qual)}isNotEmpty"
-        case (true, "reverse")     => s"${selectPrefix(qual)}reversed.toList()"
-        case (true, "headOption")  =>
-          val q = emitExpr(qual)
-          s"($q.isEmpty ? null : $q.first)"
-        case (true, "lastOption")  =>
-          val q = emitExpr(qual)
-          s"($q.isEmpty ? null : $q.last)"
-        case _                     => s"${selectPrefix(qual)}$name"
+      stdlibRewrite(qual, name, isGetter = true) match
+        case Some(rendered) => rendered
+        case None           => s"${selectPrefix(qual)}$name"
 
     /** Single place to render `qual.name(args…)` so Scala → Dart method
-     *  name mappings (e.g. Scala `withFilter` → Dart `where`) and
-     *  Iterable-to-List materialisation (`.toList()` after `map`/`where`/
-     *  `expand` on a List receiver) land consistently regardless of which
-     *  emitExpr entry point found the call.
+     *  name mappings land consistently regardless of which emitExpr entry
+     *  point found the call. Consults the `StdlibRewrite` table for
+     *  receiver-aware renames / polyfills.
      */
     private def emitMemberCall(qual: Term, name: String, args: List[Term]): String =
       // @DartTopLevel facade method → emit as a top-level Dart call
@@ -1469,38 +1457,110 @@ class DartEmitter(
       if args.isEmpty && dartGetterNames(name) then
         return emitMemberAccess(qual, name)
 
-      val recvIsListLike = isListLikeReceiver(qual)
-      val recvIsFuture   = isFutureReceiver(qual)
-      val recvIsMap      = isMapReceiver(qual)
-
       // Future.map/flatMap both map to Dart's `.then` — `.then` already
       // handles both the value-returning and Future-returning shapes via
       // its overloads, so we don't need the Scala distinction in Dart.
       // Drop the implicit ExecutionContext argument Scala inserts.
       val cleanedArgs =
-        if recvIsFuture then args.filterNot(isExecutionContextArg)
+        if isFutureReceiver(qual) then args.filterNot(isExecutionContextArg)
         else args
-
-      val mappedName = (recvIsListLike, recvIsFuture, recvIsMap, name) match
-        case (_, _, true, "contains")  => "containsKey"
-        case (true, _, _, "withFilter") => "where"
-        case (true, _, _, "filter")     => "where"
-        case (true, _, _, "flatMap")    => "expand"
-        case (true, _, _, "foldLeft")   => "fold"
-        case (true, _, _, "mkString")   => "join"
-        case (_, true, _, "map")        => "then"
-        case (_, true, _, "flatMap")    => "then"
-        case _                          => name
       val argStr = emitArgs(cleanedArgs)
-      val call   = s"${selectPrefix(qual)}$mappedName($argStr)"
-      // Scala's List.map/filter/flatMap return List; Dart's Iterable
-      // equivalents return Iterable. Force materialisation so the static
-      // type matches Scala's expectation. `fold`, `join` are terminal
-      // scalar returns — no `.toList()`.
-      if recvIsListLike && Set("map", "where", "expand").contains(mappedName) then
-        s"$call.toList()"
-      else
-        call
+
+      stdlibRewrite(qual, name, isGetter = false, argStr) match
+        case Some(rendered) => rendered
+        case None           => s"${selectPrefix(qual)}$name($argStr)"
+
+    /** Lookup helper: walks `stdlibRewrites`, returning the first matching
+     *  template's rendered output or `None`. Method-call entries receive
+     *  the pre-rendered `argStr`; getter-call entries are passed an empty
+     *  string (and only match when `isGetter` is true).
+     */
+    private def stdlibRewrite(
+      qual: Term, name: String, isGetter: Boolean, argStr: String = ""
+    ): Option[String] =
+      stdlibRewrites.find { e =>
+        e.scalaName == name && e.isGetter == isGetter && e.receiver(qual)
+      }.map { e =>
+        e.emit(RewriteCtx(prefix = selectPrefix(qual), qualExpr = emitExpr(qual), args = argStr))
+      }
+
+    /** A single Scala→Dart method-call rewrite. `prefix` is `qExpr.` (or
+     *  empty when `qual` is `this`) — preserves the existing call-site
+     *  elision behaviour. `qualExpr` is the bare expression for templates
+     *  that need to reference it twice (e.g. `(q.isEmpty ? null : q.first)`).
+     */
+    private case class RewriteCtx(prefix: String, qualExpr: String, args: String)
+
+    private case class StdlibRewrite(
+      receiver:  Term => Boolean,
+      scalaName: String,
+      isGetter:  Boolean,
+      emit:      RewriteCtx => String
+    )
+
+    // Convenience constructors keep the table dense and readable.
+    private def listGet(name: String, dartName: String) =
+      StdlibRewrite(isListLikeReceiver, name, isGetter = true, c => s"${c.prefix}$dartName")
+
+    private def listGetExpr(name: String)(template: String => String) =
+      StdlibRewrite(isListLikeReceiver, name, isGetter = true, c => template(c.qualExpr))
+
+    private def listCall(name: String)(template: RewriteCtx => String) =
+      StdlibRewrite(isListLikeReceiver, name, isGetter = false, template)
+
+    private def listRename(scalaName: String, dartName: String) =
+      listCall(scalaName)(c => s"${c.prefix}$dartName(${c.args})")
+
+    /** Scala→Dart method/getter mappings that depend on the receiver type.
+     *  The order is irrelevant (predicates are mutually exclusive across
+     *  types and `scalaName`+`isGetter` keys are unique within each type).
+     *  Adding a new mapping is a one-line addition here.
+     */
+    private val stdlibRewrites: Seq[StdlibRewrite] = Seq(
+      // ── List / Iterable getters ─────────────────────────────────────
+      listGet("size",     "length"),
+      listGet("head",     "first"),
+      listGet("nonEmpty", "isNotEmpty"),
+      // Templates that reference the qualifier multiple times.
+      listGetExpr("init")      (q => s"$q.sublist(0, $q.length - 1)"),
+      listGetExpr("tail")      (q => s"$q.sublist(1)"),
+      listGetExpr("reverse")   (q => s"$q.reversed.toList()"),
+      listGetExpr("headOption")(q => s"($q.isEmpty ? null : $q.first)"),
+      listGetExpr("lastOption")(q => s"($q.isEmpty ? null : $q.last)"),
+
+      // ── List / Iterable methods ─────────────────────────────────────
+      // Materialising chain ops — Scala returns List, Dart returns
+      // Iterable, so we force `.toList()` to keep the static type aligned.
+      listCall("map")       (c => s"${c.prefix}map(${c.args}).toList()"),
+      listCall("filter")    (c => s"${c.prefix}where(${c.args}).toList()"),
+      listCall("withFilter")(c => s"${c.prefix}where(${c.args}).toList()"),
+      listCall("flatMap")   (c => s"${c.prefix}expand(${c.args}).toList()"),
+      // Terminal scalars — no .toList() wrap.
+      listCall("foldLeft")  (c => s"${c.prefix}fold(${c.args})"),
+      listCall("mkString")  (c => s"${c.prefix}join(${c.args})"),
+      // Direct renames where Dart's name differs from Scala's.
+      listRename("drop",      "skip"),
+      listRename("dropWhile", "skipWhile"),
+      listRename("exists",    "any"),
+      listRename("forall",    "every"),
+      // Same-name passthroughs that exist on Dart's Iterable.
+      listRename("take",      "take"),
+      listRename("takeWhile", "takeWhile"),
+      listRename("contains",  "contains"),
+      listRename("indexOf",   "indexOf"),
+
+      // ── Map ────────────────────────────────────────────────────────
+      StdlibRewrite(isMapReceiver, "contains", isGetter = false,
+        c => s"${c.prefix}containsKey(${c.args})"),
+
+      // ── Future ─────────────────────────────────────────────────────
+      // `.map`/`.flatMap` collapse to Dart's overloaded `.then` — both
+      // value- and Future-returning callbacks resolve through it.
+      StdlibRewrite(isFutureReceiver, "map",     isGetter = false,
+        c => s"${c.prefix}then(${c.args})"),
+      StdlibRewrite(isFutureReceiver, "flatMap", isGetter = false,
+        c => s"${c.prefix}then(${c.args})")
+    )
 
     /** True when `t` has a Scala `List`-style static type — we rewrite its
      *  chain methods to their Dart Iterable equivalents and append
@@ -1510,7 +1570,7 @@ class DartEmitter(
      */
     private def isListLikeReceiver(t: Term): Boolean =
       val sym = t.tpe.typeSymbol
-      sym.exists && sym.fullName.startsWith("scala.collection.")
+      sym.exists && sym.fullName.startsWith("scala.collection.") && !isMapReceiver(t)
 
     /** True when `t`'s static type is `scala.concurrent.Future[...]`. */
     private def isFutureReceiver(t: Term): Boolean =

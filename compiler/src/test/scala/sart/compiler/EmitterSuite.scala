@@ -134,6 +134,32 @@ class EmitterSuite extends FunSuite:
     assert(body.contains(".toList"), body)
   }
 
+  test("List.take/drop/takeWhile/dropWhile map to Dart take/skip/takeWhile/skipWhile") {
+    val body = classBody("FxListOps")
+    assert(body.contains("xs.take(3)"),         body)
+    assert(body.contains("xs.skip(2)"),         body)
+    assert(body.contains("xs.takeWhile("),      body)
+    assert(body.contains("xs.skipWhile("),      body)
+  }
+
+  test("List.exists/forall map to Dart any/every") {
+    val body = classBody("FxListOps")
+    assert(body.contains("xs.any("),  body)
+    assert(body.contains("xs.every("), body)
+  }
+
+  test("List.contains and indexOf pass through to Dart same-named ops") {
+    val body = classBody("FxListOps")
+    assert(body.contains("xs.contains(0)"), body)
+    assert(body.contains("xs.indexOf(0)"),  body)
+  }
+
+  test("List.init and List.tail polyfill via sublist") {
+    val body = classBody("FxListOps")
+    assert(body.contains("xs.sublist(0, xs.length - 1)"), body)
+    assert(body.contains("xs.sublist(1)"),                body)
+  }
+
   test("strict-mode invariant: no /* TODO */ markers in fixture emission") {
     // Catches regressions where a previously-handled tree shape starts
     // falling through to the unhandled-case branch.

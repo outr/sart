@@ -31,3 +31,15 @@ class FxStringConcat:
 class FxForComp:
   def squares(xs: List[Int]): List[Int] =
     for x <- xs yield x * x
+
+class FxListOps:
+  def takeFew(xs: List[Int]): List[Int]      = xs.take(3)
+  def dropFew(xs: List[Int]): List[Int]      = xs.drop(2)
+  def takeWhilePos(xs: List[Int]): List[Int] = xs.takeWhile(_ > 0)
+  def dropWhilePos(xs: List[Int]): List[Int] = xs.dropWhile(_ > 0)
+  def hasOdd(xs: List[Int]): Boolean         = xs.exists(_ % 2 == 1)
+  def allPos(xs: List[Int]): Boolean         = xs.forall(_ > 0)
+  def hasZero(xs: List[Int]): Boolean        = xs.contains(0)
+  def firstZero(xs: List[Int]): Int          = xs.indexOf(0)
+  def initial(xs: List[Int]): List[Int]      = xs.init
+  def rest(xs: List[Int]): List[Int]         = xs.tail
