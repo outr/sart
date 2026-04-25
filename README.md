@@ -55,7 +55,14 @@ sbt sartMacOS    # emit + build a macOS bundle (macOS host)
 sbt sartWindows  # emit + build a Windows bundle (Windows host)
 sbt sartEmit     # just emit Dart into ./out
 sbt sartAnalyze  # emit + run flutter analyze with errors remapped to Scala sources
+sbt ~sartDev     # hot-reload dev loop: spawn flutter run once, hot-reload on each save
 ```
+
+`sartDev` wraps `flutter run` so a save in your Scala source triggers an
+emit + Flutter hot reload without leaving sbt. Defaults to the `linux`
+device; override with `-DsartDev.device=<id>` (e.g. `chrome`, `macos`,
+`windows`, or any id from `flutter devices`). Press Ctrl-C in the sbt
+shell to quit; a JVM shutdown hook sends `q` to flutter and waits.
 
 Regression gates:
 
@@ -146,7 +153,6 @@ the matching host OS to actually run `flutter build`.
 
 ## Not yet
 - Full scala3-library TASTy compile-through (the "Layer B" of Phase 2).
-- Hot-reload integration with `flutter attach`.
 - Maven Central publishing (artifacts available locally via `sartPublishLocalAll`).
 - Benchmark port of a real sample app.
 

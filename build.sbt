@@ -54,6 +54,8 @@ val sartAndroid       = taskKey[File]("Build a Flutter Android debug APK from th
 val sartMacOS         = taskKey[File]("Build a Flutter macOS bundle (requires a macOS host)")
 val sartWindows       = taskKey[File]("Build a Flutter Windows bundle (requires a Windows host)")
 val sartIOS           = taskKey[File]("Build a Flutter iOS bundle — no-codesign (requires a macOS host + Xcode)")
+val sartDev           = taskKey[Unit]("Hot-reload dev loop: spawn `flutter run` once, then signal hot reload on each subsequent invocation. Use as `sbt ~sartDev`.")
+val sartDevDevice     = settingKey[String]("Flutter device id for `sartDev`. Defaults to \"linux\"; override with -DsartDev.device=<id> or in build.")
 
 // Extract `--language-version=<major.minor>` from the SDK lower bound in
 // the emitted pubspec, so `dart format` produces deterministic output
@@ -78,6 +80,7 @@ def sartDartLanguageArgs(pubspec: File): Seq[String] = {
 val isWindows: Boolean = sys.props.get("os.name").exists(_.toLowerCase.contains("windows"))
 def sartFlutterCmd: String = if (isWindows) "flutter.bat" else "flutter"
 def sartDartCmd:    String = if (isWindows) "dart.bat"    else "dart"
+
 
 // The facade-support library: annotations + sentinel values that facades
 // depend on. Analogous to `scalajs-library` providing `@js.native`, etc.
@@ -375,14 +378,47 @@ lazy val root = (project in file("."))
     },
 
     // `sartWatch` is deliberately trivial — the actual watch mode is sbt's
-    // own `~` prefix (`sbt ~sartEmit`). This task exists so `sbt sartWatch`
-    // prints the usage hint; everyone types `sartWatch` first.
+    // own `~` prefix. Points at `sartDev` (full hot-reload integration)
+    // for the common case, and `~sartEmit` for the build-only flow.
     sartWatch := {
       streams.value.log.info(
-        "sart: use `sbt ~sartEmit` for watch mode. " +
-          "In another terminal, run `flutter run -d linux` against out/ and " +
-          "press `r` to hot-reload each time sartEmit completes."
+        "sart: for hot-reload dev, use `sbt ~sartDev` (spawns flutter once, " +
+          "hot-reloads on every save). For build-only watch, `sbt ~sartEmit`."
       )
+    },
+
+    sartDevDevice := sys.props.getOrElse("sartDev.device", "linux"),
+
+    // Hot-reload dev loop. Designed to be driven by `sbt ~sartDev`:
+    //   - First iteration: emit Dart, scaffold the platform, spawn
+    //     `flutter run -d <device>` in `out/` (output inherits the sbt
+    //     console so user sees Flutter's logs).
+    //   - Subsequent iterations (each time `~` re-triggers on a source
+    //     change): re-emit Dart, then write `r\n` to the still-running
+    //     flutter process's stdin to trigger hot reload.
+    //   - On sbt exit: a JVM shutdown hook sends `q\n` and waits.
+    //
+    // Override the device with `-DsartDev.device=<id>` (e.g. `chrome`,
+    // `web-server`, `macos`, `windows`, `android`, or a device id from
+    // `flutter devices`). Defaults to `linux`.
+    sartDev := {
+      val log    = streams.value.log
+      sartEmit.value
+      val outDir = baseDirectory.value / "out"
+      val device = sartDevDevice.value
+
+      if (FlutterDevSession.isRunning) {
+        FlutterDevSession.reload()
+        log.info(s"sart: sent hot reload to flutter (-d $device)")
+      } else {
+        // First iteration — make sure the platform is scaffolded so
+        // `flutter run` doesn't die on a missing target dir.
+        scaffoldPlatform(device, outDir, log)
+        val cmd = Seq(sartFlutterCmd, "run", "-d", device, "--suppress-analytics")
+        log.info(s"sart: launching ${cmd.mkString(" ")} in $outDir")
+        val p = FlutterDevSession.start(cmd, outDir)
+        log.info(s"sart: flutter PID ${p.pid()} — leave `~sartDev` running and edit your Scala")
+      }
     },
 
     // Single-command bootstrap: publish the 4 core modules plus the
