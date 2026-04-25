@@ -1332,7 +1332,12 @@ class DartEmitter(
     )
 
     /** Names that are **methods** on common Dart types. Scala syntax
-     *  often drops the parens for these; Dart requires them.
+     *  often drops the parens for these; Dart requires them. Note that
+     *  receiver type matters: `int.toDouble()` is a real Dart method,
+     *  but `String.toInt`/`toDouble` need a wholly different translation
+     *  (Dart's `String` has no `toInt` — use `int.parse(s)`). The
+     *  rewrite table runs *before* this set in `emitMemberAccess`, so
+     *  receiver-aware entries win where they apply.
      */
     private val dartMethodNamesNeedingParens = Set(
       "toList", "toSet", "toMap", "toString", "toInt", "toDouble",
@@ -1428,14 +1433,21 @@ class DartEmitter(
         recordAnnotations(qual.tpe.termSymbol)
         return name
 
-      // Conversely, a Scala getter-style `x.toList` on an Iterable really
-      // calls Dart's `toList()` method — add parens.
+      // Receiver-aware rewrites win first — they may translate to a
+      // wholly different shape (e.g. `s.toInt` on a String receiver
+      // becomes `int.parse(s)`, NOT `s.toInt()`). Falling back to the
+      // generic paren-fix below would emit invalid Dart.
+      stdlibRewrite(qual, name, isGetter = true) match
+        case Some(rendered) => return rendered
+        case None           => ()
+
+      // Generic Scala-getter → Dart-method paren-fix for names whose
+      // Dart counterpart is a method on most receivers (e.g.
+      // `int.toDouble()`, `iter.toList()`).
       if dartMethodNamesNeedingParens(name) then
         return s"${selectPrefix(qual)}$name()"
 
-      stdlibRewrite(qual, name, isGetter = true) match
-        case Some(rendered) => rendered
-        case None           => s"${selectPrefix(qual)}$name"
+      s"${selectPrefix(qual)}$name"
 
     /** Single place to render `qual.name(args…)` so Scala → Dart method
      *  name mappings land consistently regardless of which emitExpr entry
@@ -1612,7 +1624,41 @@ class DartEmitter(
       StdlibRewrite(isFutureReceiver, "map",     isGetter = false,
         c => s"${c.prefix}then(${c.args})"),
       StdlibRewrite(isFutureReceiver, "flatMap", isGetter = false,
-        c => s"${c.prefix}then(${c.args})")
+        c => s"${c.prefix}then(${c.args})"),
+
+      // ── Set ────────────────────────────────────────────────────────
+      // Carved out of `isListLikeReceiver` so chain ops don't get
+      // wrongly forced through `.toList()`. Most ops pass through
+      // unchanged on Dart's Set; only the renames need entries.
+      StdlibRewrite(isSetReceiver, "size",     isGetter = true,
+        c => s"${c.prefix}length"),
+      StdlibRewrite(isSetReceiver, "nonEmpty", isGetter = true,
+        c => s"${c.prefix}isNotEmpty"),
+
+      // ── List/Iterable: nullable-returning lookups ──────────────────
+      // Scala's `List.find(p): Option[T]` ↔ Sart's nullable Option.
+      // Avoid Dart's `firstWhere(orElse: ...)` because non-null T
+      // disallows `() => null` — instead, materialise the matches and
+      // pick the first or null. Slightly more allocation but uniform
+      // across element nullability.
+      listCall("find") (c => s"((){ final r = ${c.qualExpr}.where(${c.args}).toList(); return r.isEmpty ? null : r.first; })()"),
+      // `xs.count(p)` → `xs.where(p).length`.
+      listCall("count")(c => s"${c.qualExpr}.where(${c.args}).length"),
+
+      // ── String ─────────────────────────────────────────────────────
+      // All three are parameterless Scala `def`s (callable without
+      // parens), so they reach `emitMemberAccess` — `isGetter = true`.
+      // `s.toInt` / `s.toDouble` parse via Dart's static factories
+      // (Dart's `String` has no `toInt`); `int.parse` throws on bad
+      // input, matching Scala's `NumberFormatException` semantics.
+      StdlibRewrite(isStringReceiver, "toInt", isGetter = true,
+        c => s"int.parse(${c.qualExpr})"),
+      StdlibRewrite(isStringReceiver, "toDouble", isGetter = true,
+        c => s"double.parse(${c.qualExpr})"),
+      // Scala's `stripMargin` strips leading whitespace + `|` per line.
+      // Mirror with a Dart regex: every match of `^\s*\|` becomes ''.
+      StdlibRewrite(isStringReceiver, "stripMargin", isGetter = true,
+        c => s"${c.qualExpr}.replaceAll(RegExp(r'^\\s*\\|', multiLine: true), '')")
     )
 
     /** True when `t` has a Scala `List`-style static type — we rewrite its
@@ -1623,7 +1669,8 @@ class DartEmitter(
      */
     private def isListLikeReceiver(t: Term): Boolean =
       val sym = t.tpe.typeSymbol
-      sym.exists && sym.fullName.startsWith("scala.collection.") && !isMapReceiver(t)
+      sym.exists && sym.fullName.startsWith("scala.collection.") &&
+        !isMapReceiver(t) && !isSetReceiver(t)
 
     /** True when `t`'s static type is `scala.concurrent.Future[...]`. */
     private def isFutureReceiver(t: Term): Boolean =
@@ -1649,6 +1696,23 @@ class DartEmitter(
     private def isNullableOptionReceiver(t: Term): Boolean =
       val fq = t.tpe.typeSymbol.fullName
       fq == "scala.Option" || fq == "sart.stdlib.Option"
+
+    /** True when `t`'s static type is `String` (java.lang.String or
+     *  the Predef alias). Lets the rewrite table attach String-specific
+     *  rewrites like `.toInt` / `.toDouble` / `.stripMargin`.
+     */
+    private def isStringReceiver(t: Term): Boolean = isStringType(t.tpe)
+
+    /** True when `t`'s static type is a Scala `Set`. Pulled out of the
+     *  list-like umbrella so Set-specific rewrites (`size` → `length`)
+     *  don't get double-translated and so chain ops on Sets aren't
+     *  forced to materialise as `.toList()`.
+     */
+    private def isSetReceiver(t: Term): Boolean =
+      val fq = t.tpe.typeSymbol.fullName
+      fq == "scala.collection.immutable.Set" ||
+      fq == "scala.collection.mutable.Set"   ||
+      fq == "scala.collection.Set"
 
     /** True when `t` references the companion object of a case class
      *  (i.e. `Ref(Todo)` where `class Todo` is a case class). Detects
@@ -1687,7 +1751,12 @@ class DartEmitter(
 
     private def isStringType(tpe: TypeRepr): Boolean =
       val fq = tpe.typeSymbol.fullName
-      fq == "java.lang.String" || fq == "scala.Predef.String"
+      fq == "java.lang.String" || fq == "scala.Predef.String" ||
+      // `s.toInt` etc. flow through Predef's `augmentString` implicit
+      // wrapper, which gives the receiver type `StringOps` even though
+      // the user wrote a plain `String`. Treat the wrapped form as a
+      // String so the rewrite table recognises it.
+      fq == "scala.collection.StringOps"
 
     private def isFunctionType(tpe: TypeRepr): Boolean =
       tpe.typeSymbol.fullName.matches("scala\\.Function\\d+")

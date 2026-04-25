@@ -58,3 +58,16 @@ class FxOptionOps:
   def hasOddOpt(o: Option[Int]): Boolean                     = o.exists(_ % 2 == 1)
   def allPosOpt(o: Option[Int]): Boolean                     = o.forall(_ > 0)
   def keepEven(o: Option[Int]): Option[Int]                  = o.filter(_ % 2 == 0)
+
+class FxSetOps:
+  def setSize(s: Set[Int]): Int       = s.size
+  def setHasAny(s: Set[Int]): Boolean = s.nonEmpty
+
+class FxIterableOps:
+  def firstOdd(xs: List[Int]): Option[Int] = xs.find(_ % 2 == 1)
+  def positives(xs: List[Int]): Int        = xs.count(_ > 0)
+
+class FxStringOps:
+  def parseInt(s: String): Int       = s.toInt
+  def parseDouble(s: String): Double = s.toDouble
+  def stripped(s: String): String    = s.stripMargin

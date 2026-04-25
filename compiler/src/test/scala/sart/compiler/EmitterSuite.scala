@@ -194,6 +194,34 @@ class EmitterSuite extends FunSuite:
     assert(body.contains("? o : null"), body)
   }
 
+  test("Set.size→length and Set.nonEmpty→isNotEmpty (carved out of list-like)") {
+    val body = classBody("FxSetOps")
+    assert(body.contains("s.length"),     body)
+    assert(body.contains("s.isNotEmpty"), body)
+  }
+
+  test("List.find returns nullable via inline materialise+pick") {
+    val body = classBody("FxIterableOps")
+    // Polyfill: materialise the matches, return null if empty, else first.
+    assert(body.contains(".where(") && body.contains("isEmpty ? null"), body)
+  }
+
+  test("List.count maps to .where(p).length") {
+    val body = classBody("FxIterableOps")
+    assert(body.contains("xs.where(") && body.contains(".length"), body)
+  }
+
+  test("String.toInt / toDouble call Dart's static parse") {
+    val body = classBody("FxStringOps")
+    assert(body.contains("int.parse(s)"),    body)
+    assert(body.contains("double.parse(s)"), body)
+  }
+
+  test("String.stripMargin polyfills via a multiline RegExp replaceAll") {
+    val body = classBody("FxStringOps")
+    assert(body.contains("RegExp(") && body.contains("multiLine: true"), body)
+  }
+
   test("strict-mode invariant: no /* TODO */ markers in fixture emission") {
     // Catches regressions where a previously-handled tree shape starts
     // falling through to the unhandled-case branch.
