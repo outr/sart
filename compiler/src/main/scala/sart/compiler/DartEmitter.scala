@@ -82,6 +82,8 @@ class DartEmitter(
       |  T getOrElse(T fallback);
       |  bool get isSuccess;
       |  bool get isFailure;
+      |  // Sart maps Option<T> to a Dart nullable T?.
+      |  T? get toOption;
       |}
       |
       |final class Success<T> extends Try<T> {
@@ -101,6 +103,8 @@ class DartEmitter(
       |  bool get isSuccess => true;
       |  @override
       |  bool get isFailure => false;
+      |  @override
+      |  T? get toOption => value;
       |}
       |
       |final class Failure<T> extends Try<T> {
@@ -120,6 +124,8 @@ class DartEmitter(
       |  bool get isSuccess => false;
       |  @override
       |  bool get isFailure => true;
+      |  @override
+      |  T? get toOption => null;
       |}
       |""".stripMargin
   )
@@ -138,6 +144,12 @@ class DartEmitter(
       |  X fold<X>(X Function(L) onLeft, X Function(R) onRight);
       |  bool get isLeft;
       |  bool get isRight;
+      |  // Right value or `fallback` (right-biased).
+      |  R getOrElse(R fallback);
+      |  // Sart maps Option<R> to a Dart nullable R?.
+      |  R? get toOption;
+      |  // Flip Left/Right: Right(x).swap == Left(x).
+      |  Either<R, L> get swap;
       |}
       |
       |final class Left<L, R> extends Either<L, R> {
@@ -156,6 +168,12 @@ class DartEmitter(
       |  bool get isLeft => true;
       |  @override
       |  bool get isRight => false;
+      |  @override
+      |  R getOrElse(R fallback) => fallback;
+      |  @override
+      |  R? get toOption => null;
+      |  @override
+      |  Either<R, L> get swap => Right<R, L>(value);
       |}
       |
       |final class Right<L, R> extends Either<L, R> {
@@ -173,6 +191,12 @@ class DartEmitter(
       |  bool get isLeft => false;
       |  @override
       |  bool get isRight => true;
+      |  @override
+      |  R getOrElse(R fallback) => value;
+      |  @override
+      |  R? get toOption => value;
+      |  @override
+      |  Either<R, L> get swap => Left<R, L>(value);
       |}
       |""".stripMargin
   )

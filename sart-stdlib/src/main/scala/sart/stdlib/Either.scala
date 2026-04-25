@@ -13,6 +13,12 @@ sealed abstract class Either[L, R]:
   def fold[X](onLeft: L => X, onRight: R => X): X    = native.value
   def isLeft: Boolean                                 = native.value
   def isRight: Boolean                                = native.value
+  // Right value or `default` (right-biased).
+  def getOrElse[U >: R](default: U): U                = native.value
+  // Some(rightValue) on Right, None on Left — Sart maps `Option[R]` to `R?`.
+  def toOption: Option[R]                             = native.value
+  // Flip Left/Right: `Right(x).swap == Left(x)`.
+  def swap: Either[R, L]                              = native.value
 
 // Case classes so Scala pattern matching gets auto-`unapply` for
 // `case Left(v) => …` / `case Right(v) => …` — the apply-in-companion

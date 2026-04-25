@@ -17,6 +17,9 @@ sealed abstract class Try[T]:
   def getOrElse[U >: T](default: U): U                            = native.value
   def isSuccess: Boolean                                           = native.value
   def isFailure: Boolean                                           = native.value
+  // Sart maps `Option[T]` to a Dart nullable `T?`, so `toOption`
+  // returns the value on Success and `null` on Failure.
+  def toOption: Option[T]                                          = native.value
 
 // `case class` subtypes give us the Scala `unapply` for pattern
 // matching (`case Success(v) => …`) while staying @native on the Dart

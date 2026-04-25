@@ -1033,29 +1033,44 @@ class DecorationsExample extends StatelessWidget {
   }
 }
 
-/// Source: example/src/main/scala/example/features/TryEither.scala:18
+/// Source: example/src/main/scala/example/features/TryEither.scala:20
 class EitherExampleSart {
-  /// Source: example/src/main/scala/example/features/TryEither.scala:19
+  /// Source: example/src/main/scala/example/features/TryEither.scala:21
   Either<String, int> okRight(int x) {
     return Right(x);
   }
 
-  /// Source: example/src/main/scala/example/features/TryEither.scala:20
+  /// Source: example/src/main/scala/example/features/TryEither.scala:22
   Either<String, int> okLeft(String s) {
     return Left(s);
   }
 
-  /// Source: example/src/main/scala/example/features/TryEither.scala:22
+  /// Source: example/src/main/scala/example/features/TryEither.scala:24
   Either<String, String> bimapRight(Either<String, int> e) {
     return e.map((n) => n.toString());
   }
 
-  /// Source: example/src/main/scala/example/features/TryEither.scala:25
+  /// Source: example/src/main/scala/example/features/TryEither.scala:27
   String extract(Either<String, int> e) {
     return e.fold(
       (err) => 'error: ' + err.toString(),
       (n) => 'ok: ' + n.toString(),
     );
+  }
+
+  /// Source: example/src/main/scala/example/features/TryEither.scala:31
+  int rightOr(Either<String, int> e, int default_) {
+    return e.getOrElse(default_);
+  }
+
+  /// Source: example/src/main/scala/example/features/TryEither.scala:33
+  int? maybeRight(Either<String, int> e) {
+    return e.toOption;
+  }
+
+  /// Source: example/src/main/scala/example/features/TryEither.scala:35
+  Either<int, String> flip(Either<String, int> e) {
+    return e.swap;
   }
 }
 
@@ -1593,6 +1608,11 @@ class TryExampleSart {
   /// Source: example/src/main/scala/example/features/TryEither.scala:16
   int value(Try<int> t, int default_) {
     return t.getOrElse(default_);
+  }
+
+  /// Source: example/src/main/scala/example/features/TryEither.scala:18
+  int? maybe(Try<int> t) {
+    return t.toOption;
   }
 }
 

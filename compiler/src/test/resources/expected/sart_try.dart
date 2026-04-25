@@ -11,6 +11,8 @@ sealed class Try<T> {
   T getOrElse(T fallback);
   bool get isSuccess;
   bool get isFailure;
+  // Sart maps Option<T> to a Dart nullable T?.
+  T? get toOption;
 }
 
 final class Success<T> extends Try<T> {
@@ -30,6 +32,8 @@ final class Success<T> extends Try<T> {
   bool get isSuccess => true;
   @override
   bool get isFailure => false;
+  @override
+  T? get toOption => value;
 }
 
 final class Failure<T> extends Try<T> {
@@ -49,4 +53,6 @@ final class Failure<T> extends Try<T> {
   bool get isSuccess => false;
   @override
   bool get isFailure => true;
+  @override
+  T? get toOption => null;
 }

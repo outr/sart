@@ -10,6 +10,12 @@ sealed class Either<L, R> {
   X fold<X>(X Function(L) onLeft, X Function(R) onRight);
   bool get isLeft;
   bool get isRight;
+  // Right value or `fallback` (right-biased).
+  R getOrElse(R fallback);
+  // Sart maps Option<R> to a Dart nullable R?.
+  R? get toOption;
+  // Flip Left/Right: Right(x).swap == Left(x).
+  Either<R, L> get swap;
 }
 
 final class Left<L, R> extends Either<L, R> {
@@ -26,6 +32,12 @@ final class Left<L, R> extends Either<L, R> {
   bool get isLeft => true;
   @override
   bool get isRight => false;
+  @override
+  R getOrElse(R fallback) => fallback;
+  @override
+  R? get toOption => null;
+  @override
+  Either<R, L> get swap => Right<R, L>(value);
 }
 
 final class Right<L, R> extends Either<L, R> {
@@ -42,4 +54,10 @@ final class Right<L, R> extends Either<L, R> {
   bool get isLeft => false;
   @override
   bool get isRight => true;
+  @override
+  R getOrElse(R fallback) => value;
+  @override
+  R? get toOption => value;
+  @override
+  Either<R, L> get swap => Left<R, L>(value);
 }
