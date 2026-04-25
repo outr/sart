@@ -27,15 +27,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
-      - uses: coursier/cache-action@v6
+      - uses: coursier/cache-action@v8
       - uses: sbt/setup-sbt@v1
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.41.7'
           channel: stable
 
       # Flutter project sites live at /<repo>/, so every asset URL in
@@ -43,7 +44,7 @@ jobs:
       # sbt-side hook that forwards this to `flutter build web --base-href`.
       - run: sbt -Dsbt.color=false -Dsart.web.baseHref=/sart/ sartWeb
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: out/build/web
 
@@ -55,4 +56,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
