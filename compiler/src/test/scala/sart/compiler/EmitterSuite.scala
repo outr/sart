@@ -160,6 +160,40 @@ class EmitterSuite extends FunSuite:
     assert(body.contains("xs.sublist(1)"),                body)
   }
 
+  test("Map.get / getOrElse use Dart's index syntax with `??`") {
+    val body = classBody("FxMapOps")
+    assert(body.contains("m[k]"),         body)
+    assert(body.contains("(m[k] ?? 0)"),  body)
+  }
+
+  test("Map getters: size→length, nonEmpty→isNotEmpty, keys/values pass through") {
+    val body = classBody("FxMapOps")
+    assert(body.contains("m.length"),     body)
+    assert(body.contains("m.isNotEmpty"), body)
+    assert(body.contains("m.keys"),       body)
+    assert(body.contains("m.values"),     body)
+  }
+
+  test("Option.orElse / contains map to nullable polyfills") {
+    val body = classBody("FxOptionOps")
+    assert(body.contains("(o ?? d)"),     body)
+    assert(body.contains("(o == x)"),     body)
+  }
+
+  test("Option.exists / forall guard the call by null") {
+    val body = classBody("FxOptionOps")
+    // exists: o != null && p(o!)
+    assert(body.contains("o != null") && body.contains("o!"), body)
+    // forall: o == null || p(o!)
+    assert(body.contains("o == null"), body)
+  }
+
+  test("Option.filter returns the value-or-null based on the predicate") {
+    val body = classBody("FxOptionOps")
+    // (o != null && p(o!) ? o : null)
+    assert(body.contains("? o : null"), body)
+  }
+
   test("strict-mode invariant: no /* TODO */ markers in fixture emission") {
     // Catches regressions where a previously-handled tree shape starts
     // falling through to the unhandled-case branch.

@@ -1464,32 +1464,52 @@ class DartEmitter(
       val cleanedArgs =
         if isFutureReceiver(qual) then args.filterNot(isExecutionContextArg)
         else args
-      val argStr = emitArgs(cleanedArgs)
+      // Render each arg the same way `emitArgs` does (NamedArg handling,
+      // default-arg filtering) so rewrite templates see the same forms
+      // whether they reach for `args` (joined) or `argList` (per-arg).
+      val argList = cleanedArgs.filterNot(isDefaultArg).map {
+        case NamedArg(name, value) => s"$name: ${emitExpr(value)}"
+        case other                 => emitExpr(other)
+      }
+      val argStr = argList.mkString(", ")
 
-      stdlibRewrite(qual, name, isGetter = false, argStr) match
+      stdlibRewrite(qual, name, isGetter = false, argList, argStr) match
         case Some(rendered) => rendered
         case None           => s"${selectPrefix(qual)}$name($argStr)"
 
     /** Lookup helper: walks `stdlibRewrites`, returning the first matching
      *  template's rendered output or `None`. Method-call entries receive
-     *  the pre-rendered `argStr`; getter-call entries are passed an empty
-     *  string (and only match when `isGetter` is true).
+     *  both `argList` (one Dart expr per Scala argument) and `args` (the
+     *  comma-joined form); getter-call entries get empty values.
      */
     private def stdlibRewrite(
-      qual: Term, name: String, isGetter: Boolean, argStr: String = ""
+      qual: Term, name: String, isGetter: Boolean,
+      argList: List[String] = Nil, argStr: String = ""
     ): Option[String] =
       stdlibRewrites.find { e =>
         e.scalaName == name && e.isGetter == isGetter && e.receiver(qual)
       }.map { e =>
-        e.emit(RewriteCtx(prefix = selectPrefix(qual), qualExpr = emitExpr(qual), args = argStr))
+        e.emit(RewriteCtx(
+          prefix   = selectPrefix(qual),
+          qualExpr = emitExpr(qual),
+          args     = argStr,
+          argList  = argList
+        ))
       }
 
     /** A single Scala→Dart method-call rewrite. `prefix` is `qExpr.` (or
      *  empty when `qual` is `this`) — preserves the existing call-site
      *  elision behaviour. `qualExpr` is the bare expression for templates
      *  that need to reference it twice (e.g. `(q.isEmpty ? null : q.first)`).
+     *  `argList` exposes pre-rendered individual args for templates that
+     *  need to reorder or skip them (e.g. `Map.getOrElse(k, default)`).
      */
-    private case class RewriteCtx(prefix: String, qualExpr: String, args: String)
+    private case class RewriteCtx(
+      prefix:   String,
+      qualExpr: String,
+      args:     String,
+      argList:  List[String]
+    )
 
     private case class StdlibRewrite(
       receiver:  Term => Boolean,
@@ -1550,8 +1570,41 @@ class DartEmitter(
       listRename("indexOf",   "indexOf"),
 
       // ── Map ────────────────────────────────────────────────────────
+      // Getters: `m.size`/`nonEmpty` rename; `keys`/`values` exist in Dart
+      // unchanged but are listed explicitly so the table is the single
+      // source of truth.
+      StdlibRewrite(isMapReceiver, "size",     isGetter = true,  c => s"${c.prefix}length"),
+      StdlibRewrite(isMapReceiver, "nonEmpty", isGetter = true,  c => s"${c.prefix}isNotEmpty"),
+      StdlibRewrite(isMapReceiver, "keys",     isGetter = true,  c => s"${c.prefix}keys"),
+      StdlibRewrite(isMapReceiver, "values",   isGetter = true,  c => s"${c.prefix}values"),
+      // Methods.
       StdlibRewrite(isMapReceiver, "contains", isGetter = false,
         c => s"${c.prefix}containsKey(${c.args})"),
+      // Scala's `m.get(k): Option[V]` matches Dart's `m[k]: V?` — Sart
+      // models Option as a nullable, so the index form is exactly right.
+      StdlibRewrite(isMapReceiver, "get", isGetter = false,
+        c => s"${c.qualExpr}[${c.args}]"),
+      // `m.getOrElse(k, default)` becomes `m[k] ?? default`.
+      StdlibRewrite(isMapReceiver, "getOrElse", isGetter = false,
+        c => s"(${c.qualExpr}[${c.argList(0)}] ?? ${c.argList(1)})"),
+
+      // ── Option (nullable receiver via the sart_option.dart shim) ───
+      // `o.orElse(alt)` → `(o ?? alt)`; both are nullable types.
+      StdlibRewrite(isNullableOptionReceiver, "orElse", isGetter = false,
+        c => s"(${c.qualExpr} ?? ${c.args})"),
+      // `o.contains(x)` → `o == x` — works because Sart maps `Some(x)` to
+      // a non-null value and `None` to `null`, so equality is exact.
+      StdlibRewrite(isNullableOptionReceiver, "contains", isGetter = false,
+        c => s"(${c.qualExpr} == ${c.args})"),
+      // `o.exists(p)` → `o != null && p(o)` — guard then test.
+      StdlibRewrite(isNullableOptionReceiver, "exists", isGetter = false,
+        c => s"(${c.qualExpr} != null && (${c.args})(${c.qualExpr}!))"),
+      // `o.forall(p)` → `o == null || p(o)` — vacuously true on absence.
+      StdlibRewrite(isNullableOptionReceiver, "forall", isGetter = false,
+        c => s"(${c.qualExpr} == null || (${c.args})(${c.qualExpr}!))"),
+      // `o.filter(p)` → `o != null && p(o) ? o : null`.
+      StdlibRewrite(isNullableOptionReceiver, "filter", isGetter = false,
+        c => s"(${c.qualExpr} != null && (${c.args})(${c.qualExpr}!) ? ${c.qualExpr} : null)"),
 
       // ── Future ─────────────────────────────────────────────────────
       // `.map`/`.flatMap` collapse to Dart's overloaded `.then` — both
@@ -1585,6 +1638,17 @@ class DartEmitter(
       fq == "scala.collection.immutable.Map" ||
       fq == "scala.collection.mutable.Map"   ||
       fq == "scala.collection.Map"
+
+    /** True when `t`'s static type is one of the Option flavours Sart
+     *  models as Dart nullables (`scala.Option` or `sart.stdlib.Option`).
+     *  Used by the rewrite table to attach Option-specific method
+     *  polyfills (orElse, contains, exists, forall, filter) on top of the
+     *  ones already covered by the sart_option.dart shim (map/flatMap/
+     *  fold/foreach).
+     */
+    private def isNullableOptionReceiver(t: Term): Boolean =
+      val fq = t.tpe.typeSymbol.fullName
+      fq == "scala.Option" || fq == "sart.stdlib.Option"
 
     /** True when `t` references the companion object of a case class
      *  (i.e. `Ref(Todo)` where `class Todo` is a case class). Detects
