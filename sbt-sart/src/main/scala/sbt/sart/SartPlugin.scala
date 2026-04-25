@@ -39,6 +39,15 @@ object SartPlugin extends AutoPlugin {
     }
   }
 
+  // Java's ProcessBuilder doesn't resolve `.bat`/`.cmd` extensions on
+  // Windows, so `Process(Seq("flutter", ...))` fails with CreateProcess
+  // error=2 because there's no literal `flutter` binary — only
+  // `flutter.bat`. Pick the right name per OS.
+  private[sart] val isWindows: Boolean =
+    sys.props.get("os.name").exists(_.toLowerCase.contains("windows"))
+  private[sart] def flutterCmd: String = if (isWindows) "flutter.bat" else "flutter"
+  private[sart] def dartCmd:    String = if (isWindows) "dart.bat"    else "dart"
+
   // Hidden Ivy configurations that carry Sart's compile-time and facade
   // artifacts separately from the user's main classpath. Keeps the Sart
   // compiler off the user's compile/runtime path — it's only used by the
@@ -179,7 +188,7 @@ object SartPlugin extends AutoPlugin {
       if (libDir.exists()) {
         try {
           val langArgs = SartPlugin.dartLanguageArgs(outDir / "pubspec.yaml")
-          sys.process.Process(Seq("dart", "format") ++ langArgs :+ libDir.getAbsolutePath).!
+          sys.process.Process(Seq(SartPlugin.dartCmd, "format") ++ langArgs :+ libDir.getAbsolutePath).!
         } catch {
           case _: java.io.IOException =>
             log.warn("dart not on PATH; skipping auto-format")
@@ -334,7 +343,7 @@ object SartPlugin extends AutoPlugin {
       log.info(s"sbt-sart: scaffolding Flutter $platform platform")
       val projName = projectName.replace('-', '_')
       val rc = sys.process.Process(
-        Seq("flutter", "create", s"--platforms=$platform",
+        Seq(SartPlugin.flutterCmd, "create", s"--platforms=$platform",
             "--project-name", projName,
             "--org", "com.example", "--suppress-analytics", "."),
         outDir
@@ -353,7 +362,7 @@ object SartPlugin extends AutoPlugin {
   ): Unit = {
     log.info(s"sbt-sart: flutter build $target ${extraArgs.mkString(" ")}")
     val rc = sys.process.Process(
-      Seq("flutter", "build", target, "--suppress-analytics") ++ extraArgs,
+      Seq(SartPlugin.flutterCmd, "build", target, "--suppress-analytics") ++ extraArgs,
       outDir
     ).!
     if (rc != 0) sys.error(s"flutter build $target exited $rc")

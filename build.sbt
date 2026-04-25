@@ -71,6 +71,14 @@ def sartDartLanguageArgs(pubspec: File): Seq[String] = {
   }
 }
 
+// Java's ProcessBuilder doesn't resolve `.bat`/`.cmd` extensions on
+// Windows the way cmd.exe does, so `Process(Seq("flutter", ...))` fails
+// with "CreateProcess error=2" because the literal `flutter` binary
+// doesn't exist — only `flutter.bat`. Pick the right name per OS.
+val isWindows: Boolean = sys.props.get("os.name").exists(_.toLowerCase.contains("windows"))
+def sartFlutterCmd: String = if (isWindows) "flutter.bat" else "flutter"
+def sartDartCmd:    String = if (isWindows) "dart.bat"    else "dart"
+
 // The facade-support library: annotations + sentinel values that facades
 // depend on. Analogous to `scalajs-library` providing `@js.native`, etc.
 lazy val `sart-dart` = (project in file("sart-dart"))
@@ -172,7 +180,7 @@ lazy val root = (project in file("."))
         if (libDir.exists()) {
           val langArgs = sartDartLanguageArgs(outDir / "pubspec.yaml")
           try {
-            val rc = sys.process.Process(Seq("dart", "format") ++ langArgs :+ libDir.getAbsolutePath).!
+            val rc = sys.process.Process(Seq(sartDartCmd, "format") ++ langArgs :+ libDir.getAbsolutePath).!
             if (rc != 0) log.warn(s"dart format exited $rc (emission succeeded)")
           } catch {
             case _: java.io.IOException =>
@@ -404,7 +412,7 @@ def runAnalyzeAndRemap(outDir: File, log: Logger): Unit = {
     l => { rawOutput.append(l); rawOutput.append('\n') }
   )
   sys.process.Process(
-    Seq("flutter", "analyze", "lib/", "--suppress-analytics"),
+    Seq(sartFlutterCmd, "analyze", "lib/", "--suppress-analytics"),
     outDir
   ).!(logger)
 
@@ -443,7 +451,7 @@ def scaffoldPlatform(platform: String, outDir: File, log: Logger): Unit = {
   if (!platformDir.exists()) {
     log.info(s"sart: scaffolding Flutter $platform platform")
     val rc = sys.process.Process(
-      Seq("flutter", "create", s"--platforms=$platform",
+      Seq(sartFlutterCmd, "create", s"--platforms=$platform",
           "--project-name=sart_example", "--org", "com.outr",
           "--suppress-analytics", "."),
       outDir
@@ -484,7 +492,7 @@ def tidyScaffold(outDir: File): Unit = {
 def buildPlatform(target: String, extraArgs: Seq[String], outDir: File, log: Logger): Unit = {
   log.info(s"sart: flutter build $target ${extraArgs.mkString(" ")}")
   val rc = sys.process.Process(
-    Seq("flutter", "build", target, "--suppress-analytics") ++ extraArgs,
+    Seq(sartFlutterCmd, "build", target, "--suppress-analytics") ++ extraArgs,
     outDir
   ).!
   if (rc != 0) sys.error(s"flutter build $target exited $rc")
