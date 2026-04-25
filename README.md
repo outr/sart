@@ -1,5 +1,12 @@
 # Sart — Scala 3 → Dart / Flutter
 
+[![CI](https://github.com/outr/sart/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/outr/sart/actions/workflows/ci.yml)
+[![Pages](https://github.com/outr/sart/actions/workflows/pages.yml/badge.svg?branch=master)](https://outr.github.io/sart/)
+[![Scala 3](https://img.shields.io/badge/Scala-3.8-DC322F?logo=scala&logoColor=white)](https://www.scala-lang.org/)
+[![Flutter](https://img.shields.io/badge/Flutter-stable-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
+[![Lines of code](https://tokei.rs/b1/github/outr/sart?category=code)](https://github.com/outr/sart)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Sart compiles Scala 3 source to Dart via TASTy inspection and drops the
 result into a ready-to-build Flutter project. Write your UI in pure Scala;
 run it as a native Flutter app on Linux (today), with web/mobile/desktop
