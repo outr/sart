@@ -294,6 +294,18 @@ class EmitterSuite extends FunSuite:
     assert(body.contains("{...m, k: v}"), body)
   }
 
+  test("List.sum / product fold from a literal zero/one") {
+    val body = classBody("FxNumericOps")
+    assert(body.contains("xs.fold(0, (a, b) => a + b)"), body)
+    assert(body.contains("xs.fold(1, (a, b) => a * b)"), body)
+  }
+
+  test("List.min / max use reduce with a comparison ternary") {
+    val body = classBody("FxNumericOps")
+    assert(body.contains("xs.reduce((a, b) => a < b ? a : b)"), body)
+    assert(body.contains("xs.reduce((a, b) => a > b ? a : b)"), body)
+  }
+
   test("strict-mode invariant: no /* TODO */ markers in fixture emission") {
     // Catches regressions where a previously-handled tree shape starts
     // falling through to the unhandled-case branch.

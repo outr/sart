@@ -1296,6 +1296,26 @@ class ListOpsExample {
   String joined(List<String> xs) {
     return xs.join(', ');
   }
+
+  /// Source: example/src/main/scala/example/features/ListOps.scala:15
+  int total(List<int> xs) {
+    return xs.fold(0, (a, b) => a + b);
+  }
+
+  /// Source: example/src/main/scala/example/features/ListOps.scala:16
+  int factor(List<int> xs) {
+    return xs.fold(1, (a, b) => a * b);
+  }
+
+  /// Source: example/src/main/scala/example/features/ListOps.scala:17
+  int smallest(List<int> xs) {
+    return xs.reduce((a, b) => a < b ? a : b);
+  }
+
+  /// Source: example/src/main/scala/example/features/ListOps.scala:18
+  int largest(List<int> xs) {
+    return xs.reduce((a, b) => a > b ? a : b);
+  }
 }
 
 /// Source: example/src/main/scala/example/features/Maps.scala:9

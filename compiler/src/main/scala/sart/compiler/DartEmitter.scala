@@ -1748,6 +1748,24 @@ class DartEmitter(
       StdlibRewrite(isMapReceiver, "updated", isGetter = false,
         c => s"{...${c.qualExpr}, ${c.argList(0)}: ${c.argList(1)}}"),
 
+      // ── List/Iterable: numeric reductions ─────────────────────────
+      // Each takes an implicit Numeric/Ordering in TASTy that we ignore.
+      // `sum` and `product` start from a literal zero/one — correct for
+      // `List[Int]` and `List[Long]`. `List[Double]` users may need to
+      // cast the result from `num` to `double`, or fold directly with
+      // a `0.0` seed; deliberate trade-off for table simplicity.
+      // `min`/`max` use `reduce`, which (matching Scala) throws on an
+      // empty list rather than requiring a seed.
+      // Both getter (Scala syntax) and method (TASTy with implicit) shapes.
+      listGetExpr("sum")    (q => s"$q.fold(0, (a, b) => a + b)"),
+      listCall("sum")        (c => s"${c.qualExpr}.fold(0, (a, b) => a + b)"),
+      listGetExpr("product")(q => s"$q.fold(1, (a, b) => a * b)"),
+      listCall("product")    (c => s"${c.qualExpr}.fold(1, (a, b) => a * b)"),
+      listGetExpr("min")    (q => s"$q.reduce((a, b) => a < b ? a : b)"),
+      listCall("min")        (c => s"${c.qualExpr}.reduce((a, b) => a < b ? a : b)"),
+      listGetExpr("max")    (q => s"$q.reduce((a, b) => a > b ? a : b)"),
+      listCall("max")        (c => s"${c.qualExpr}.reduce((a, b) => a > b ? a : b)"),
+
       // ── String ─────────────────────────────────────────────────────
       // All three are parameterless Scala `def`s (callable without
       // parens), so they reach `emitMemberAccess` — `isGetter = true`.

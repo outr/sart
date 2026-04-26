@@ -93,3 +93,9 @@ class FxPairing:
 
 class FxMapMutators:
   def add(m: Map[String, Int], k: String, v: Int): Map[String, Int] = m.updated(k, v)
+
+class FxNumericOps:
+  def total(xs: List[Int]): Int    = xs.sum
+  def product(xs: List[Int]): Int  = xs.product
+  def smallest(xs: List[Int]): Int = xs.min
+  def largest(xs: List[Int]): Int  = xs.max
