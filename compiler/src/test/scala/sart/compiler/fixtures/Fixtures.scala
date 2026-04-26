@@ -99,3 +99,8 @@ class FxNumericOps:
   def product(xs: List[Int]): Int  = xs.product
   def smallest(xs: List[Int]): Int = xs.min
   def largest(xs: List[Int]): Int  = xs.max
+
+class FxRanges:
+  def inclusive(n: Int): List[Int] = (1 to n).toList
+  def exclusive(n: Int): List[Int] = (0 until n).toList
+  def squared(n: Int): List[Int]   = (0 until n).map(i => i * i).toList

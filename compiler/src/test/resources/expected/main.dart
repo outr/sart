@@ -1495,6 +1495,27 @@ class Point {
 /// Source: example/src/main/scala/example/features/Enums.scala:11
 enum Priority { Low, Medium, High, Urgent }
 
+/// Source: example/src/main/scala/example/features/Ranges.scala:8
+class RangeExample {
+  /// Source: example/src/main/scala/example/features/Ranges.scala:10
+  List<int> inclusive(int n) {
+    return List<int>.generate(n - 1 + 1, (i) => 1 + i).toList();
+  }
+
+  /// Source: example/src/main/scala/example/features/Ranges.scala:12
+  List<int> exclusive(int n) {
+    return List<int>.generate(n - 0, (i) => 0 + i).toList();
+  }
+
+  /// Source: example/src/main/scala/example/features/Ranges.scala:14
+  List<int> squared(int n) {
+    return List<int>.generate(
+      n - 0,
+      (i) => 0 + i,
+    ).map((i) => i * i).toList().toList();
+  }
+}
+
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:8
 class Rectangle extends Shape {
   final double width;

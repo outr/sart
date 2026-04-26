@@ -306,6 +306,21 @@ class EmitterSuite extends FunSuite:
     assert(body.contains("xs.reduce((a, b) => a > b ? a : b)"), body)
   }
 
+  test("Range `1 to n` materialises as List<int>.generate inclusive") {
+    val body = classBody("FxRanges")
+    assert(body.contains("List<int>.generate(n - 1 + 1"), body)
+  }
+
+  test("Range `0 until n` materialises as List<int>.generate exclusive") {
+    val body = classBody("FxRanges")
+    assert(body.contains("List<int>.generate(n - 0,"), body)
+  }
+
+  test("Range `.map(f)` chains through the list-like rewrite to .map().toList()") {
+    val body = classBody("FxRanges")
+    assert(body.contains(".map(") && body.contains(".toList()"), body)
+  }
+
   test("strict-mode invariant: no /* TODO */ markers in fixture emission") {
     // Catches regressions where a previously-handled tree shape starts
     // falling through to the unhandled-case branch.

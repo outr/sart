@@ -1659,6 +1659,19 @@ class DartEmitter(
       StdlibRewrite(isFutureReceiver, "flatMap", isGetter = false,
         c => s"${c.prefix}then(${c.args})"),
 
+      // ── Range construction (1 to 10 / 1 until 10) ──────────────────
+      // Receiver is an Int (or Predef-wrapped RichInt — the wrapper
+      // itself is stripped earlier in emitExpr). Materialise as a Dart
+      // List<int>; if the user chains .map / .where / .toList / .foreach
+      // on it, those resolve through the existing list-like rewrites
+      // because Scala's Range type starts with `scala.collection.`.
+      // Qualifier evaluated twice — fine for literal ints, less ideal
+      // for expressions; matches the existing zip / partition trade-off.
+      StdlibRewrite(isIntReceiver, "to",    isGetter = false,
+        c => s"List<int>.generate(${c.argList(0)} - ${c.qualExpr} + 1, (i) => ${c.qualExpr} + i)"),
+      StdlibRewrite(isIntReceiver, "until", isGetter = false,
+        c => s"List<int>.generate(${c.argList(0)} - ${c.qualExpr}, (i) => ${c.qualExpr} + i)"),
+
       // ── Tuple field access ─────────────────────────────────────────
       // `t._N` → Dart record positional getter `t.$N`. Cover up through
       // _9 — covers all common cases; Scala supports up to _22 on the
@@ -1841,6 +1854,16 @@ class DartEmitter(
      */
     private def isTupleReceiver(t: Term): Boolean =
       t.tpe.typeSymbol.fullName.matches("scala\\.Tuple\\d+")
+
+    /** True when `t`'s static type is `Int`/`Long` (or its Predef wrapper
+     *  `RichInt`/`RichLong`). Lets the rewrite table catch `1 to 10`
+     *  patterns where the receiver is the int literal under
+     *  Predef.intWrapper. The wrapper itself gets stripped at emit time.
+     */
+    private def isIntReceiver(t: Term): Boolean =
+      val fq = t.tpe.typeSymbol.fullName
+      fq == "scala.Int" || fq == "scala.Long" ||
+      fq == "scala.runtime.RichInt" || fq == "scala.runtime.RichLong"
 
     /** True when `t` references the companion object of a case class
      *  (i.e. `Ref(Todo)` where `class Todo` is a case class). Detects
