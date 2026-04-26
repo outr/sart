@@ -1637,6 +1637,32 @@ class TupleExample {
   (String, int) swap((int, String) t) {
     return (t.$2, t.$1);
   }
+
+  /// Source: example/src/main/scala/example/features/Tuples.scala:18
+  List<(int, String)> zipped(List<int> xs, List<String> ys) {
+    return List.generate(
+      (xs.length < ys.length ? xs.length : ys.length),
+      (i) => (xs[i], ys[i]),
+    );
+  }
+
+  /// Source: example/src/main/scala/example/features/Tuples.scala:19
+  List<(String, int)> indexed(List<String> xs) {
+    return List.generate(xs.length, (i) => (xs[i], i));
+  }
+
+  /// Source: example/src/main/scala/example/features/Tuples.scala:20
+  (List<int>, List<int>) split(List<int> xs) {
+    return (
+      xs.where((_$1) => _$1 > 0).toList(),
+      xs.where((x) => !((_$1) => _$1 > 0)(x)).toList(),
+    );
+  }
+
+  /// Source: example/src/main/scala/example/features/Tuples.scala:23
+  Map<String, int> addEntry(Map<String, int> m, String k, int v) {
+    return {...m, k: v};
+  }
 }
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:9

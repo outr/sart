@@ -85,3 +85,11 @@ class FxTuples:
   def fst(t: (Int, String)): Int                     = t._1
   def snd(t: (Int, String)): String                  = t._2
   def third(t: (Int, String, Int)): Int              = t._3
+
+class FxPairing:
+  def zipped(xs: List[Int], ys: List[String]): List[(Int, String)] = xs.zip(ys)
+  def indexed(xs: List[String]): List[(String, Int)]               = xs.zipWithIndex
+  def split(xs: List[Int]): (List[Int], List[Int])                 = xs.partition(_ > 0)
+
+class FxMapMutators:
+  def add(m: Map[String, Int], k: String, v: Int): Map[String, Int] = m.updated(k, v)

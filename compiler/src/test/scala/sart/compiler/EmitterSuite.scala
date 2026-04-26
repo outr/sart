@@ -271,6 +271,29 @@ class EmitterSuite extends FunSuite:
     assert(body.contains("t.$3"), body)
   }
 
+  test("List.zip pairs by index up to the shorter length") {
+    val body = classBody("FxPairing")
+    assert(body.contains("List.generate"),  body)
+    assert(body.contains("(xs[i], ys[i])"), body)
+  }
+
+  test("List.zipWithIndex builds (elem, index) pairs in Scala order") {
+    val body = classBody("FxPairing")
+    // Scala puts the index second in each pair.
+    assert(body.contains("(xs[i], i)"), body)
+  }
+
+  test("List.partition returns a tuple of (matching, not-matching)") {
+    val body = classBody("FxPairing")
+    assert(body.contains(".where(") && body.contains("!("), body)
+    assert(body.contains(".toList(),"),                     body)
+  }
+
+  test("Map.updated emits as a Dart spread-and-add map literal") {
+    val body = classBody("FxMapMutators")
+    assert(body.contains("{...m, k: v}"), body)
+  }
+
   test("strict-mode invariant: no /* TODO */ markers in fixture emission") {
     // Catches regressions where a previously-handled tree shape starts
     // falling through to the unhandled-case branch.

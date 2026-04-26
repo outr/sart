@@ -13,3 +13,12 @@ class TupleExample:
   def first(t: (Int, String)): Int           = t._1
   def second(t: (Int, String)): String       = t._2
   def swap(t: (Int, String)): (String, Int)  = (t._2, t._1)
+
+  // Tuples-via-collection-ops: zip / zipWithIndex / partition.
+  def zipped(xs: List[Int], ys: List[String]): List[(Int, String)] = xs.zip(ys)
+  def indexed(xs: List[String]): List[(String, Int)]               = xs.zipWithIndex
+  def split(xs: List[Int]): (List[Int], List[Int])                 = xs.partition(_ > 0)
+
+  // Map immutable update via spread.
+  def addEntry(m: Map[String, Int], k: String, v: Int): Map[String, Int] =
+    m.updated(k, v)

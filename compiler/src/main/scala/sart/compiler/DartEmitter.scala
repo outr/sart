@@ -1721,6 +1721,33 @@ class DartEmitter(
       listCall("foldRight")(c =>
         s"${c.qualExpr}.reversed.fold(${c.argList(0)}, (acc, a) => (${c.argList(1)})(a, acc))"),
 
+      // ── List/Iterable: pairing ops (require Tuple support) ────────
+      // `xs.zip(ys)` → `List<(A, B)>`. Dart has no built-in zip; build
+      // pairs by index up to the shorter length. Args are referenced
+      // multiple times — acceptable for typical identifier args, and
+      // matches the existing partition / sortBy idiom in this table.
+      listCall("zip")(c =>
+        s"List.generate((${c.qualExpr}.length < ${c.argList(0)}.length ? " +
+        s"${c.qualExpr}.length : ${c.argList(0)}.length), " +
+        s"(i) => (${c.qualExpr}[i], ${c.argList(0)}[i]))"),
+      // `xs.zipWithIndex` → `List<(A, Int)>`. Note Scala puts the index
+      // SECOND in each pair (Dart's `Iterable.indexed` puts it first),
+      // so we hand-build pairs in Scala's order.
+      listGetExpr("zipWithIndex")(q =>
+        s"List.generate($q.length, (i) => ($q[i], i))"),
+      listCall("zipWithIndex")(c =>
+        s"List.generate(${c.qualExpr}.length, (i) => (${c.qualExpr}[i], i))"),
+      // `xs.partition(p)` → `(matching, not-matching)`. Calls p twice
+      // per element; acceptable for MVP.
+      listCall("partition")(c =>
+        s"(${c.qualExpr}.where(${c.argList(0)}).toList(), " +
+        s"${c.qualExpr}.where((x) => !(${c.argList(0)})(x)).toList())"),
+
+      // ── Map mutators (return new Map) ─────────────────────────────
+      // `m.updated(k, v)` → `{...m, k: v}` (Dart spread on map literal).
+      StdlibRewrite(isMapReceiver, "updated", isGetter = false,
+        c => s"{...${c.qualExpr}, ${c.argList(0)}: ${c.argList(1)}}"),
+
       // ── String ─────────────────────────────────────────────────────
       // All three are parameterless Scala `def`s (callable without
       // parens), so they reach `emitMemberAccess` — `isGetter = true`.
