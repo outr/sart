@@ -1616,6 +1616,29 @@ class TryExampleSart {
   }
 }
 
+/// Source: example/src/main/scala/example/features/Tuples.scala:11
+class TupleExample {
+  /// Source: example/src/main/scala/example/features/Tuples.scala:12
+  (int, String) pair(int a, String b) {
+    return (a, b);
+  }
+
+  /// Source: example/src/main/scala/example/features/Tuples.scala:13
+  int first((int, String) t) {
+    return t.$1;
+  }
+
+  /// Source: example/src/main/scala/example/features/Tuples.scala:14
+  String second((int, String) t) {
+    return t.$2;
+  }
+
+  /// Source: example/src/main/scala/example/features/Tuples.scala:15
+  (String, int) swap((int, String) t) {
+    return (t.$2, t.$1);
+  }
+}
+
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:9
 class UnitSquare extends Shape {}
 

@@ -251,6 +251,26 @@ class EmitterSuite extends FunSuite:
     assert(body.contains("(a, acc)"), body)
   }
 
+  test("Tuple type → Dart record type with parens") {
+    val body = classBody("FxTuples")
+    // Method signatures: `(int, String) pair(...)`, `(int, String, int) triple(...)`.
+    assert(body.contains("(int, String) pair(") || body.contains("(int, String) Function"), body)
+    assert(body.contains("(int, String, int) triple"), body)
+  }
+
+  test("Tuple literal → Dart record literal with same syntax") {
+    val body = classBody("FxTuples")
+    assert(body.contains("(a, b)"),    body)
+    assert(body.contains("(a, b, c)"), body)
+  }
+
+  test("Tuple field access ._N → Dart positional getter .$N") {
+    val body = classBody("FxTuples")
+    assert(body.contains("t.$1"), body)
+    assert(body.contains("t.$2"), body)
+    assert(body.contains("t.$3"), body)
+  }
+
   test("strict-mode invariant: no /* TODO */ markers in fixture emission") {
     // Catches regressions where a previously-handled tree shape starts
     // falling through to the unhandled-case branch.

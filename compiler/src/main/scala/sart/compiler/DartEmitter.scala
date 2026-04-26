@@ -1057,6 +1057,15 @@ class DartEmitter(
       case Apply(Select(Ident("List"), "apply"), List(arg)) if isVarargs(arg) =>
         varargsItems(arg).map(emitExpr).mkString("[", ", ", "]")
 
+      // (a, b, ...) — tuple literals desugar to `Tuple<N>.apply(a, b, ...)`
+      // in TASTy. Emit Dart record literals `(a, b, ...)`.
+      case Apply(TypeApply(Select(Ident(name), "apply"), _), args)
+        if name.matches("Tuple\\d+") =>
+        args.map(emitExpr).mkString("(", ", ", ")")
+      case Apply(Select(Ident(name), "apply"), args)
+        if name.matches("Tuple\\d+") =>
+        args.map(emitExpr).mkString("(", ", ", ")")
+
       // Set(a, b, ...) → {a, b, ...}  (Dart set literal; empty `Set()` →
       // `<dynamic>{}` would be ambiguous with a Map, so we fall through
       // to the generic path when empty.)
@@ -1650,6 +1659,20 @@ class DartEmitter(
       StdlibRewrite(isFutureReceiver, "flatMap", isGetter = false,
         c => s"${c.prefix}then(${c.args})"),
 
+      // ── Tuple field access ─────────────────────────────────────────
+      // `t._N` → Dart record positional getter `t.$N`. Cover up through
+      // _9 — covers all common cases; Scala supports up to _22 on the
+      // legacy TupleN classes.
+      StdlibRewrite(isTupleReceiver, "_1", isGetter = true, c => s"${c.prefix}$$1"),
+      StdlibRewrite(isTupleReceiver, "_2", isGetter = true, c => s"${c.prefix}$$2"),
+      StdlibRewrite(isTupleReceiver, "_3", isGetter = true, c => s"${c.prefix}$$3"),
+      StdlibRewrite(isTupleReceiver, "_4", isGetter = true, c => s"${c.prefix}$$4"),
+      StdlibRewrite(isTupleReceiver, "_5", isGetter = true, c => s"${c.prefix}$$5"),
+      StdlibRewrite(isTupleReceiver, "_6", isGetter = true, c => s"${c.prefix}$$6"),
+      StdlibRewrite(isTupleReceiver, "_7", isGetter = true, c => s"${c.prefix}$$7"),
+      StdlibRewrite(isTupleReceiver, "_8", isGetter = true, c => s"${c.prefix}$$8"),
+      StdlibRewrite(isTupleReceiver, "_9", isGetter = true, c => s"${c.prefix}$$9"),
+
       // ── Set ────────────────────────────────────────────────────────
       // Carved out of `isListLikeReceiver` so chain ops don't get
       // wrongly forced through `.toList()`. Most ops pass through
@@ -1766,6 +1789,13 @@ class DartEmitter(
       fq == "scala.collection.immutable.Set" ||
       fq == "scala.collection.mutable.Set"   ||
       fq == "scala.collection.Set"
+
+    /** True when `t`'s static type is `scala.TupleN` for any N. Lets the
+     *  rewrite table translate `t._1`/`._2`/… into Dart's record-getter
+     *  syntax `t.$1`/`.$2`/….
+     */
+    private def isTupleReceiver(t: Term): Boolean =
+      t.tpe.typeSymbol.fullName.matches("scala\\.Tuple\\d+")
 
     /** True when `t` references the companion object of a case class
      *  (i.e. `Ref(Todo)` where `class Todo` is a case class). Detects
@@ -2156,6 +2186,14 @@ class DartEmitter(
               val R  = emitTypeRef(args.last.asInstanceOf[TypeRepr])
               s"$R Function($Ts)"
             case _ => "Function"
+        // scala.Tuple2..Tuple22 → Dart record types `(T1, T2, …)`.
+        // Field access (`_1`, `_2`, …) is rewritten via the stdlib table
+        // to Dart record positional getters (`$1`, `$2`, …).
+        case fqn if fqn.matches("scala\\.Tuple\\d+") =>
+          return tpe match
+            case AppliedType(_, args) if args.nonEmpty =>
+              args.map { case t: TypeRepr => emitTypeRef(t) }.mkString("(", ", ", ")")
+            case _ => "Object"
         case _ =>
 
       val base = sym.fullName match

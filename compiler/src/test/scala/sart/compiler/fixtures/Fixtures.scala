@@ -78,3 +78,10 @@ class FxListStructural:
   def asc(xs: List[Int]): List[Int]         = xs.sorted
   def byLen(xs: List[String]): List[String] = xs.sortBy(_.length)
   def rfold(xs: List[Int], z: Int): Int     = xs.foldRight(z)((a, acc) => a - acc)
+
+class FxTuples:
+  def pair(a: Int, b: String): (Int, String)         = (a, b)
+  def triple(a: Int, b: String, c: Int): (Int, String, Int) = (a, b, c)
+  def fst(t: (Int, String)): Int                     = t._1
+  def snd(t: (Int, String)): String                  = t._2
+  def third(t: (Int, String, Int)): Int              = t._3
