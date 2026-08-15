@@ -71,7 +71,19 @@ sbt sartGoldenVerify   # diff emission against checked-in golden files
 sbt sartGoldenAccept   # refresh the golden files from current emission
 ```
 
-Facade generation (MVP):
+Facade generation — the Flutter material facades are themselves
+generated from the real SDK sources (resolved `package:analyzer`
+analysis: real constructor signatures incl. `super.`-params,
+required/optional fidelity, named/factory constructors, full
+`Icons`/`Colors` catalogs). The manifest is
+`flutter-facades/facadegen.conf`; the curated semantic core stays
+hand-written in `material.scala`:
+
+```bash
+sbt sartFacadesRegen   # re-derive flutter-facades/material_generated.scala
+```
+
+Ad-hoc generation for any Dart library:
 
 ```bash
 sbt 'sart-facadegen/runMain sart.facadegen.Main \
@@ -153,6 +165,11 @@ the matching host OS to actually run `flutter build`.
 
 ## Not yet
 - Full scala3-library TASTy compile-through (the "Layer B" of Phase 2).
+
+See [ROADMAP.md](ROADMAP.md) for the 1.0 plan: language completeness,
+generated facades at scale, a shared Scala core module for frontend +
+backend, and Maven Central releases. [PORTING.md](PORTING.md) is the
+step-by-step playbook for the two 1.0 reference-app ports.
 
 ## Design principles
 
