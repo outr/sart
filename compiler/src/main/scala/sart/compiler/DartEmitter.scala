@@ -1348,6 +1348,7 @@ class DartEmitter(
       case t if isSartRef(t, "scala.None") => "null"
       case Ident(name) => dartSafeName(name)
       case This(_) => "this"
+      case _: Super => "super"
 
       // Scala's Predef auto-inserts implicit wrappers (`augmentString(s)`,
       // `intWrapper(n)`, etc.) so its stdlib-style methods/operators are
@@ -1986,6 +1987,7 @@ class DartEmitter(
       // Materialising chain ops — Scala returns List, Dart returns
       // Iterable, so we force `.toList()` to keep the static type aligned.
       listCall("map")       (c => s"${c.prefix}map(${c.args}).toList()"),
+      listCall("foreach")   (c => s"${c.prefix}forEach(${c.args})"),
       listCall("filter")    (c => s"${c.prefix}where(${c.args}).toList()"),
       listCall("withFilter")(c => s"${c.prefix}where(${c.args}).toList()"),
       listCall("flatMap")   (c => s"${c.prefix}expand(${c.args}).toList()"),

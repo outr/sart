@@ -358,6 +358,13 @@ class EmitterSuite extends FunSuite:
     assert(body.contains("fxmath.sqrt(x)"), body)
   }
 
+  test("super calls and List.foreach emit") {
+    val body = classBody("FxLifecycle")
+    assert(body.contains("super.initState();"), body)
+    val fe = classBody("FxForeach")
+    assert(fe.contains("xs.forEach(f);"), fe)
+  }
+
   test("scala.Some / scala.None lower like the sart.stdlib pair") {
     val body = classBody("FxScalaOpt")
     assert(body.contains("id == 0 ? null : 'found'"), body)

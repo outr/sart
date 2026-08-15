@@ -44,8 +44,13 @@ abstract class StatefulWidget extends Widget:
 abstract class State[W <: StatefulWidget] extends DartObject:
   def widget: W = native.value
   def context: BuildContext = native.value
+  def mounted: Boolean = native.value
   def setState(fn: () => Unit): Unit = native.value
   def build(context: BuildContext): Widget = native.value
+  // Lifecycle — overrides must call super.initState() / super.dispose(),
+  // exactly as in Dart.
+  def initState(): Unit = native.value
+  def dispose(): Unit = native.value
 
 @native
 @DartImport("package:flutter/material.dart")

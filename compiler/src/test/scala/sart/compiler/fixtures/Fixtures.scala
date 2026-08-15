@@ -113,6 +113,18 @@ case class FxKeyed(@JsonField("_id") id: String, label: String)
 class FxScalaOpt:
   def find(id: Int): Option[String] = if id == 0 then None else Some("found")
 
+class FxLifecycleBase:
+  def initState(): Unit = ()
+  def register(): Unit = ()
+
+class FxLifecycle extends FxLifecycleBase:
+  override def initState(): Unit =
+    super.initState()
+    register()
+
+class FxForeach:
+  def visitAll(xs: List[String], f: String => Unit): Unit = xs.foreach(f)
+
 @sart.dart.native
 @sart.dart.DartImport("dart:math")
 @sart.dart.DartAlias("fxmath")
