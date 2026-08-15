@@ -730,10 +730,12 @@ class DartEmitter(
         case dd: DefDef => dd
       }.filterNot { stat =>
         // Drop compiler-synthesised accessors for ctor params (we emit the
-        // fields ourselves) and default-value getters (their literals are
-        // folded into the emitted parameter shape).
+        // fields ourselves), var setters (`x_=`), and default-value getters
+        // (their literals are folded into the emitted parameter shape).
         stat.symbol.flags.is(Flags.ParamAccessor) ||
         stat.symbol.flags.is(Flags.Synthetic) ||
+        stat.symbol.flags.is(Flags.FieldAccessor) ||
+        stat.symbol.name.endsWith("_=") ||
         stat.symbol.name.contains("$default$") ||
         stat.symbol.name == "<init>"
       }
