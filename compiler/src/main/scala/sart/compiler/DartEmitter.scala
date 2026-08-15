@@ -460,11 +460,13 @@ class DartEmitter(
             emitEnumFromCompanion(cd, companion)
           else if sym.flags.is(Flags.Case) then
             emitCaseObject(cd)
-          else if hasUserDefinedBody(cd) then
-            // A `$`-class with user-written methods: typically the synthesised
-            // module for `given X: T with { … }`. Emit as a concrete class so
-            // the corresponding `val X = X$()` resolves.
-            emitClassDef(cd)
+          else if hasUserDefinedBody(cd) || hasUserFields(cd) then
+            // A `$`-class with user-written members. Two varieties:
+            //   - `given X: T with { … }` singleton → concrete class, so the
+            //     corresponding top-level `val X = X$()` resolves.
+            //   - a plain user `object` → a Dart class of static members.
+            if moduleVal.exists && moduleVal.flags.is(Flags.Given) then emitClassDef(cd)
+            else emitStaticObject(cd)
           // Plain companions (case-class `$`, etc.) — skip.
         else if name.contains("$") || sym.flags.is(Flags.Synthetic) then
           () // Synthetic/anonymous classes — skip.
@@ -567,6 +569,42 @@ class DartEmitter(
           !dd.symbol.flags.is(Flags.Synthetic) && dd.symbol.name != "<init>"
         case _ => false
       }
+
+    private def hasUserFields(cd: ClassDef): Boolean =
+      cd.body.exists {
+        case vd: ValDef => !vd.symbol.flags.is(Flags.Synthetic)
+        case _          => false
+      }
+
+    /** A user `object` → a Dart class of static members with a private
+     *  constructor. `Session.user` / `Service.restful(...)` call sites
+     *  line up because the Scala module reference prints as the bare
+     *  object name.
+     */
+    private def emitStaticObject(cd: ClassDef): Unit =
+      val sym = cd.symbol
+      val objName = sym.name.stripSuffix("$")
+      val memberStats = cd.body.collect {
+        case vd: ValDef => vd
+        case dd: DefDef => dd
+      }.filterNot { stat =>
+        stat.symbol.flags.is(Flags.Synthetic) ||
+        stat.symbol.flags.is(Flags.ParamAccessor) ||
+        stat.symbol.name.contains("$default$") ||
+        stat.symbol.name == "<init>"
+      }
+      emitSourceAttribution(sym)
+      line(s"class $objName {")
+      indent += 1
+      line(s"$objName._();")
+      blank()
+      for stat <- memberStats do
+        stat match
+          case vd: ValDef => emitField(vd, static = true)
+          case dd: DefDef => emitMethod(dd, static = true)
+      indent -= 1
+      line("}")
+      blank()
 
     /** Recognise the `@main def foo` wrapper class Scala 3 synthesises.
      *  Heuristic: the class contains a `main(args: Array[String])` method.
@@ -937,12 +975,13 @@ class DartEmitter(
       line("Map<String, dynamic> toJson();")
       blank()
 
-    private def emitField(vd: ValDef): Unit =
+    private def emitField(vd: ValDef, static: Boolean = false): Unit =
       val isMutable = vd.symbol.flags.is(Flags.Mutable)
       // `lazy val` fields → Dart `late final` (first-read initialization).
-      val prefix =
+      val prefix = (if static then "static " else "") + {
         if vd.symbol.flags.is(Flags.Lazy) then "late final "
         else if isMutable then "" else "final "
+      }
       val baseTpe = emitTypeRef(vd.tpt.tpe)
       // Null-initialised fields: Dart's sound null safety rejects
       // `Foo x = null`, so add a `?` to the type when the RHS is a
@@ -955,12 +994,13 @@ class DartEmitter(
       val init = vd.rhs.map(r => s" = ${emitExpr(r)}").getOrElse("")
       line(s"$prefix$tpe ${vd.name}$init;")
 
-    private def emitMethod(dd: DefDef): Unit =
+    private def emitMethod(dd: DefDef, static: Boolean = false): Unit =
       val sym = dd.symbol
       if sym.flags.is(Flags.Synthetic) then return
 
       emitSourceAttribution(sym)
-      if sym.flags.is(Flags.Override) then line("@override")
+      if sym.flags.is(Flags.Override) && !static then line("@override")
+      val staticPrefix = if static then "static " else ""
 
       val retType = emitTypeRef(dd.returnTpt.tpe)
       val params = dd.paramss.flatMap(_.params).collect { case vd: ValDef => vd }
@@ -983,8 +1023,8 @@ class DartEmitter(
       dd.rhs match
         case Some(body) =>
           val header =
-            if isGetter then s"$retType get ${sym.name} {"
-            else s"$retType ${sym.name}$tparams($paramStr) {"
+            if isGetter then s"$staticPrefix$retType get ${sym.name} {"
+            else s"$staticPrefix$retType ${sym.name}$tparams($paramStr) {"
           line(header)
           indent += 1
           emitBodyAsStatements(body, returnLast = retType != "void")
@@ -992,8 +1032,8 @@ class DartEmitter(
           line("}")
           blank()
         case None =>
-          if isGetter then line(s"$retType get ${sym.name};")
-          else line(s"$retType ${sym.name}$tparams($paramStr);")
+          if isGetter then line(s"$staticPrefix$retType get ${sym.name};")
+          else line(s"$staticPrefix$retType ${sym.name}$tparams($paramStr);")
 
     /** Extract `[T <: Foo, U]`-style type parameters from a `DefDef`
      *  (including the primary constructor, which is how class-level type
@@ -1129,6 +1169,10 @@ class DartEmitter(
       // via `emitCaseObject`, which IS the Dart identity — the pointer
       // val has no meaning in Dart and would just dangle.
       if typeSym.flags.is(Flags.Case) && typeSym.flags.is(Flags.Module) then return
+      // The pointer val behind a plain user `object` (emitted as a Dart
+      // class of statics) has no Dart meaning either — only `given`
+      // singletons keep their value binding.
+      if typeSym.flags.is(Flags.Module) && !sym.flags.is(Flags.Given) then return
       // For a val whose static type is a module class (e.g. the synthesised
       // singleton behind `given intFormatter: Formatter[Int] with { … }`)
       // widen to the first real parent, so the Dart variable references

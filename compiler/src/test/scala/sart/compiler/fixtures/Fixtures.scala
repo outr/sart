@@ -116,6 +116,14 @@ sealed trait FxWire
 case class FxPing(seq: Int) extends FxWire
 case class FxPong(seq: Int, note: String) extends FxWire
 
+object FxRegistry:
+  var current: String = ""
+  val limit: Int = 10
+  def isActive: Boolean = current != ""
+  def register(name: String): String =
+    current = name
+    name
+
 class FxBase(val label: String):
   def describe(): String = "base " + label
 

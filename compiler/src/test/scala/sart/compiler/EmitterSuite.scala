@@ -331,6 +331,16 @@ class EmitterSuite extends FunSuite:
     assert(body.contains(".map(") && body.contains(".toList()"), body)
   }
 
+  test("user object emits as a Dart class of static members") {
+    val body = classBody("FxRegistry")
+    assert(body.contains("FxRegistry._();"), body)
+    assert(body.contains("static String current"), body)
+    assert(body.contains("static final int limit = 10;"), body)
+    assert(body.contains("static bool get isActive {"), body)
+    assert(body.contains("static String register(String name) {"), body)
+    assert(!emittedMain.contains("FxRegistry$"), "module val or class leaked")
+  }
+
   test("@JsonModel case class gets fromJson/toJson in json_serializable shape") {
     val body = classBody("FxUser")
     assert(body.contains("static FxUser fromJson(Map<String, dynamic> json) =>"), body)
