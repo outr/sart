@@ -21,7 +21,18 @@ what to build next, and the concrete first steps for each app port.
   chains (unknown types collapse to the nearest facaded supertype).
   Works against SDK sources and, in principle, any pub package source.
 - **Emitter**: everything in the README's "what works" list, plus (new)
-  `while` loops and `lazy val` → `late final`.
+  `while` loops, `lazy val` → `late final`, `Future.successful/failed`,
+  **named/required/default parameters for user-defined code** (literal
+  defaults become Dart named sections on methods and constructors, call
+  sites shaped to match, `.copy` → `copyWith`), and the **`Dyn` dynamic
+  bridge** (`sart.dart.Dyn` → `dynamic`, `d(key)`/`d.str`/`d.toInt`/
+  `d.isNull` lowerings) with `sart.stdlib.convert` (`jsonEncode`/
+  `jsonDecode`) for the wire boundary.
+- **User-authored facades**: `@native` objects/classes declared in app
+  code work (annotations recorded, no Dart leakage) — `app-sart`'s
+  `package:http` facade is the template, and its `@DartPackage`
+  annotation feeds the emitted pubspec. The login slice now POSTs the
+  real `/authenticate` JSON protocol through it.
 
 ## Not built yet — the gating work, in build order
 
@@ -31,24 +42,25 @@ dependency order for the ports. Build each against fixtures first
 `sbt compiler/testFull sartGoldenVerify` green, and let `--strict`
 find what's missing.
 
-1. **Named-parameter emission for user-defined Scala methods/classes**
-   (Dart named params with defaults + `required`) — both apps are
-   named-param-heavy at every layer.
+1. ~~Named-parameter emission~~ **✅ landed** (literal defaults; the
+   non-literal-default follow-up is default-getter emission).
 2. **Super-parameter forwarding & multi-parent emission** (`super.key`,
    `implements`/`with`, `: super(...)` initializers) — needed the moment
    a ported widget subclasses another ported widget or applies a
-   framework mixin.
+   framework mixin (`mixin Screen on StatelessWidget` in outr_flutter).
 3. **Sealed-hierarchy JSON codecs** (`fromJson` tag dispatch, `toJson`
    with `map['type']`, `copyWith`, `props`, `deepClone`) byte-matching
    the existing generated model wire shape — unlocks replacing LN's
    `lib/model/**` + nabo's model layer with the shared Scala module.
-4. **`Dyn` type** in `sart-dart` lowering to Dart `dynamic`, plus
-   `Map[String, Dyn]` ergonomics — the transport boundary of both apps.
-5. **`const` inference** — start early, validate on real hardware; it's
+4. ~~`Dyn` type~~ **✅ landed** (with `sart.stdlib.convert`; richer
+   `Map[String, Dyn]` ergonomics as needed).
+5. **go_router facade** (generate via facadegen) — LN's 14 routes and
+   the app shell.
+6. **`const` inference** — start early, validate on real hardware; it's
    a perf cliff, not a correctness one.
-6. **Overload disambiguation, switch statements, getter-emission rules,
+7. **Overload disambiguation, switch statements, getter-emission rules,
    `@DartCovariant`** — round out the 0.2 milestone.
-7. **Conditional-export mechanism** (14 sites in nabo, 2 in
+8. **Conditional-export mechanism** (14 sites in nabo, 2 in
    outr_flutter) and `package:web`/JS-interop facades — needed by 0.5+.
 
 ## LogicalNetwork port (first target — milestone 0.6)
