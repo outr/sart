@@ -590,7 +590,9 @@ class DartEmitter(
       }.filterNot { stat =>
         stat.symbol.flags.is(Flags.Synthetic) ||
         stat.symbol.flags.is(Flags.ParamAccessor) ||
+        stat.symbol.flags.is(Flags.FieldAccessor) ||
         stat.symbol.name.contains("$default$") ||
+        stat.symbol.name.endsWith("_=") ||
         stat.symbol.name == "<init>"
       }
       emitSourceAttribution(sym)
@@ -1204,6 +1206,11 @@ class DartEmitter(
      *  true, the final expression is prefixed with `return`.
      */
     private def emitBodyAsStatements(t: Tree, returnLast: Boolean): Unit = t match
+      // A body that IS a lambda — `def redirect = (c, s) => …` — arrives
+      // as Block(List(DefDef), Closure). Route it through the expression
+      // path whole, before the generic Block split would tear it apart.
+      case b @ Block(List(_: DefDef), _: Closure) =>
+        emitTerminal(b, returnLast)
       // Temp-val desugar at body position — route through the expression
       // path so the block-inliner collapses the synthetic `val xN$M = …`
       // hoisting into a single call. Without this, method bodies that
@@ -2154,6 +2161,9 @@ class DartEmitter(
       sym.exists && sym.fullName.startsWith("scala.collection.") &&
         !isMapReceiver(t) && !isSetReceiver(t)
 
+    private def isUnitTyped(t: Term): Boolean =
+      t.tpe.typeSymbol.fullName == "scala.Unit"
+
     /** Record the annotations of a bare Ident's owning facade object (and
      *  its companions) — no-op for non-facade owners.
      */
@@ -2616,6 +2626,9 @@ class DartEmitter(
       dd.rhs match
         case Some(body) =>
           body match
+            // A statless Block is just a wrapper — unwrap to the arrow form.
+            case Block(Nil, expr: Term) =>
+              s"($paramStr) => ${emitExpr(expr)}"
             // Temp-val desugar inside a closure body — inline the same way
             // we do for method bodies. Without this, closures that build
             // a widget with named/default args come out as `(ctx, i) {
@@ -2639,7 +2652,8 @@ class DartEmitter(
               }
               expr match
                 case Literal(c) if c.value == () => ()
-                case term: Term => sb.append(emitExpr(term)).append("; ")
+                case term: Term if isUnitTyped(term) => sb.append(emitExpr(term)).append("; ")
+                case term: Term => sb.append("return ").append(emitExpr(term)).append("; ")
                 case _ => ()
               sb.append("}")
               sb.toString

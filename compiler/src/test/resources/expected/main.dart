@@ -193,14 +193,14 @@ class ClockAppState extends State<ClockApp> {
 
   /// Source: example/src/main/scala/example/apps/ClockApp.scala:18
   void start() {
-    setState(() {
-      timer = Timer.periodic(
+    setState(
+      () => timer = Timer.periodic(
         Duration(seconds: 1),
         (t) => setState(() {
           seconds = seconds + 1;
         }),
-      );
-    });
+      ),
+    );
   }
 
   /// Source: example/src/main/scala/example/apps/ClockApp.scala:28
