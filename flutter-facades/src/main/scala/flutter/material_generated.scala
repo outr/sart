@@ -10652,6 +10652,146 @@ class ListTile(
 object ListTile:
   def divideTiles(context: BuildContext = native.value, tiles: List[Widget], color: Color = native.value): List[Widget] = native.value
 
+// ─── dialog.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class AlertDialog(
+  val key: Key = native.value,
+  val icon: Widget = native.value,
+  val iconPadding: EdgeInsetsGeometry = native.value,
+  val iconColor: Color = native.value,
+  val title: Widget = native.value,
+  val titlePadding: EdgeInsetsGeometry = native.value,
+  val titleTextStyle: TextStyle = native.value,
+  val content: Widget = native.value,
+  val contentPadding: EdgeInsetsGeometry = native.value,
+  val contentTextStyle: TextStyle = native.value,
+  val actions: List[Widget] = native.value,
+  val actionsPadding: EdgeInsetsGeometry = native.value,
+  val actionsAlignment: MainAxisAlignment = native.value,
+  val actionsOverflowAlignment: DartObject = native.value,
+  val actionsOverflowDirection: DartObject = native.value,
+  val actionsOverflowButtonSpacing: Double = native.value,
+  val buttonPadding: EdgeInsetsGeometry = native.value,
+  val backgroundColor: Color = native.value,
+  val elevation: Double = native.value,
+  val shadowColor: Color = native.value,
+  val surfaceTintColor: Color = native.value,
+  val semanticLabel: String = native.value,
+  val insetPadding: EdgeInsets = native.value,
+  val clipBehavior: DartObject = native.value,
+  val shape: DartObject = native.value,
+  val alignment: AlignmentGeometry = native.value,
+  val constraints: DartObject = native.value,
+  val scrollable: Boolean = native.value
+) extends StatelessWidget
+
+@native
+@DartImport("package:flutter/material.dart")
+object AlertDialog:
+  def adaptive(key: Key = native.value, icon: Widget = native.value, iconPadding: EdgeInsetsGeometry = native.value, iconColor: Color = native.value, title: Widget = native.value, titlePadding: EdgeInsetsGeometry = native.value, titleTextStyle: TextStyle = native.value, content: Widget = native.value, contentPadding: EdgeInsetsGeometry = native.value, contentTextStyle: TextStyle = native.value, actions: List[Widget] = native.value, actionsPadding: EdgeInsetsGeometry = native.value, actionsAlignment: MainAxisAlignment = native.value, actionsOverflowAlignment: DartObject = native.value, actionsOverflowDirection: DartObject = native.value, actionsOverflowButtonSpacing: Double = native.value, buttonPadding: EdgeInsetsGeometry = native.value, backgroundColor: Color = native.value, elevation: Double = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, semanticLabel: String = native.value, insetPadding: EdgeInsets = native.value, clipBehavior: DartObject = native.value, shape: DartObject = native.value, alignment: AlignmentGeometry = native.value, constraints: DartObject = native.value, scrollable: Boolean = native.value, scrollController: DartObject = native.value, actionScrollController: DartObject = native.value, insetAnimationDuration: sart.stdlib.Duration = native.value, insetAnimationCurve: DartObject = native.value): AlertDialog = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+class SimpleDialog(
+  val key: Key = native.value,
+  val title: Widget = native.value,
+  val titlePadding: EdgeInsetsGeometry = native.value,
+  val titleTextStyle: TextStyle = native.value,
+  val children: List[Widget] = native.value,
+  val contentPadding: EdgeInsetsGeometry = native.value,
+  val contentTextStyle: TextStyle = native.value,
+  val backgroundColor: Color = native.value,
+  val elevation: Double = native.value,
+  val shadowColor: Color = native.value,
+  val surfaceTintColor: Color = native.value,
+  val semanticLabel: String = native.value,
+  val insetPadding: EdgeInsets = native.value,
+  val clipBehavior: DartObject = native.value,
+  val shape: DartObject = native.value,
+  val alignment: AlignmentGeometry = native.value,
+  val constraints: DartObject = native.value
+) extends StatelessWidget
+
+// ─── data_table.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class DataColumn(
+  val label: Widget,
+  val columnWidth: DartObject = native.value,
+  val tooltip: String = native.value,
+  val numeric: Boolean = native.value,
+  val onSort: (Int, Boolean) => Unit = native.value,
+  val mouseCursor: DartObject = native.value,
+  val headingRowAlignment: MainAxisAlignment = native.value
+) extends DartObject
+
+@native
+@DartImport("package:flutter/material.dart")
+class DataRow(
+  val key: Key = native.value,
+  val selected: Boolean = native.value,
+  val onSelectChanged: Boolean => Unit = native.value,
+  val onLongPress: () => Unit = native.value,
+  val onHover: Boolean => Unit = native.value,
+  val color: DartObject = native.value,
+  val mouseCursor: DartObject = native.value,
+  val cells: List[DataCell]
+) extends DartObject
+
+@native
+@DartImport("package:flutter/material.dart")
+object DataRow:
+  def byIndex(index: Int = native.value, selected: Boolean = native.value, onSelectChanged: Boolean => Unit = native.value, onLongPress: () => Unit = native.value, onHover: Boolean => Unit = native.value, color: DartObject = native.value, mouseCursor: DartObject = native.value, cells: List[DataCell]): DataRow = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+class DataCell(
+  val child: Widget,
+  val placeholder: Boolean = native.value,
+  val showEditIcon: Boolean = native.value,
+  val onTap: () => Unit = native.value,
+  val onLongPress: () => Unit = native.value,
+  val onTapDown: DartObject => Unit = native.value,
+  val onDoubleTap: () => Unit = native.value,
+  val onTapCancel: () => Unit = native.value
+) extends DartObject
+
+@native
+@DartImport("package:flutter/material.dart")
+object DataCell:
+  def empty: DataCell = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+class DataTable(
+  val key: Key = native.value,
+  val columns: List[DataColumn],
+  val sortColumnIndex: Int = native.value,
+  val sortAscending: Boolean = native.value,
+  val onSelectAll: Boolean => Unit = native.value,
+  val decoration: Decoration = native.value,
+  val dataRowColor: DartObject = native.value,
+  val dataRowHeight: Double = native.value,
+  val dataRowMinHeight: Double = native.value,
+  val dataRowMaxHeight: Double = native.value,
+  val dataTextStyle: TextStyle = native.value,
+  val headingRowColor: DartObject = native.value,
+  val headingRowHeight: Double = native.value,
+  val headingTextStyle: TextStyle = native.value,
+  val horizontalMargin: Double = native.value,
+  val columnSpacing: Double = native.value,
+  val showCheckboxColumn: Boolean = native.value,
+  val showBottomBorder: Boolean = native.value,
+  val dividerThickness: Double = native.value,
+  val rows: List[DataRow],
+  val checkboxHorizontalMargin: Double = native.value,
+  val border: DartObject = native.value,
+  val clipBehavior: DartObject = native.value
+) extends StatelessWidget
+
 // ─── tabs.dart ────────────────────────────────────────
 
 @native
