@@ -1518,6 +1518,13 @@ class DartEmitter(
       if args.isEmpty && dartGetterNames(name) then
         return emitMemberAccess(qual, name)
 
+      // Future companion constructors: Dart spells them differently.
+      if isFutureCompanion(qual) then
+        name match
+          case "successful" => return s"Future.value(${emitArgs(args)})"
+          case "failed"     => return s"Future.error(${emitArgs(args)})"
+          case _            => ()
+
       // Future.map/flatMap both map to Dart's `.then` — `.then` already
       // handles both the value-returning and Future-returning shapes via
       // its overloads, so we don't need the Scala distinction in Dart.
@@ -1821,6 +1828,11 @@ class DartEmitter(
       val sym = t.tpe.typeSymbol
       sym.exists && sym.fullName.startsWith("scala.collection.") &&
         !isMapReceiver(t) && !isSetReceiver(t)
+
+    /** True when `t` is the `scala.concurrent.Future` companion object. */
+    private def isFutureCompanion(t: Term): Boolean =
+      val sym = t.tpe.termSymbol
+      sym.exists && sym.fullName == "scala.concurrent.Future"
 
     /** True when `t`'s static type is `scala.concurrent.Future[...]`. */
     private def isFutureReceiver(t: Term): Boolean =
@@ -2217,8 +2229,10 @@ class DartEmitter(
 
       var out = emitExpr(expr)
       for (name, value) <- subs do
+        // Not `\b`: compiler temps like `$1$` start/end with `$`, which
+        // isn't a regex word character, so `\b` never matches around it.
         out = out.replaceAll(
-          s"\\b${java.util.regex.Pattern.quote(name)}\\b",
+          s"(?<![A-Za-z0-9_$$])${java.util.regex.Pattern.quote(name)}(?![A-Za-z0-9_$$])",
           java.util.regex.Matcher.quoteReplacement(value)
         )
 
@@ -2253,6 +2267,10 @@ class DartEmitter(
       // need to bypass the standard `base<T, U>` template because they
       // format differently (e.g. `Option[T]` → `T?`, not `Option<T>`).
       sym.fullName match
+        // The facade marker base class has no Dart-side existence — in
+        // type position it's just "any Dart object".
+        case "sart.dart.DartObject" =>
+          return "Object"
         case "sart.stdlib.Option" | "scala.Option" =>
           // Both the hand-ported `sart.stdlib.Option` and Scala's built-in
           // `scala.Option` map to Dart's `T?` nullable. Flag the shim AND

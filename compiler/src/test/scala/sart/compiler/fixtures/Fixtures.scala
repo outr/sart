@@ -105,6 +105,11 @@ class FxRanges:
   def exclusive(n: Int): List[Int] = (0 until n).toList
   def squared(n: Int): List[Int]   = (0 until n).map(i => i * i).toList
 
+class FxFutureCtor:
+  import scala.concurrent.Future
+  def ready(n: Int): Future[Int]          = Future.successful(n)
+  def broken(e: Exception): Future[Int]   = Future.failed(e)
+
 class FxWhileLoop:
   def countdown(n: Int): Int =
     var i = n

@@ -330,6 +330,12 @@ class EmitterSuite extends FunSuite:
     assert(body.contains(".map(") && body.contains(".toList()"), body)
   }
 
+  test("Future.successful / Future.failed emit Dart Future.value / Future.error") {
+    val body = classBody("FxFutureCtor")
+    assert(body.contains("Future.value(n)"), body)
+    assert(body.contains("Future.error(e)"), body)
+  }
+
   test("while loop emits a Dart while statement") {
     val body = classBody("FxWhileLoop")
     assert(body.contains("while (i > 0) {"), body)
