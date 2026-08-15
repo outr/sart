@@ -105,7 +105,13 @@ class FxRanges:
   def exclusive(n: Int): List[Int] = (0 until n).toList
   def squared(n: Int): List[Int]   = (0 until n).map(i => i * i).toList
 
-import sart.dart.{Dyn, Json, JsonModel, JsonTag}
+import sart.dart.{Dyn, Json, JsonField, JsonModel, JsonTag}
+
+@JsonModel
+case class FxKeyed(@JsonField("_id") id: String, label: String)
+
+class FxScalaOpt:
+  def find(id: Int): Option[String] = if id == 0 then None else Some("found")
 
 class FxJsonBridge:
   def parse(d: Dyn): FxUser = Json.decode[FxUser](d)

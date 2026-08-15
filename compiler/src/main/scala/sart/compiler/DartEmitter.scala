@@ -938,12 +938,21 @@ class DartEmitter(
      *  with json_serializable output (`explicitToJson: true` shape). A
      *  sealed-hierarchy member also writes its `type` tag.
      */
+    /** The JSON key for a @JsonModel field: `@JsonField("...")` if
+     *  present, else the field's own name.
+     */
+    private def jsonKeyOf(p: ValDef): String =
+      p.symbol.annotations.collectFirst {
+        case a if annoFqn(a) == "sart.dart.JsonField" =>
+          constArgs(a).collectFirst { case s: String => s }
+      }.flatten.getOrElse(p.name)
+
     private def emitJsonSynths(className: String, shape: DartParamShape, tag: Option[String]): Unit =
       val all = shape.positional ++ shape.named.map(_._1)
       // fromJson — constructor call mirrors the emitted ctor shape.
       val ctorArgs =
-        (shape.positional.map(p => jsonDecodeExpr(p.tpt.tpe, s"json['${p.name}']")) ++
-          shape.named.map((p, _) => s"${p.name}: ${jsonDecodeExpr(p.tpt.tpe, s"json['${p.name}']")}"))
+        (shape.positional.map(p => jsonDecodeExpr(p.tpt.tpe, s"json['${jsonKeyOf(p)}']")) ++
+          shape.named.map((p, _) => s"${p.name}: ${jsonDecodeExpr(p.tpt.tpe, s"json['${jsonKeyOf(p)}']")}"))
           .mkString(", ")
       line(s"static $className fromJson(Map<String, dynamic> json) =>")
       indent += 1
@@ -955,7 +964,7 @@ class DartEmitter(
       line(s"Map<String, dynamic> toJson() => {")
       indent += 1
       for p <- all do
-        line(s"'${p.name}': ${jsonEncodeExpr(p.tpt.tpe, p.name.toString)},")
+        line(s"'${jsonKeyOf(p)}': ${jsonEncodeExpr(p.tpt.tpe, p.name.toString)},")
       tag.foreach(t => line(s"'type': '$t',"))
       indent -= 1
       line("};")
@@ -1321,6 +1330,7 @@ class DartEmitter(
       // Hand-ported stdlib singletons — must precede the generic `Ident` /
       // `Select` fallbacks or those would swallow the reference.
       case t if isSartRef(t, "sart.stdlib.None") => "null"
+      case t if isSartRef(t, "scala.None") => "null"
       case Ident(name) => dartSafeName(name)
       case This(_) => "this"
 
@@ -1406,9 +1416,9 @@ class DartEmitter(
 
       // `sart.stdlib.Some(x)` → just `x` — Dart promotes the non-null value
       // into the nullable type automatically.
-      case Apply(Select(qual, "apply"), args) if isSartRef(qual, "sart.stdlib.Some") =>
+      case Apply(Select(qual, "apply"), args) if isSartRef(qual, "sart.stdlib.Some") || isSartRef(qual, "scala.Some") =>
         args.headOption.map(emitExpr).getOrElse("null")
-      case Apply(TypeApply(Select(qual, "apply"), _), args) if isSartRef(qual, "sart.stdlib.Some") =>
+      case Apply(TypeApply(Select(qual, "apply"), _), args) if isSartRef(qual, "sart.stdlib.Some") || isSartRef(qual, "scala.Some") =>
         args.headOption.map(emitExpr).getOrElse("null")
 
       // `Todo.apply(x, y)` on a case-class companion → `Todo(x, y)`. Scala

@@ -352,6 +352,17 @@ class EmitterSuite extends FunSuite:
     assert(body.contains("'name': name,"), body)
   }
 
+  test("scala.Some / scala.None lower like the sart.stdlib pair") {
+    val body = classBody("FxScalaOpt")
+    assert(body.contains("id == 0 ? null : 'found'"), body)
+  }
+
+  test("@JsonField overrides the JSON key") {
+    val body = classBody("FxKeyed")
+    assert(body.contains("(json['_id'] as String)"), body)
+    assert(body.contains("'_id': id,"), body)
+  }
+
   test("Json.decode/encode lower to the synthesized codecs") {
     val body = classBody("FxJsonBridge")
     assert(body.contains("FxUser.fromJson(d as Map<String, dynamic>)"), body)

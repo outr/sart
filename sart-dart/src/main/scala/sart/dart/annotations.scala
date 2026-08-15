@@ -108,3 +108,9 @@ final class JsonModel extends StaticAnnotation
  *  and matches in JSON. Defaults to the class's simple name.
  */
 final class JsonTag(val tag: String) extends StaticAnnotation
+
+/** Overrides the JSON key a `@JsonModel` field reads/writes — the
+ *  counterpart of json_serializable's `@JsonKey(name: '...')`
+ *  (e.g. LightDB's `_id`).
+ */
+final class JsonField(val name: String) extends StaticAnnotation
