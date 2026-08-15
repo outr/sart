@@ -92,3 +92,19 @@ final class DartPubspec(val yaml: String) extends StaticAnnotation
  *  }}}
  */
 final class DartTopLevel extends StaticAnnotation
+
+// ─── JSON codec synthesis ──────────────────────────────────────────────────
+
+/** Marks a case class — or a sealed trait of case classes — for JSON
+ *  codec synthesis. Sart emits `fromJson` / `toJson` on the Dart class,
+ *  matching the wire shape of json_serializable-generated models:
+ *  string-keyed maps, nested `toJson` expansion, and (for members of a
+ *  sealed hierarchy) a `type` discriminator with a factory dispatch on
+ *  the sealed parent.
+ */
+final class JsonModel extends StaticAnnotation
+
+/** Overrides the `type` discriminator a sealed-hierarchy member writes
+ *  and matches in JSON. Defaults to the class's simple name.
+ */
+final class JsonTag(val tag: String) extends StaticAnnotation

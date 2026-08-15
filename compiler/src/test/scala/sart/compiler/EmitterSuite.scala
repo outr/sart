@@ -37,7 +37,8 @@ class EmitterSuite extends FunSuite:
     val cp = List(
       tastyRoot.toString,
       codeSourcePath(classOf[scala.runtime.TupleXXL]), // scala3-library
-      codeSourcePath(classOf[scala.Option[?]])         // scala-library
+      codeSourcePath(classOf[scala.Option[?]]),        // scala-library
+      codeSourcePath(classOf[sart.dart.native])        // sart-dart annotations
     ).distinct
     val emitter = new DartEmitter(outDir)
     val ok = TastyInspector.inspectAllTastyFiles(tastyFiles, Nil, cp)(emitter)
@@ -328,6 +329,27 @@ class EmitterSuite extends FunSuite:
   test("Range `.map(f)` chains through the list-like rewrite to .map().toList()") {
     val body = classBody("FxRanges")
     assert(body.contains(".map(") && body.contains(".toList()"), body)
+  }
+
+  test("@JsonModel case class gets fromJson/toJson in json_serializable shape") {
+    val body = classBody("FxUser")
+    assert(body.contains("static FxUser fromJson(Map<String, dynamic> json) =>"), body)
+    assert(body.contains("(json['name'] as String)"), body)
+    assert(body.contains("(json['age'] as num).toInt()"), body)
+    assert(body.contains("(json['tags'] as List<dynamic>).map((e) => (e as String)).toList()"), body)
+    assert(body.contains("json['nickname'] == null ? null : (json['nickname'] as String)"), body)
+    assert(body.contains("Map<String, dynamic> toJson() => {"), body)
+    assert(body.contains("'name': name,"), body)
+  }
+
+  test("@JsonModel sealed hierarchy dispatches on the type tag") {
+    val parent = classBody("FxWire")
+    assert(parent.contains("static FxWire fromJson(Map<String, dynamic> json) {"), parent)
+    assert(parent.contains("if (t == 'Wire.Ping') return FxPing.fromJson(json);"), parent)
+    assert(parent.contains("if (t == 'FxPong') return FxPong.fromJson(json);"), parent)
+    assert(parent.contains("Map<String, dynamic> toJson();"), parent)
+    val ping = classBody("FxPing")
+    assert(ping.contains("'type': 'Wire.Ping',"), ping)
   }
 
   test("subclassing a user class emits a super(...) initializer") {

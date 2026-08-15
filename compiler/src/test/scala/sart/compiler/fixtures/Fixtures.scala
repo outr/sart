@@ -105,6 +105,17 @@ class FxRanges:
   def exclusive(n: Int): List[Int] = (0 until n).toList
   def squared(n: Int): List[Int]   = (0 until n).map(i => i * i).toList
 
+import sart.dart.{JsonModel, JsonTag}
+
+@JsonModel
+case class FxUser(name: String, age: Int, tags: List[String], nickname: Option[String])
+
+@JsonModel
+sealed trait FxWire
+@JsonTag("Wire.Ping")
+case class FxPing(seq: Int) extends FxWire
+case class FxPong(seq: Int, note: String) extends FxWire
+
 class FxBase(val label: String):
   def describe(): String = "base " + label
 

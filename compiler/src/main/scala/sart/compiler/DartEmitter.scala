@@ -321,6 +321,18 @@ class DartEmitter(
     private def hasNative(sym: Symbol): Boolean =
       sym.annotations.exists(a => annoFqn(a) == "sart.dart.native")
 
+    private def hasJsonModel(sym: Symbol): Boolean =
+      sym.annotations.exists(a => annoFqn(a) == "sart.dart.JsonModel")
+
+    /** The JSON `type` discriminator for a sealed-hierarchy member:
+     *  `@JsonTag("...")` if present, else the class's simple name.
+     */
+    private def jsonTagOf(sym: Symbol): String =
+      sym.annotations.collectFirst {
+        case a if annoFqn(a) == "sart.dart.JsonTag" =>
+          constArgs(a).collectFirst { case s: String => s }
+      }.flatten.getOrElse(sym.name)
+
     /** Unwrap a `Literal(Constant(...))` into its underlying value, whatever
      *  the concrete `Constant` subtype is.
      */
@@ -748,6 +760,17 @@ class DartEmitter(
       if sym.flags.is(Flags.Case) && ctorParams.nonEmpty then
         emitCaseClassSynths(className, ctorParams, ctorShape)
 
+      // JSON codec synthesis: annotated case classes (or every member of
+      // an annotated sealed hierarchy) get fromJson/toJson; the sealed
+      // parent itself gets the type-tag dispatch factory.
+      val sealedJsonParent = parents.extendsTpt.map(_.tpe.typeSymbol)
+        .filter(p => p.flags.is(Flags.Sealed) && hasJsonModel(p))
+      if sym.flags.is(Flags.Case) && ctorParams.nonEmpty
+         && (hasJsonModel(sym) || sealedJsonParent.isDefined) then
+        emitJsonSynths(className, ctorShape, sealedJsonParent.map(_ => jsonTagOf(sym)))
+      if sym.flags.is(Flags.Sealed) && hasJsonModel(sym) then
+        emitSealedJsonDispatch(className, sym)
+
       indent -= 1
       line("}")
       blank()
@@ -794,7 +817,11 @@ class DartEmitter(
       // copyWith — method's own parameters are named (Dart convention for
       // `copyWith`); the body's constructor call mirrors the emitted ctor
       // shape (positional prefix, named section for defaulted params).
-      val cwParams = names.zip(types).map { case (n, t) => s"$t? $n" }.mkString(", ")
+      // Already-nullable field types (Option-mapped) keep a single `?`.
+      val cwParams = names.zip(types).map { case (n, t) =>
+        val opt = if t.endsWith("?") then t else s"$t?"
+        s"$opt $n"
+      }.mkString(", ")
       val cwArgs =
         (shape.positional.map(p => s"${p.name} ?? this.${p.name}") ++
           shape.named.map((p, _) => s"${p.name}: ${p.name} ?? this.${p.name}")).mkString(", ")
@@ -802,6 +829,113 @@ class DartEmitter(
       indent += 1
       line(s"$className($cwArgs);")
       indent -= 1
+
+    // ── JSON codec synthesis (@JsonModel) ────────────────────────────────
+
+    /** Decode `src` (a `dynamic` from a JSON map) into the Dart value for
+     *  Scala type `tpe`.
+     */
+    private def jsonDecodeExpr(rawTpe: TypeRepr, src: String): String =
+      val tpe = rawTpe.dealias
+      val sym = tpe.typeSymbol
+      def arg0: Option[TypeRepr] = tpe match
+        case AppliedType(_, List(a: TypeRepr)) => Some(a)
+        case _                                 => None
+      def arg1: Option[TypeRepr] = tpe match
+        case AppliedType(_, List(_, b: TypeRepr)) => Some(b)
+        case _                                    => None
+      sym.fullName match
+        case "scala.Int"        => s"($src as num).toInt()"
+        case "scala.Long"       => s"($src as num).toInt()"
+        case "scala.Double"     => s"($src as num).toDouble()"
+        case "scala.Boolean"    => s"($src as bool)"
+        case "java.lang.String" => s"($src as String)"
+        case "sart.dart.Dyn"    => src
+        case "scala.Option" | "sart.stdlib.Option" =>
+          arg0.map(a => s"$src == null ? null : ${jsonDecodeExpr(a, src)}")
+            .getOrElse(src)
+        case "scala.collection.immutable.List" | "scala.collection.Seq"
+           | "scala.collection.immutable.Seq" =>
+          arg0.map(a => s"($src as List<dynamic>).map((e) => ${jsonDecodeExpr(a, "e")}).toList()")
+            .getOrElse(src)
+        case "scala.collection.immutable.Map" =>
+          arg1 match
+            case Some(v) if v.typeSymbol.fullName == "java.lang.String" =>
+              s"($src as Map<String, dynamic>).map((k, v) => MapEntry(k, v as String))"
+            case _ => s"($src as Map<String, dynamic>)"
+        case _ if sym.flags.is(Flags.Case) || (sym.flags.is(Flags.Sealed) && hasJsonModel(sym)) =>
+          s"${sym.name}.fromJson($src as Map<String, dynamic>)"
+        case _ => src
+
+    /** Encode the field value `ref` of Scala type `tpe` for a JSON map. */
+    private def jsonEncodeExpr(rawTpe: TypeRepr, ref: String): String =
+      val tpe = rawTpe.dealias
+      val sym = tpe.typeSymbol
+      def arg0: Option[TypeRepr] = tpe match
+        case AppliedType(_, List(a: TypeRepr)) => Some(a)
+        case _                                 => None
+      sym.fullName match
+        case "scala.Int" | "scala.Long" | "scala.Double" | "scala.Boolean"
+           | "java.lang.String" | "sart.dart.Dyn" => ref
+        case "scala.Option" | "sart.stdlib.Option" =>
+          arg0 match
+            case Some(a) if isJsonObjectLike(a) => s"$ref?.toJson()"
+            case _                              => ref
+        case "scala.collection.immutable.List" | "scala.collection.Seq"
+           | "scala.collection.immutable.Seq" =>
+          arg0 match
+            case Some(a) if isJsonObjectLike(a) => s"$ref.map((e) => e.toJson()).toList()"
+            case _                              => ref
+        case _ if isJsonObjectLike(tpe) => s"$ref.toJson()"
+        case _ => ref
+
+    private def isJsonObjectLike(tpe: TypeRepr): Boolean =
+      val sym = tpe.dealias.typeSymbol
+      (sym.flags.is(Flags.Case) && !hasNative(sym)) ||
+        (sym.flags.is(Flags.Sealed) && hasJsonModel(sym))
+
+    /** `fromJson` / `toJson` for a @JsonModel case class, wire-compatible
+     *  with json_serializable output (`explicitToJson: true` shape). A
+     *  sealed-hierarchy member also writes its `type` tag.
+     */
+    private def emitJsonSynths(className: String, shape: DartParamShape, tag: Option[String]): Unit =
+      val all = shape.positional ++ shape.named.map(_._1)
+      // fromJson — constructor call mirrors the emitted ctor shape.
+      val ctorArgs =
+        (shape.positional.map(p => jsonDecodeExpr(p.tpt.tpe, s"json['${p.name}']")) ++
+          shape.named.map((p, _) => s"${p.name}: ${jsonDecodeExpr(p.tpt.tpe, s"json['${p.name}']")}"))
+          .mkString(", ")
+      line(s"static $className fromJson(Map<String, dynamic> json) =>")
+      indent += 1
+      line(s"$className($ctorArgs);")
+      indent -= 1
+      blank()
+      // toJson
+      if tag.isDefined then line("@override")
+      line(s"Map<String, dynamic> toJson() => {")
+      indent += 1
+      for p <- all do
+        line(s"'${p.name}': ${jsonEncodeExpr(p.tpt.tpe, p.name.toString)},")
+      tag.foreach(t => line(s"'type': '$t',"))
+      indent -= 1
+      line("};")
+      blank()
+
+    /** The sealed parent's side of the codec: an abstract `toJson` and a
+     *  `fromJson` factory dispatching on the `type` discriminator.
+     */
+    private def emitSealedJsonDispatch(className: String, sym: Symbol): Unit =
+      line(s"static $className fromJson(Map<String, dynamic> json) {")
+      indent += 1
+      line("final String t = json['type'] as String;")
+      for child <- sym.children do
+        line(s"if (t == '${jsonTagOf(child)}') return ${child.name}.fromJson(json);")
+      line("throw Exception('Unsupported type: ' + t);")
+      indent -= 1
+      line("}")
+      blank()
+      line("Map<String, dynamic> toJson();")
+      blank()
 
     private def emitField(vd: ValDef): Unit =
       val isMutable = vd.symbol.flags.is(Flags.Mutable)

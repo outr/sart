@@ -125,6 +125,7 @@ lazy val example = (project in file("example"))
 // The Scala 3 → Dart compiler itself. Reads TASTy via tasty-inspector and
 // writes Dart source to `out/`.
 lazy val compiler = (project in file("compiler"))
+  .dependsOn(`sart-dart` % "test")
   .settings(
     name := "sart-compiler",
     libraryDependencies ++= Seq(
