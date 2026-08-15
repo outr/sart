@@ -55,6 +55,7 @@ ThisBuild / publishMavenStyle := true
 @transient val sartWindows       = taskKey[File]("Build a Flutter Windows bundle (requires a Windows host)")
 @transient val sartIOS           = taskKey[File]("Build a Flutter iOS bundle — no-codesign (requires a macOS host + Xcode)")
 @transient val sartDev           = taskKey[Unit]("Hot-reload dev loop: spawn `flutter run` once, then signal hot reload on each subsequent invocation. Use as `sbt ~sartDev`.")
+@transient val sartFacadesRegen  = taskKey[Unit]("Regenerate flutter-facades/material_generated.scala from the Flutter SDK via sart-facadegen (manifest: flutter-facades/facadegen.conf)")
 val sartDevDevice     = settingKey[String]("Flutter device id for `sartDev`. Defaults to \"linux\"; override with -DsartDev.device=<id> or in build.")
 
 // Extract `--language-version=<major.minor>` from the SDK lower bound in
@@ -431,6 +432,32 @@ lazy val root = (project in file("."))
         val p = FlutterDevSession.start(cmd, outDir)
         log.info(s"sart: flutter PID ${p.pid()} — leave `~sartDev` running and edit your Scala")
       }
+    },
+
+    // Regenerate the generated portion of flutter-facades from the real
+    // Flutter SDK sources. Needs FLUTTER_ROOT set, or `flutter` on PATH
+    // (the root is derived from the binary's location).
+    sartFacadesRegen := {
+      val log  = streams.value.log
+      val conv = fileConverter.value
+      val runCp = (`sart-facadegen` / Runtime / fullClasspath).value
+        .map(e => conv.toPath(e.data).toAbsolutePath.toString)
+        .mkString(java.io.File.pathSeparator)
+      val conf = baseDirectory.value / "flutter-facades" / "facadegen.conf"
+      val flutterRoot = sys.env.get("FLUTTER_ROOT").orElse {
+        sys.env.get("PATH").flatMap(_.split(java.io.File.pathSeparator)
+          .map(d => new File(d, sartFlutterCmd))
+          .find(_.canExecute)
+          .map(_.getCanonicalFile.getParentFile.getParentFile.getAbsolutePath))
+      }.getOrElse(sys.error(
+        "sartFacadesRegen: set FLUTTER_ROOT or put `flutter` on PATH"))
+      log.info(s"sart: regenerating facades from Flutter SDK at $flutterRoot")
+      val rc = sys.process.Process(
+        Seq("java", "-cp", runCp, "sart.facadegen.Main", "--config", conf.getAbsolutePath),
+        baseDirectory.value,
+        "FLUTTER_ROOT" -> flutterRoot
+      ).!
+      if (rc != 0) sys.error(s"sart-facadegen exited $rc")
     },
 
     // Single-command bootstrap: publish the 4 core modules plus the
