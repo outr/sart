@@ -75,14 +75,14 @@ class Color(
   def red: Int = native.value
   def green: Int = native.value
   def blue: Int = native.value
-  def toARGB32: Int = native.value
+  def toARGB32(): Int = native.value
   def withValues(alpha: Double = native.value, red: Double = native.value, green: Double = native.value, blue: Double = native.value, colorSpace: DartObject = native.value): Color = native.value
   def withAlpha(a: Int): Color = native.value
   def withOpacity(opacity: Double): Color = native.value
   def withRed(r: Int): Color = native.value
   def withGreen(g: Int): Color = native.value
   def withBlue(b: Int): Color = native.value
-  def computeLuminance: Double = native.value
+  def computeLuminance(): Double = native.value
 
 @native
 @DartImport("package:flutter/material.dart")
@@ -263,7 +263,7 @@ object BoxDecoration:
 abstract class Decoration extends DartObject:
   def padding: EdgeInsetsGeometry = native.value
   def isComplex: Boolean = native.value
-  def debugAssertIsValid: Boolean = native.value
+  def debugAssertIsValid(): Boolean = native.value
   def lerpFrom(a: Decoration, t: Double): Decoration = native.value
   def lerpTo(b: Decoration, t: Double): Decoration = native.value
   def hitTest(size: Size, position: Offset, textDirection: DartObject = native.value): Boolean = native.value
@@ -881,7 +881,7 @@ class MaterialApp(
 @DartImport("package:flutter/material.dart")
 object MaterialApp:
   def router(key: Key = native.value, scaffoldMessengerKey: Key = native.value, routeInformationProvider: DartObject = native.value, routeInformationParser: DartObject = native.value, routerDelegate: DartObject = native.value, routerConfig: DartObject = native.value, backButtonDispatcher: DartObject = native.value, builder: (BuildContext, Widget) => Widget = native.value, title: String = native.value, onGenerateTitle: BuildContext => String = native.value, onNavigationNotification: DartObject => Boolean = native.value, color: Color = native.value, theme: ThemeData = native.value, darkTheme: ThemeData = native.value, highContrastTheme: ThemeData = native.value, highContrastDarkTheme: ThemeData = native.value, themeMode: DartObject = native.value, themeAnimationDuration: sart.stdlib.Duration = native.value, themeAnimationCurve: DartObject = native.value, locale: DartObject = native.value, localizationsDelegates: List[DartObject] = native.value, localeListResolutionCallback: (List[DartObject], List[DartObject]) => DartObject = native.value, localeResolutionCallback: (DartObject, List[DartObject]) => DartObject = native.value, supportedLocales: List[DartObject] = native.value, debugShowMaterialGrid: Boolean = native.value, showPerformanceOverlay: Boolean = native.value, checkerboardRasterCacheImages: Boolean = native.value, checkerboardOffscreenLayers: Boolean = native.value, showSemanticsDebugger: Boolean = native.value, debugShowCheckedModeBanner: Boolean = native.value, shortcuts: Map[DartObject, DartObject] = native.value, actions: Map[DartObject, DartObject] = native.value, restorationScopeId: String = native.value, scrollBehavior: DartObject = native.value, useInheritedMediaQuery: Boolean = native.value, themeAnimationStyle: DartObject = native.value): MaterialApp = native.value
-  def createMaterialHeroController: DartObject = native.value
+  def createMaterialHeroController(): DartObject = native.value
 
 // ─── theme_data.dart ────────────────────────────────────────
 
@@ -980,8 +980,8 @@ class ThemeData(
   val indicatorColor: Color = native.value
 ) extends DartObject:
   def adaptationMap: Map[DartObject, DartObject] = native.value
-  def getAdaptation[T]: DartObject = native.value
-  def extension[T]: T = native.value
+  def getAdaptation[T](): DartObject = native.value
+  def extension[T](): T = native.value
   def copyWith(adaptations: List[DartObject] = native.value, applyElevationOverlayColor: Boolean = native.value, cupertinoOverrideTheme: DartObject = native.value, extensions: List[DartObject] = native.value, inputDecorationTheme: Any = native.value, materialTapTargetSize: DartObject = native.value, pageTransitionsTheme: DartObject = native.value, platform: DartObject = native.value, scrollbarTheme: DartObject = native.value, splashFactory: DartObject = native.value, visualDensity: DartObject = native.value, colorScheme: ColorScheme = native.value, brightness: Brightness = native.value, canvasColor: Color = native.value, cardColor: Color = native.value, disabledColor: Color = native.value, dividerColor: Color = native.value, focusColor: Color = native.value, highlightColor: Color = native.value, hintColor: Color = native.value, hoverColor: Color = native.value, primaryColor: Color = native.value, primaryColorDark: Color = native.value, primaryColorLight: Color = native.value, scaffoldBackgroundColor: Color = native.value, secondaryHeaderColor: Color = native.value, shadowColor: Color = native.value, splashColor: Color = native.value, unselectedWidgetColor: Color = native.value, iconTheme: DartObject = native.value, primaryIconTheme: DartObject = native.value, primaryTextTheme: TextTheme = native.value, textTheme: TextTheme = native.value, typography: DartObject = native.value, actionIconTheme: DartObject = native.value, appBarTheme: Any = native.value, badgeTheme: DartObject = native.value, bannerTheme: DartObject = native.value, bottomAppBarTheme: DartObject = native.value, bottomNavigationBarTheme: DartObject = native.value, bottomSheetTheme: DartObject = native.value, buttonTheme: DartObject = native.value, cardTheme: DartObject = native.value, carouselViewTheme: DartObject = native.value, checkboxTheme: DartObject = native.value, chipTheme: DartObject = native.value, dataTableTheme: DartObject = native.value, datePickerTheme: DartObject = native.value, dialogTheme: DartObject = native.value, dividerTheme: DartObject = native.value, drawerTheme: DartObject = native.value, dropdownMenuTheme: DartObject = native.value, elevatedButtonTheme: DartObject = native.value, expansionTileTheme: DartObject = native.value, filledButtonTheme: DartObject = native.value, floatingActionButtonTheme: DartObject = native.value, iconButtonTheme: DartObject = native.value, listTileTheme: DartObject = native.value, menuBarTheme: DartObject = native.value, menuButtonTheme: DartObject = native.value, menuTheme: DartObject = native.value, navigationBarTheme: DartObject = native.value, navigationDrawerTheme: DartObject = native.value, navigationRailTheme: DartObject = native.value, outlinedButtonTheme: DartObject = native.value, popupMenuTheme: DartObject = native.value, progressIndicatorTheme: DartObject = native.value, radioTheme: DartObject = native.value, searchBarTheme: DartObject = native.value, searchViewTheme: DartObject = native.value, segmentedButtonTheme: DartObject = native.value, sliderTheme: DartObject = native.value, snackBarTheme: DartObject = native.value, switchTheme: DartObject = native.value, tabBarTheme: DartObject = native.value, textButtonTheme: DartObject = native.value, textSelectionTheme: DartObject = native.value, timePickerTheme: DartObject = native.value, toggleButtonsTheme: DartObject = native.value, tooltipTheme: DartObject = native.value, useMaterial3: Boolean = native.value, buttonBarTheme: DartObject = native.value, dialogBackgroundColor: Color = native.value, indicatorColor: Color = native.value): ThemeData = native.value
 
 @native
@@ -10037,11 +10037,11 @@ class ScaffoldMessengerState extends DartObject:
   def showSnackBar(snackBar: SnackBar, snackBarAnimationStyle: DartObject = native.value): DartObject = native.value
   def removeCurrentSnackBar(reason: DartObject = native.value): Unit = native.value
   def hideCurrentSnackBar(reason: DartObject = native.value): Unit = native.value
-  def clearSnackBars: Unit = native.value
+  def clearSnackBars(): Unit = native.value
   def showMaterialBanner(materialBanner: StatefulWidget): DartObject = native.value
   def removeCurrentMaterialBanner(reason: DartObject = native.value): Unit = native.value
   def hideCurrentMaterialBanner(reason: DartObject = native.value): Unit = native.value
-  def clearMaterialBanners: Unit = native.value
+  def clearMaterialBanners(): Unit = native.value
 
 @native
 @DartImport("package:flutter/material.dart")

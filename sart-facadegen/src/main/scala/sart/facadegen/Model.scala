@@ -24,10 +24,11 @@ case class Method(
   returnType: String,
   typeParams: List[String],
   overrides: Boolean,
-  params: List[Param]
+  params: List[Param],
+  from: String = ""          // declaring ancestor for inherited members
 )
 
-case class Getter(name: String, tpe: String, overrides: Boolean)
+case class Getter(name: String, tpe: String, overrides: Boolean, from: String = "")
 
 case class StaticField(name: String, tpe: String)
 
@@ -40,7 +41,9 @@ case class ClassInfo(
   staticFields: List[StaticField],
   staticMethods: List[Method],
   instanceGetters: List[Getter],
-  instanceMethods: List[Method]
+  instanceMethods: List[Method],
+  inheritedGetters: List[Getter] = Nil,
+  inheritedMethods: List[Method] = Nil
 )
 
 case class EnumInfo(name: String, constants: List[String])

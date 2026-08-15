@@ -2843,7 +2843,10 @@ class DartEmitter(
         case "scala.Float"   => "double"
         case "scala.Boolean" => "bool"
         case "scala.Unit"    => "void"
-        case "scala.Any" | "scala.AnyRef" | "java.lang.Object" => "Object"
+        // `dynamic`, not `Object`: Scala Any is the interop escape hatch,
+        // and Dart facade generics/JSON maps materialise as <dynamic>.
+        case "scala.Any" => "dynamic"
+        case "scala.AnyRef" | "java.lang.Object" => "Object"
         case "scala.AnyVal"  => "Object"
         case "scala.Nothing" => "Never"
         case "java.lang.String" | "scala.Predef.String" => "String"

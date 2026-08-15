@@ -70,26 +70,38 @@ object Main:
     out: Path,
     curated: Set[String],
     curatedGeneric: Map[String, Int],
-    files: List[(Path, Set[String])]
+    files: List[(String, Set[String])],   // absolute path or library URI
+    contextDir: Option[Path],
+    scalaImports: List[String],
+    dartPackages: List[(String, String)],
+    flattenInherited: Boolean
   )
 
   private def runConfig(cfgPath: Path): Unit =
     val cfg  = parseConfig(cfgPath)
-    val dartFiles = cfg.files.map(_._1)
-    dartFiles.filterNot(Files.exists(_)) match
-      case Nil     => ()
-      case missing => sys.error(s"facadegen: missing input files:\n  ${missing.mkString("\n  ")}")
+    val keys = cfg.files.map(_._1)
+    if cfg.contextDir.isEmpty then
+      keys.map(Paths.get(_)).filterNot(Files.exists(_)) match
+        case Nil     => ()
+        case missing => sys.error(s"facadegen: missing input files:\n  ${missing.mkString("\n  ")}")
 
-    System.err.println(s"sart-facadegen: resolving ${dartFiles.size} Dart files (this can take a minute)…")
-    val json = runDartHelper(dartFiles)
+    System.err.println(s"sart-facadegen: resolving ${keys.size} Dart libraries (this can take a minute)…")
+    val json = cfg.contextDir match
+      case Some(ctx) => runDartHelperUris(ctx, keys)
+      case None      => runDartHelper(keys.map(Paths.get(_)))
     val dump = JsonParser.parse(json)
 
     val keepByFile: Map[String, Set[String]] =
-      cfg.files.map((p, keeps) => p.toString -> keeps).toMap
+      cfg.files.toMap
 
     val rendered = FacadeWriter.render(
       dump,
-      FacadeWriter.GenConfig(cfg.scalaPackage, cfg.dartImport, cfg.curated, cfg.curatedGeneric, keepByFile)
+      FacadeWriter.GenConfig(
+        cfg.scalaPackage, cfg.dartImport, cfg.curated, cfg.curatedGeneric, keepByFile,
+        scalaImports = cfg.scalaImports,
+        dartPackages = cfg.dartPackages,
+        flattenInherited = cfg.flattenInherited
+      )
     )
 
     // Warn about requested names that never materialised.
@@ -97,7 +109,7 @@ object Main:
     for
       (p, keeps) <- cfg.files
       k <- keeps if !emitted.contains(k)
-    do System.err.println(s"sart-facadegen: WARNING — '$k' not found in ${p.getFileName}")
+    do System.err.println(s"sart-facadegen: WARNING — '$k' not found in $p")
 
     Files.createDirectories(cfg.out.getParent)
     Files.writeString(cfg.out, rendered, StandardCharsets.UTF_8)
@@ -109,9 +121,13 @@ object Main:
     var imp = "package:flutter/material.dart"
     var out: Option[Path] = None
     var root: Option[Path] = flutterRoot
+    var contextDir: Option[Path] = None
     val curated        = scala.collection.mutable.Set[String]()
     val curatedGeneric = scala.collection.mutable.Map[String, Int]()
-    val files   = scala.collection.mutable.ListBuffer[(Path, scala.collection.mutable.Set[String])]()
+    val files   = scala.collection.mutable.ListBuffer[(String, scala.collection.mutable.Set[String])]()
+    val scalaImports = scala.collection.mutable.ListBuffer[String]()
+    val dartPackages = scala.collection.mutable.ListBuffer[(String, String)]()
+    var flattenInherited = false
 
     for
       raw <- Files.readAllLines(cfgPath).asScala
@@ -127,30 +143,44 @@ object Main:
         case "out"          => out = Some(cfgPath.getParent.resolve(rest).normalize)
         case "flutter-root" => if root.isEmpty then root = Some(Paths.get(rest))
         case "curated"      => curated ++= rest.split("\\s+")
+        case "scala-import" => scalaImports += rest
+        case "dart-package" =>
+          rest.split("\\s+", 2) match
+            case Array(n, v) => dartPackages += ((n, v.trim))
+            case _ => sys.error(s"facadegen: bad dart-package entry '$rest' (want <name> <version>)")
+        case "flatten-inherited" => flattenInherited = true
         case "curated-generic" =>
           // Entries like `State/1` — curated generic facades with arity.
           for entry <- rest.split("\\s+") do entry.split('/') match
             case Array(n, a) => curatedGeneric(n) = a.toInt
             case _ => sys.error(s"facadegen: bad curated-generic entry '$entry' (want Name/arity)")
+        case "context" =>
+          contextDir = Some(cfgPath.getParent.resolve(rest).normalize)
+        case "library" =>
+          files += rest -> scala.collection.mutable.Set[String]()
         case "file" =>
           val p = Paths.get(rest)
           val resolved =
             if p.isAbsolute then p
             else root.map(_.resolve(p)).getOrElse(
               sys.error("facadegen: relative `file` path but no flutter-root / FLUTTER_ROOT set"))
-          files += resolved.normalize -> scala.collection.mutable.Set[String]()
+          files += resolved.normalize.toString -> scala.collection.mutable.Set[String]()
         case "keep" =>
           if files.isEmpty then sys.error("facadegen: `keep` before any `file`")
           files.last._2 ++= rest.split("\\s+")
         case other => sys.error(s"facadegen: unknown config key '$other' in $cfgPath")
 
     Config(
-      scalaPackage   = pkg,
-      dartImport     = imp,
-      out            = out.getOrElse(sys.error("facadegen: config must set `out`")),
-      curated        = curated.toSet,
-      curatedGeneric = curatedGeneric.toMap,
-      files          = files.map((p, k) => (p, k.toSet)).toList
+      scalaPackage     = pkg,
+      dartImport       = imp,
+      out              = out.getOrElse(sys.error("facadegen: config must set `out`")),
+      curated          = curated.toSet,
+      curatedGeneric   = curatedGeneric.toMap,
+      files            = files.map((p, k) => (p, k.toSet)).toList,
+      contextDir       = contextDir,
+      scalaImports     = scalaImports.toList,
+      dartPackages     = dartPackages.toList,
+      flattenInherited = flattenInherited
     )
 
   // ── Ad-hoc mode ──────────────────────────────────────────────────────
@@ -195,18 +225,27 @@ object Main:
       .find(p => Files.isExecutable(p))
       .map(_.toString)
 
+  private def runDartHelperUris(contextDir: Path, uris: List[String]): String =
+    runHelperCommand(Seq(
+      dartBinary, "run", "--suppress-analytics",
+      toolRoot.resolve("bin/facadegen.dart").toString,
+      "--context", contextDir.toString
+    ) ++ uris)
+
   private def runDartHelper(dartFiles: List[Path]): String =
+    runHelperCommand(Seq(
+      dartBinary, "run",
+      "--suppress-analytics",
+      toolRoot.resolve("bin/facadegen.dart").toString
+    ) ++ dartFiles.map(_.toString))
+
+  private def runHelperCommand(cmd: Seq[String]): String =
     val stdout = new StringBuilder
     val stderr = new StringBuilder
     val logger = ProcessLogger(
       l => { stdout.append(l); stdout.append('\n') },
       l => { stderr.append(l); stderr.append('\n') }
     )
-    val cmd = Seq(
-      dartBinary, "run",
-      "--suppress-analytics",
-      toolRoot.resolve("bin/facadegen.dart").toString
-    ) ++ dartFiles.map(_.toString)
     val rc = Process(cmd, toolRoot.toFile).!(logger)
     if rc != 0 then
       System.err.println(s"Dart helper failed (rc=$rc):\n${stderr.toString}")

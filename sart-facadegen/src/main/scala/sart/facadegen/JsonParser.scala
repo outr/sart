@@ -61,7 +61,9 @@ object JsonParser:
         staticFields    = arr(o, "staticFields").map(toStaticField),
         staticMethods   = arr(o, "staticMethods").map(toMethod),
         instanceGetters = arr(o, "instanceGetters").map(toGetter),
-        instanceMethods = arr(o, "instanceMethods").map(toMethod)
+        instanceMethods = arr(o, "instanceMethods").map(toMethod),
+        inheritedGetters = arr(o, "inheritedGetters").map(toGetter),
+        inheritedMethods = arr(o, "inheritedMethods").map(toMethod)
       )
     case _ => sys.error(s"expected class object, got $v")
 
@@ -80,7 +82,7 @@ object JsonParser:
     case _ => sys.error(s"expected static-field object, got $v")
 
   private def toGetter(v: JValue): Getter = v match
-    case o: JObject => Getter(str(o, "name"), str(o, "type"), bool(o, "overrides"))
+    case o: JObject => Getter(str(o, "name"), str(o, "type"), bool(o, "overrides"), str(o, "from"))
     case _ => sys.error(s"expected getter object, got $v")
 
   private def toMethod(v: JValue): Method = v match
@@ -90,7 +92,8 @@ object JsonParser:
         returnType = str(o, "returnType"),
         typeParams = strList(o.members.getOrElse("typeParams", JArray(Nil))),
         overrides  = bool(o, "overrides"),
-        params     = arr(o, "params").map(toParam)
+        params     = arr(o, "params").map(toParam),
+        from       = str(o, "from")
       )
     case _ => sys.error(s"expected method object, got $v")
 

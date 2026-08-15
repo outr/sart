@@ -1487,7 +1487,7 @@ class PatternMatchExample {
   }
 
   /// Source: example/src/main/scala/example/features/PatternMatching.scala:24
-  String typeClassify(Object x) {
+  String typeClassify(dynamic x) {
     return switch (x) {
       String _ => 'string',
       int _ => 'int',

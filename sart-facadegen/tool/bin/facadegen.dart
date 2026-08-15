@@ -47,21 +47,43 @@ final Map<String, List<String>> typeAncestors = {};
 
 Future<void> main(List<String> args) async {
   if (args.isEmpty) {
-    stderr.writeln('usage: dart run bin/facadegen.dart <path.dart> [more...]');
+    stderr.writeln(
+        'usage: dart run bin/facadegen.dart <path.dart> [more...]\n'
+        '   or: dart run bin/facadegen.dart --context <dir> <library-uri>...');
     exit(2);
   }
-  final paths = args.map((a) => File(a).absolute.path).toList();
-  final collection = AnalysisContextCollection(includedPaths: paths);
 
   final files = <Map<String, Object?>>[];
-  for (final path in paths) {
-    final context = collection.contextFor(path);
-    final result = await context.currentSession.getResolvedUnit(path);
-    if (result is! ResolvedUnitResult) {
-      stderr.writeln('Failed to resolve $path: $result');
-      exit(1);
+
+  if (args.first == '--context') {
+    // URI mode: resolve libraries through an existing Dart/Flutter
+    // project's analysis context, so package: imports (flutter, other
+    // pub deps) resolve with the project's full package graph. Element
+    // model only — facades never need statement bodies.
+    final contextDir = Directory(args[1]).absolute.path;
+    final uris = args.sublist(2);
+    final collection = AnalysisContextCollection(includedPaths: [contextDir]);
+    final session = collection.contextFor(contextDir).currentSession;
+    for (final uri in uris) {
+      final result = await session.getLibraryByUri(uri);
+      if (result is! LibraryElementResult) {
+        stderr.writeln('Failed to resolve library $uri: $result');
+        exit(1);
+      }
+      files.add(_describeLibrary(uri, result.element2));
     }
-    files.add(_describeFile(path, result));
+  } else {
+    final paths = args.map((a) => File(a).absolute.path).toList();
+    final collection = AnalysisContextCollection(includedPaths: paths);
+    for (final path in paths) {
+      final context = collection.contextFor(path);
+      final result = await context.currentSession.getResolvedUnit(path);
+      if (result is! ResolvedUnitResult) {
+        stderr.writeln('Failed to resolve $path: $result');
+        exit(1);
+      }
+      files.add(_describeFile(path, result));
+    }
   }
 
   final out = <String, Object?>{
@@ -69,6 +91,28 @@ Future<void> main(List<String> args) async {
     'typeAncestors': typeAncestors,
   };
   stdout.writeln(const JsonEncoder.withIndent(' ').convert(out));
+}
+
+Map<String, Object?> _describeLibrary(String key, LibraryElement2 lib) {
+  final classes = <Map<String, Object?>>[];
+  final enums = <Map<String, Object?>>[];
+  for (final cls in lib.classes) {
+    final name = cls.name3;
+    if (name == null || name.startsWith('_')) continue;
+    classes.add(_describeClass(cls));
+  }
+  for (final en in lib.enums) {
+    final name = en.name3;
+    if (name == null || name.startsWith('_')) continue;
+    enums.add({
+      'name': name,
+      'constants': en.fields2
+          .where((f) => f.isEnumConstant && !(f.name3 ?? '_').startsWith('_'))
+          .map((f) => f.name3)
+          .toList(),
+    });
+  }
+  return {'path': key, 'classes': classes, 'enums': enums};
 }
 
 Map<String, Object?> _describeFile(String path, ResolvedUnitResult result) {
@@ -150,6 +194,52 @@ Map<String, Object?> _describeClass(ClassElement2 cls) {
     (m.isStatic ? staticMethods : instanceMethods).add(desc);
   }
 
+  // Inherited public API, tagged with its declaring ancestor. The Scala
+  // side flattens these into subclassable facades when the ancestor
+  // itself has no facade (e.g. ChangeNotifier.notifyListeners on
+  // DataGridSource) — otherwise a Scala subclass couldn't reach them.
+  const skipInherited = {
+    'toString', 'noSuchMethod', 'hashCode', 'runtimeType',
+    'toStringShort', 'toStringDeep', 'toDiagnosticsNode',
+    'debugFillProperties', 'debugDescribeChildren',
+  };
+  final inheritedGetters = <Map<String, Object?>>[];
+  final inheritedMethods = <Map<String, Object?>>[];
+  final seenInherited = <String>{};
+  for (final t in cls.allSupertypes) {
+    final ancestorName = t.element3.name3;
+    if (ancestorName == null || ancestorName == 'Object') continue;
+    for (final m in t.methods2) {
+      final mname = m.name3;
+      if (mname == null || mname.startsWith('_') || m.isStatic) continue;
+      if (m.isOperator || skipInherited.contains(mname)) continue;
+      if (!seenInherited.add(mname)) continue;
+      inheritedMethods.add({
+        'from': ancestorName,
+        'name': mname,
+        'returnType': _typeStr(m.returnType),
+        'typeParams': m.typeParameters2
+            .map((tp) => tp.name3)
+            .whereType<String>()
+            .toList(),
+        'overrides': false,
+        'params': m.formalParameters.map(_describeParam).toList(),
+      });
+    }
+    for (final g in t.getters) {
+      final gname = g.name3;
+      if (gname == null || gname.startsWith('_') || g.isStatic) continue;
+      if (skipInherited.contains(gname)) continue;
+      if (!seenInherited.add(gname)) continue;
+      inheritedGetters.add({
+        'from': ancestorName,
+        'name': gname,
+        'type': _typeStr(g.returnType),
+        'overrides': false,
+      });
+    }
+  }
+
   return {
     'name': cls.name3,
     'abstract': cls.isAbstract,
@@ -161,6 +251,8 @@ Map<String, Object?> _describeClass(ClassElement2 cls) {
     'staticMethods': staticMethods,
     'instanceGetters': instanceGetters,
     'instanceMethods': instanceMethods,
+    'inheritedGetters': inheritedGetters,
+    'inheritedMethods': inheritedMethods,
   };
 }
 
