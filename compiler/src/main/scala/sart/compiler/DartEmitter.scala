@@ -241,7 +241,7 @@ class DartEmitter(
    *  format step extracts the major.minor from the written pubspec to
    *  pass as `dart format --language-version`. Bump this to roll forward
    *  to a newer Dart language version. */
-  private val sdkFloor = "3.11.0"
+  private val sdkFloor = "3.12.0"
 
   private def renderPubspec(): String =
     val b = new StringBuilder

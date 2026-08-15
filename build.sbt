@@ -1,4 +1,4 @@
-ThisBuild / scalaVersion := "3.8.3"
+ThisBuild / scalaVersion := "3.8.4"
 ThisBuild / organization := "com.outr"
 ThisBuild / version      := "0.1.0-SNAPSHOT"
 
@@ -40,21 +40,21 @@ ThisBuild / publishMavenStyle := true
 // Single-command workflow tasks that chain the Scala → TASTy → Dart →
 // Flutter-Linux pipeline. The task keys are defined at the top level so
 // they're usable from both the root project and the command line.
-val sartEmit          = taskKey[Unit]("Compile the example and emit Dart into out/")
-val sartLinux         = taskKey[File]("Build a native Linux bundle from the emitted Dart")
-val sartRun           = taskKey[Unit]("Build and launch the generated Linux app")
-val sartGoldenVerify  = taskKey[Unit]("Emit Dart and diff it against the checked-in golden files")
-val sartGoldenAccept  = taskKey[Unit]("Emit Dart and overwrite the golden files with the new output")
-val sartAnalyze       = taskKey[Unit]("Run flutter analyze on out/ and map errors back to Scala sources")
-val sartAnalyzeOnly   = taskKey[Unit]("Run flutter analyze on the existing out/ without re-emitting (for testing the mapper)")
-val sartWatch         = taskKey[Unit]("Hint: run with `sbt ~sartEmit` — documented here so `sbt sartWatch` prints usage")
-val sartPublishLocalAll = taskKey[Unit]("Publish all Sart core modules + the sbt-sart plugin to the local Ivy repo")
-val sartWeb           = taskKey[File]("Build a Flutter web bundle from the emitted Dart")
-val sartAndroid       = taskKey[File]("Build a Flutter Android debug APK from the emitted Dart")
-val sartMacOS         = taskKey[File]("Build a Flutter macOS bundle (requires a macOS host)")
-val sartWindows       = taskKey[File]("Build a Flutter Windows bundle (requires a Windows host)")
-val sartIOS           = taskKey[File]("Build a Flutter iOS bundle — no-codesign (requires a macOS host + Xcode)")
-val sartDev           = taskKey[Unit]("Hot-reload dev loop: spawn `flutter run` once, then signal hot reload on each subsequent invocation. Use as `sbt ~sartDev`.")
+@transient val sartEmit          = taskKey[Unit]("Compile the example and emit Dart into out/")
+@transient val sartLinux         = taskKey[File]("Build a native Linux bundle from the emitted Dart")
+@transient val sartRun           = taskKey[Unit]("Build and launch the generated Linux app")
+@transient val sartGoldenVerify  = taskKey[Unit]("Emit Dart and diff it against the checked-in golden files")
+@transient val sartGoldenAccept  = taskKey[Unit]("Emit Dart and overwrite the golden files with the new output")
+@transient val sartAnalyze       = taskKey[Unit]("Run flutter analyze on out/ and map errors back to Scala sources")
+@transient val sartAnalyzeOnly   = taskKey[Unit]("Run flutter analyze on the existing out/ without re-emitting (for testing the mapper)")
+@transient val sartWatch         = taskKey[Unit]("Hint: run with `sbt ~sartEmit` — documented here so `sbt sartWatch` prints usage")
+@transient val sartPublishLocalAll = taskKey[Unit]("Publish all Sart core modules + the sbt-sart plugin to the local Ivy repo")
+@transient val sartWeb           = taskKey[File]("Build a Flutter web bundle from the emitted Dart")
+@transient val sartAndroid       = taskKey[File]("Build a Flutter Android debug APK from the emitted Dart")
+@transient val sartMacOS         = taskKey[File]("Build a Flutter macOS bundle (requires a macOS host)")
+@transient val sartWindows       = taskKey[File]("Build a Flutter Windows bundle (requires a Windows host)")
+@transient val sartIOS           = taskKey[File]("Build a Flutter iOS bundle — no-codesign (requires a macOS host + Xcode)")
+@transient val sartDev           = taskKey[Unit]("Hot-reload dev loop: spawn `flutter run` once, then signal hot reload on each subsequent invocation. Use as `sbt ~sartDev`.")
 val sartDevDevice     = settingKey[String]("Flutter device id for `sartDev`. Defaults to \"linux\"; override with -DsartDev.device=<id> or in build.")
 
 // Extract `--language-version=<major.minor>` from the SDK lower bound in
@@ -128,14 +128,18 @@ lazy val compiler = (project in file("compiler"))
     name := "sart-compiler",
     libraryDependencies ++= Seq(
       "org.scala-lang" %% "scala3-tasty-inspector" % scalaVersion.value,
-      "org.scalameta" %% "munit" % "1.0.4" % Test
+      "org.scalameta" %% "munit" % "1.3.5" % Test
     ),
     // Test fixtures live under `src/test/scala/sart/compiler/fixtures/`.
     // Retain trees so the inspector can read their TASTy.
     Test / scalacOptions += "-Yretain-trees",
-    // Tests don't fork — the suite reads the inspector classpath via
-    // `java.class.path`, which only matches the JVM's own classpath.
-    Test / fork := false,
+    // Tests fork, and the build hands the suite the real test-classes
+    // directory via a system property: sbt 2's classpaths surface as
+    // hashed cache jars (target/out/value/sha256-…), so neither
+    // `java.class.path` filtering nor code-source lookup can find the
+    // fixtures' .tasty files on their own.
+    Test / fork := true,
+    Test / javaOptions += s"-Dsart.test.classesDir=${(Test / classDirectory).value.getAbsolutePath}",
     fork := true
   )
 
@@ -158,49 +162,57 @@ lazy val root = (project in file("."))
     // drop `lib/main.dart` + `pubspec.yaml` into `out/`. This is pure Scala
     // → Dart; no Flutter tooling is invoked here.
     //
-    // Def.taskDyn lets us compute the argument line from other tasks'
-    // values and then delegate to `runMain`'s InputTask — a plain
-    // `task := { ... }` block can't embed `toTask(<dynamic string>).value`.
-    sartEmit := Def.taskDyn {
+    // The compiler runs as a forked `java` subprocess (mirroring what
+    // sbt-sart does for consumers) rather than via `runMain`: under sbt 2
+    // a `runMain`-delegating taskDyn was observed completing before the
+    // forked process had flushed its output, letting dependents like
+    // `sartGoldenVerify` read stale files. `Process(...).!` blocks until
+    // the emitter has exited.
+    sartEmit := {
       (example / Compile / compile).value
       val exClasses = (example / Compile / classDirectory).value
+      // sbt 2: Classpath entries are HashedVirtualFileRef, not File —
+      // resolve them to concrete paths via the build's FileConverter.
+      val conv      = fileConverter.value
       val cp        = (example / Compile / fullClasspath).value
-        .map(_.data.getAbsolutePath).mkString(java.io.File.pathSeparator)
+        .map(e => conv.toPath(e.data).toAbsolutePath.toString)
+        .mkString(java.io.File.pathSeparator)
+      val runCp     = (compiler / Runtime / fullClasspath).value
+        .map(e => conv.toPath(e.data).toAbsolutePath.toString)
+        .mkString(java.io.File.pathSeparator)
       val outDir    = baseDirectory.value / "out"
       val log       = streams.value.log
       IO.createDirectory(outDir)
       log.info(s"sart: emitting Dart into $outDir")
-      // cp is path-separator-joined so it has no internal spaces —
-      // whitespace-splitting in runMain's arg parser leaves it intact.
       // The 4th arg is the source root that the emitter uses to
       // relativise `/// Source:` attribution comments.
       val sourceRoot = baseDirectory.value.getAbsolutePath
-      val argLine = s" sart.compiler.Main ${exClasses.getAbsolutePath} $cp ${outDir.getAbsolutePath} $sourceRoot"
-      val emit = (compiler / Compile / runMain).toTask(argLine)
-      Def.task {
-        emit.value
-        // Run `dart format` on the emitted lib/ so the output is
-        // idiomatic multi-line Dart instead of a wall of inline calls.
-        // Non-fatal if the toolchain isn't available — we only log.
-        // Pin --language-version to the major.minor extracted from the
-        // emitted pubspec's SDK floor. This keeps formatter output
-        // reproducible regardless of whether `flutter pub get` has
-        // populated `.dart_tool/package_config.json`. The pubspec is
-        // the single source of truth — bump `sdkFloor` in DartEmitter
-        // and this picks it up automatically.
-        val libDir = outDir / "lib"
-        if (libDir.exists()) {
-          val langArgs = sartDartLanguageArgs(outDir / "pubspec.yaml")
-          try {
-            val rc = sys.process.Process(Seq(sartDartCmd, "format") ++ langArgs :+ libDir.getAbsolutePath).!
-            if (rc != 0) log.warn(s"dart format exited $rc (emission succeeded)")
-          } catch {
-            case _: java.io.IOException =>
-              log.warn("dart not on PATH; skipping auto-format")
-          }
+      val rc = sys.process.Process(Seq(
+        "java", "-cp", runCp, "sart.compiler.Main",
+        exClasses.getAbsolutePath, cp, outDir.getAbsolutePath, sourceRoot
+      )).!
+      if (rc != 0) sys.error(s"sart.compiler.Main exited $rc")
+      // Run `dart format` on the emitted lib/ so the output is
+      // idiomatic multi-line Dart instead of a wall of inline calls.
+      // Non-fatal if the toolchain isn't available — we only log.
+      // Pin --language-version to the major.minor extracted from the
+      // emitted pubspec's SDK floor. This keeps formatter output
+      // reproducible regardless of whether `flutter pub get` has
+      // populated `.dart_tool/package_config.json`. The pubspec is
+      // the single source of truth — bump `sdkFloor` in DartEmitter
+      // and this picks it up automatically.
+      val libDir = outDir / "lib"
+      if (libDir.exists()) {
+        val langArgs = sartDartLanguageArgs(outDir / "pubspec.yaml")
+        try {
+          val fmtRc = sys.process.Process(Seq(sartDartCmd, "format") ++ langArgs :+ libDir.getAbsolutePath).!
+          if (fmtRc != 0) log.warn(s"dart format exited $fmtRc (emission succeeded)")
+        } catch {
+          case _: java.io.IOException =>
+            log.warn("dart not on PATH; skipping auto-format")
         }
       }
-    }.value,
+    },
 
     // Platform tasks share scaffold + build logic via helpers below.
     // Each one: emits Dart, scaffolds the platform if missing, runs
@@ -431,12 +443,13 @@ lazy val root = (project in file("."))
       (`flutter-facades` / publishLocal).value
       (compiler / publishLocal).value
 
-      // sbt-sart/ is its own sbt build (Scala 2.12 plugin) — shell out
-      // to a subprocess because we can't reach it via project refs.
+      // sbt-sart/ is its own sbt build (cross-built: Scala 2.12 → sbt 1.x,
+      // Scala 3 → sbt 2.x) — shell out to a subprocess because we can't
+      // reach it via project refs. `+publishLocal` publishes both axes.
       val pluginDir = baseDirectory.value / "sbt-sart"
       log.info(s"sart: publishing sbt-sart plugin from $pluginDir")
       val rc = sys.process.Process(
-        Seq("sbt", "-Dsbt.color=false", "publishLocal"),
+        Seq("sbt", "-Dsbt.color=false", "+publishLocal"),
         pluginDir
       ).!
       if (rc != 0) sys.error(s"sbt-sart publishLocal exited $rc")

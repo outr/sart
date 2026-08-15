@@ -64,12 +64,12 @@ object SartPlugin extends AutoPlugin {
         "version this plugin was published at."
     )
 
-    val sartCompilerClasspath = taskKey[Seq[File]](
+    @transient val sartCompilerClasspath = taskKey[Seq[File]](
       "Classpath that runs sart.compiler.Main in a forked JVM. Auto-populated " +
         "from sartVersion; override to supply custom jars."
     )
 
-    val sartFacadeClasspath = taskKey[Seq[File]](
+    @transient val sartFacadeClasspath = taskKey[Seq[File]](
       "Classpath entries carrying Sart facade TASTy: sart-dart, sart-stdlib, " +
         "flutter-facades (plus any user-authored facades). Auto-populated."
     )
@@ -89,16 +89,16 @@ object SartPlugin extends AutoPlugin {
 
     // ── Tasks ──────────────────────────────────────────────────────────
 
-    val sartEmit          = taskKey[Unit]("Compile this project and emit Dart into <sartOutDir>/lib/")
-    val sartLinux         = taskKey[File]("Build a native Linux bundle from the emitted Dart")
-    val sartWeb           = taskKey[File]("Build a Flutter web bundle from the emitted Dart")
-    val sartAndroid       = taskKey[File]("Build a Flutter Android debug APK from the emitted Dart")
-    val sartMacOS         = taskKey[File]("Build a Flutter macOS bundle (requires macOS host)")
-    val sartWindows       = taskKey[File]("Build a Flutter Windows bundle (requires Windows host)")
-    val sartIOS           = taskKey[File]("Build a Flutter iOS bundle — no-codesign (requires macOS + Xcode)")
-    val sartRun           = taskKey[Unit]("Build and launch the generated Linux app")
-    val sartGoldenVerify  = taskKey[Unit]("Emit Dart and diff it against sartGoldenDir")
-    val sartGoldenAccept  = taskKey[Unit]("Emit Dart and overwrite sartGoldenDir with the new output")
+    @transient val sartEmit          = taskKey[Unit]("Compile this project and emit Dart into <sartOutDir>/lib/")
+    @transient val sartLinux         = taskKey[File]("Build a native Linux bundle from the emitted Dart")
+    @transient val sartWeb           = taskKey[File]("Build a Flutter web bundle from the emitted Dart")
+    @transient val sartAndroid       = taskKey[File]("Build a Flutter Android debug APK from the emitted Dart")
+    @transient val sartMacOS         = taskKey[File]("Build a Flutter macOS bundle (requires macOS host)")
+    @transient val sartWindows       = taskKey[File]("Build a Flutter Windows bundle (requires Windows host)")
+    @transient val sartIOS           = taskKey[File]("Build a Flutter iOS bundle — no-codesign (requires macOS + Xcode)")
+    @transient val sartRun           = taskKey[Unit]("Build and launch the generated Linux app")
+    @transient val sartGoldenVerify  = taskKey[Unit]("Emit Dart and diff it against sartGoldenDir")
+    @transient val sartGoldenAccept  = taskKey[Unit]("Emit Dart and overwrite sartGoldenDir with the new output")
   }
 
   import autoImport._
@@ -128,8 +128,12 @@ object SartPlugin extends AutoPlugin {
       "com.outr" %% "sart-stdlib"     % sartVersion.value,
       "com.outr" %% "flutter-facades" % sartVersion.value
     ),
-    sartCompilerClasspath := Classpaths.managedJars(SartCompile, classpathTypes.value, update.value).map(_.data),
-    sartFacadeClasspath   := Classpaths.managedJars(SartFacade,  classpathTypes.value, update.value).map(_.data),
+    sartCompilerClasspath := PluginCompat.managedJarFiles(
+      SartCompile, classpathTypes.value, update.value, fileConverter.value
+    ),
+    sartFacadeClasspath := PluginCompat.managedJarFiles(
+      SartFacade, classpathTypes.value, update.value, fileConverter.value
+    ),
 
     // ── sartEmit: run the Scala 3 compiler to TASTy, then Sart → Dart ───
 
@@ -137,7 +141,7 @@ object SartPlugin extends AutoPlugin {
       val log       = streams.value.log
       (Compile / compile).value
       val exClasses = (Compile / classDirectory).value
-      val userCp    = (Compile / fullClasspath).value.map(_.data)
+      val userCp    = PluginCompat.toFiles((Compile / fullClasspath).value, fileConverter.value)
       val compilerCp = sartCompilerClasspath.value
       val facadeCp   = sartFacadeClasspath.value
       val outDir     = sartOutDir.value
@@ -205,7 +209,7 @@ object SartPlugin extends AutoPlugin {
       sbtSartScaffold("linux", outDir, normalizedName.value, log)
       sbtSartBuild("linux", Seq.empty, outDir, log)
       val bundleDir = outDir / "build" / "linux" / "x64" / "release" / "bundle"
-      val binary    = Option(bundleDir.listFiles()).getOrElse(Array.empty)
+      val binary    = Option(bundleDir.listFiles()).getOrElse(Array.empty[File])
         .find(f => f.canExecute && !f.isDirectory)
         .getOrElse(sys.error(s"sbt-sart: no bundled binary found in $bundleDir"))
       log.info(s"sbt-sart: built $binary")
@@ -287,7 +291,7 @@ object SartPlugin extends AutoPlugin {
       val log       = streams.value.log
       val outDir    = sartOutDir.value
       val goldenDir = sartGoldenDir.value
-      val libFiles = Option((outDir / "lib").listFiles()).getOrElse(Array.empty)
+      val libFiles = Option((outDir / "lib").listFiles()).getOrElse(Array.empty[File])
         .toSeq.filter(_.getName.endsWith(".dart"))
       val pairs = libFiles.map(f => f -> (goldenDir / f.getName)) :+
         ((outDir / "pubspec.yaml") -> (goldenDir / "pubspec.yaml"))
@@ -317,7 +321,7 @@ object SartPlugin extends AutoPlugin {
       val outDir    = sartOutDir.value
       val goldenDir = sartGoldenDir.value
       IO.createDirectory(goldenDir)
-      val libFiles = Option((outDir / "lib").listFiles()).getOrElse(Array.empty)
+      val libFiles = Option((outDir / "lib").listFiles()).getOrElse(Array.empty[File])
         .toSeq.filter(_.getName.endsWith(".dart"))
       libFiles.foreach(f => IO.copyFile(f, goldenDir / f.getName))
       IO.copyFile(outDir / "pubspec.yaml", goldenDir / "pubspec.yaml")

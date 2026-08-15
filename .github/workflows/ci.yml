@@ -23,9 +23,10 @@ jobs:
       - uses: sbt/setup-sbt@v1
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.41.7'
+          flutter-version: '3.44.8'
           channel: stable
-      - run: sbt -Dsbt.color=false "compiler/test" sartGoldenVerify
+      # sbt 2's `test` is incremental — `testFull` forces the whole suite.
+      - run: sbt -Dsbt.color=false "compiler/testFull" sartGoldenVerify
 
   # Per-platform build matrix. Each job is the full chain
   #   compile → emit → scaffold → flutter build
@@ -59,7 +60,7 @@ jobs:
       - uses: sbt/setup-sbt@v1
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.41.7'
+          flutter-version: '3.44.8'
           channel: stable
       # `flutter build linux` shells out to CMake, which pkg_check_modules
       # for gtk-3.0/glib/pango. The hosted ubuntu runner doesn't ship
@@ -88,7 +89,7 @@ jobs:
       - uses: sbt/setup-sbt@v1
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.41.7'
+          flutter-version: '3.44.8'
           channel: stable
       - run: sbt -Dsbt.color=false sartPublishLocalAll
       - run: .github/scripts/plugin-consumer-smoke.sh

@@ -18,21 +18,27 @@ class EmitterSuite extends FunSuite:
 
   // Lazy + shared so the inspection cost (a few seconds) is paid once.
   private lazy val emittedMain: String = {
-    val tastyRoot = locateTestClassesDir(classOf[fixtures.FxPoint])
+    // The build injects the real test-classes directory (sbt 2 presents
+    // classpaths as hashed cache jars, so code-source lookup lands on a
+    // jar without the fixtures' .tasty files). The code-source fallback
+    // keeps the suite runnable from IDEs.
+    val tastyRoot = sys.props.get("sart.test.classesDir")
+      .map(Paths.get(_))
+      .getOrElse(locateTestClassesDir(classOf[fixtures.FxPoint]))
+    require(Files.isDirectory(tastyRoot), s"test classes dir not found: $tastyRoot")
     val outDir    = Files.createTempDirectory("sart-emitter-test")
     val tastyFiles = findTastyFiles(tastyRoot)
+    require(tastyFiles.nonEmpty, s"no fixture .tasty files under $tastyRoot")
     // Pare the inspector classpath down to the stdlib jars + the
     // fixtures' own classes dir. The full test classpath drags in
     // scala3-compiler (transitively via munit), which exposes its own
     // Predef and breaks symbol resolution against the fixtures' TASTy.
-    val cp = sys.props.getOrElse("java.class.path", "")
-      .split(java.io.File.pathSeparator).toList
-      .filter(_.nonEmpty)
-      .filter { p =>
-        p.endsWith("test-classes") ||
-        p.contains("scala-library")  ||
-        p.contains("scala3-library")
-      }
+    // Stdlib jars are located via code source so jar naming is irrelevant.
+    val cp = List(
+      tastyRoot.toString,
+      codeSourcePath(classOf[scala.runtime.TupleXXL]), // scala3-library
+      codeSourcePath(classOf[scala.Option[?]])         // scala-library
+    ).distinct
     val emitter = new DartEmitter(outDir)
     val ok = TastyInspector.inspectAllTastyFiles(tastyFiles, Nil, cp)(emitter)
     require(ok, "TASTy inspection failed")
@@ -42,6 +48,9 @@ class EmitterSuite extends FunSuite:
 
   private def locateTestClassesDir(cls: Class[?]): Path =
     Paths.get(cls.getProtectionDomain.getCodeSource.getLocation.toURI)
+
+  private def codeSourcePath(cls: Class[?]): String =
+    Paths.get(cls.getProtectionDomain.getCodeSource.getLocation.toURI).toString
 
   private def findTastyFiles(root: Path): List[String] =
     // Only inspect the fixtures package — the suite itself ends up in

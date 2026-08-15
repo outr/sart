@@ -36,7 +36,7 @@ jobs:
       - uses: sbt/setup-sbt@v1
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.41.7'
+          flutter-version: '3.44.8'
           channel: stable
 
       # Flutter project sites live at /<repo>/, so every asset URL in

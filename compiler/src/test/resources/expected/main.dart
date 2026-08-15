@@ -46,12 +46,12 @@ class LauncherApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      home: LauncherHome(),
       title: 'Sart Showcase',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: LauncherHome(),
     );
   }
 }
@@ -72,11 +72,10 @@ class LauncherHome extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text('Sart Demos'),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: ListView.builder(
-        itemCount: demos.length,
         itemBuilder: (ctx, i) => ListTile(
           leading: Icon(Icons.menu),
           title: Text(demos[i].title),
@@ -85,57 +84,58 @@ class LauncherHome extends StatelessWidget {
             Navigator.of(ctx).push(MaterialPageRoute(builder: demos[i].build));
           },
         ),
+        itemCount: demos.length,
       ),
     );
   }
 }
 
-/// Source: example/src/main/scala/example/CounterApp.scala:9
+/// Source: example/src/main/scala/example/CounterApp.scala:5
 class MyApp extends StatelessWidget {
-  /// Source: example/src/main/scala/example/CounterApp.scala:10
+  /// Source: example/src/main/scala/example/CounterApp.scala:6
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      home: MyHomePage('Flutter Demo Home Page'),
       title: 'Flutter Demo',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: MyHomePage('Flutter Demo Home Page'),
     );
   }
 }
 
-/// Source: example/src/main/scala/example/CounterApp.scala:20
+/// Source: example/src/main/scala/example/CounterApp.scala:16
 class MyHomePage extends StatefulWidget {
   final String title;
   MyHomePage(this.title);
 
-  /// Source: example/src/main/scala/example/CounterApp.scala:21
+  /// Source: example/src/main/scala/example/CounterApp.scala:17
   @override
   State<MyHomePage> createState() {
     return MyHomePageState();
   }
 }
 
-/// Source: example/src/main/scala/example/CounterApp.scala:24
+/// Source: example/src/main/scala/example/CounterApp.scala:20
 class MyHomePageState extends State<MyHomePage> {
   int counter = 0;
 
-  /// Source: example/src/main/scala/example/CounterApp.scala:27
+  /// Source: example/src/main/scala/example/CounterApp.scala:23
   void incrementCounter() {
     setState(() {
       counter = counter + 1;
     });
   }
 
-  /// Source: example/src/main/scala/example/CounterApp.scala:30
+  /// Source: example/src/main/scala/example/CounterApp.scala:26
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: Center(
         child: Column(
@@ -147,9 +147,9 @@ class MyHomePageState extends State<MyHomePage> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => incrementCounter(),
-        tooltip: 'Increment',
         child: Icon(Icons.add),
+        tooltip: 'Increment',
+        onPressed: () => incrementCounter(),
       ),
     );
   }
@@ -316,21 +316,21 @@ class DiceAppState extends State<DiceApp> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text('Dice'),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Center(
             child: Container(
-              width: 120.0,
-              height: 120.0,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16.0),
                 boxShadow: [BoxShadow(color: Colors.grey, blurRadius: 8.0)],
               ),
+              width: 120.0,
+              height: 120.0,
               child: Center(child: Text(faceLabel(latestRoll))),
             ),
           ),
@@ -348,13 +348,13 @@ class DiceAppState extends State<DiceApp> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        child: Icon(Icons.menu),
+        tooltip: 'History',
         onPressed: () {
           Navigator.of(
             context,
           ).push(MaterialPageRoute(builder: (ctx) => HistoryScreen(history)));
         },
-        tooltip: 'History',
-        child: Icon(Icons.menu),
       ),
     );
   }
@@ -371,12 +371,12 @@ class HistoryScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text('History')),
       body: ListView.builder(
-        itemCount: history.length,
         itemBuilder: (ctx, i) => ListTile(
           leading: Icon(Icons.check),
           title: Text('Roll #' + history[i].index.toString()),
           trailing: Text(history[i].face.toString()),
         ),
+        itemCount: history.length,
       ),
     );
   }
@@ -732,8 +732,8 @@ class ShowcaseAppState extends State<ShowcaseApp> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text('Showcase'),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: ListView(
         padding: EdgeInsets.all(8.0),
@@ -842,11 +842,11 @@ class TodoAppState extends State<TodoApp> {
           ),
           Expanded(
             child: ListView.builder(
-              itemCount: todos.length,
               itemBuilder: (ctx, i) => ListTile(
                 leading: Icon(todos[i].done ? Icons.check : Icons.edit),
                 title: Text(todos[i].text),
               ),
+              itemCount: todos.length,
             ),
           ),
         ],
@@ -1015,8 +1015,6 @@ class DecorationsExample extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 200.0,
-      height: 120.0,
       decoration: BoxDecoration(
         color: Color.fromARGB(255, 200, 230, 255),
         borderRadius: BorderRadius.circular(12.0),
@@ -1028,6 +1026,8 @@ class DecorationsExample extends StatelessWidget {
           ),
         ],
       ),
+      width: 200.0,
+      height: 120.0,
       child: Center(child: Text('Hello, styled world')),
     );
   }
@@ -1249,12 +1249,12 @@ class LayoutFacadesExample extends StatelessWidget {
         children: [
           Image.network('https://flutter.dev/assets/logo.png'),
           Positioned(
-            child: Align(
-              alignment: Alignment.bottomLeft,
-              child: GestureDetector(onTap: () => null, child: Text('tap me')),
-            ),
             left: 16.0,
             bottom: 16.0,
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: GestureDetector(child: Text('tap me'), onTap: () => null),
+            ),
           ),
         ],
       ),
