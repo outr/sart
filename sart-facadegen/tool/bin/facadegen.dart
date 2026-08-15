@@ -1,26 +1,38 @@
-// Sart facade-generator Dart helper.
+// Sart facade-generator Dart helper (v2 — resolved analysis).
 //
-// Given a path to a Dart source file on the command line, parse it via
-// `package:analyzer` and dump a JSON description of the public API to
-// stdout. The Scala CLI then reads the JSON and emits Scala facades.
+// Given one or more Dart source files on the command line, resolve them
+// via `package:analyzer` and dump a JSON description of their public API
+// to stdout. Resolution (rather than parsing) is what lets us see:
+//   - constructor parameters declared as `super.x` with their real types
+//   - typedef-expanded function types (`VoidCallback` → `void Function()`)
+//   - default-value presence and `required`-ness
+//   - the full ancestor chain of every class and referenced type, so the
+//     Scala side can collapse unknown types to the nearest facaded one.
 //
-// JSON shape (MVP):
+// JSON shape (v2):
 // {
-//   "path": "<input path>",
-//   "libraryName": "<library directive or filename>",
-//   "classes": [
-//     {
-//       "name": "Greeter",
-//       "typeParams": ["T"],
-//       "extends": "SomeBase",           // or null
-//       "implements": ["Comparable"],
-//       "fields":  [{"name": "x", "type": "int", "final": true}],
-//       "methods": [{"name": "greet", "returnType": "String", "params": [...]}]
-//     }
-//   ],
-//   "functions": [
-//     {"name": "add", "returnType": "int", "params": [...]}
-//   ]
+//   "files": [
+//     { "path": "...",
+//       "classes": [
+//         { "name": "TextButton", "abstract": false,
+//           "typeParams": ["T"],
+//           "ancestors": ["ButtonStyleButton", "StatefulWidget", ...],
+//           "constructors": [
+//             { "name": "",            // "" = unnamed; "icon" = named
+//               "const": true, "factory": false,
+//               "params": [ {"name": "child", "type": "Widget",
+//                            "named": true, "required": true,
+//                            "hasDefault": false} ] } ],
+//           "staticFields": [ {"name": "red", "type": "MaterialColor"} ],
+//           "staticMethods": [ ...method... ],
+//           "instanceGetters": [ {"name": "text", "type": "String",
+//                                 "overrides": false} ],
+//           "instanceMethods": [
+//             { "name": "clear", "returnType": "void", "typeParams": [],
+//               "overrides": false, "params": [...] } ] } ],
+//       "enums": [ {"name": "MainAxisAlignment",
+//                   "constants": ["start", "center", ...]} ] } ],
+//   "typeAncestors": { "MaterialColor": ["ColorSwatch", "Color", ...] }
 // }
 
 import 'dart:convert';
@@ -28,132 +40,165 @@ import 'dart:io';
 
 import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
-import 'package:analyzer/dart/ast/ast.dart';
-import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:analyzer/dart/element/element2.dart';
+import 'package:analyzer/dart/element/type.dart';
+
+final Map<String, List<String>> typeAncestors = {};
 
 Future<void> main(List<String> args) async {
   if (args.isEmpty) {
-    stderr.writeln('usage: dart run bin/facadegen.dart <path.dart>');
+    stderr.writeln('usage: dart run bin/facadegen.dart <path.dart> [more...]');
     exit(2);
   }
-  final path = File(args.first).absolute.path;
-  final collection = AnalysisContextCollection(includedPaths: [path]);
-  final context = collection.contextFor(path);
-  final result = context.currentSession.getParsedUnit(path);
-  if (result is! ParsedUnitResult) {
-    stderr.writeln('Failed to parse $path: $result');
-    exit(1);
-  }
+  final paths = args.map((a) => File(a).absolute.path).toList();
+  final collection = AnalysisContextCollection(includedPaths: paths);
 
-  final visitor = _ApiVisitor();
-  result.unit.accept(visitor);
+  final files = <Map<String, Object?>>[];
+  for (final path in paths) {
+    final context = collection.contextFor(path);
+    final result = await context.currentSession.getResolvedUnit(path);
+    if (result is! ResolvedUnitResult) {
+      stderr.writeln('Failed to resolve $path: $result');
+      exit(1);
+    }
+    files.add(_describeFile(path, result));
+  }
 
   final out = <String, Object?>{
-    'path': path,
-    'libraryName': _libraryName(result.unit, path),
-    'classes': visitor.classes,
-    'enums': visitor.enums,
-    'functions': visitor.functions,
+    'files': files,
+    'typeAncestors': typeAncestors,
   };
-  stdout.writeln(const JsonEncoder.withIndent('  ').convert(out));
+  stdout.writeln(const JsonEncoder.withIndent(' ').convert(out));
 }
 
-String _libraryName(CompilationUnit unit, String path) {
-  for (final directive in unit.directives) {
-    if (directive is LibraryDirective) {
-      return directive.name2?.toSource() ?? '';
-    }
+Map<String, Object?> _describeFile(String path, ResolvedUnitResult result) {
+  final lib = result.libraryElement2;
+  final classes = <Map<String, Object?>>[];
+  final enums = <Map<String, Object?>>[];
+
+  for (final cls in lib.classes) {
+    final name = cls.name3;
+    if (name == null || name.startsWith('_')) continue;
+    classes.add(_describeClass(cls));
   }
-  return path.split('/').last.replaceAll('.dart', '');
-}
-
-class _ApiVisitor extends RecursiveAstVisitor<void> {
-  final List<Map<String, Object?>> classes = [];
-  final List<Map<String, Object?>> enums = [];
-  final List<Map<String, Object?>> functions = [];
-
-  @override
-  void visitEnumDeclaration(EnumDeclaration node) {
-    if (node.name.lexeme.startsWith('_')) return;
+  for (final en in lib.enums) {
+    final name = en.name3;
+    if (name == null || name.startsWith('_')) continue;
     enums.add({
-      'name': node.name.lexeme,
-      'constants': node.constants
-        .where((c) => !c.name.lexeme.startsWith('_'))
-        .map((c) => c.name.lexeme)
-        .toList(),
+      'name': name,
+      'constants': en.fields2
+          .where((f) => f.isEnumConstant && !(f.name3 ?? '_').startsWith('_'))
+          .map((f) => f.name3)
+          .toList(),
+    });
+  }
+  return {'path': path, 'classes': classes, 'enums': enums};
+}
+
+Map<String, Object?> _describeClass(ClassElement2 cls) {
+  final ancestors = <String>[];
+  for (final t in cls.allSupertypes) {
+    final n = t.element3.name3;
+    if (n != null && !n.startsWith('_')) ancestors.add(n);
+  }
+
+  bool superHas(String memberName) => cls.allSupertypes.any((t) =>
+      t.getMethod2(memberName) != null || t.getGetter2(memberName) != null);
+
+  final constructors = <Map<String, Object?>>[];
+  for (final ctor in cls.constructors2) {
+    final cname = ctor.name3 ?? 'new';
+    if (cname.startsWith('_')) continue;
+    constructors.add({
+      'name': cname == 'new' ? '' : cname,
+      'const': ctor.isConst,
+      'factory': ctor.isFactory,
+      'params': ctor.formalParameters.map(_describeParam).toList(),
     });
   }
 
-  @override
-  void visitClassDeclaration(ClassDeclaration node) {
-    if (node.name.lexeme.startsWith('_')) return; // skip private
-    final fields = <Map<String, Object?>>[];
-    final methods = <Map<String, Object?>>[];
-
-    for (final member in node.members) {
-      if (member is FieldDeclaration) {
-        final isFinal = member.fields.isFinal;
-        for (final v in member.fields.variables) {
-          if (v.name.lexeme.startsWith('_')) continue;
-          fields.add({
-            'name': v.name.lexeme,
-            'type': member.fields.type?.toSource() ?? 'dynamic',
-            'final': isFinal,
-          });
-        }
-      } else if (member is MethodDeclaration) {
-        if (member.name.lexeme.startsWith('_')) continue;
-        methods.add({
-          'name': member.name.lexeme,
-          'returnType': member.returnType?.toSource() ?? 'dynamic',
-          'params': _paramList(member.parameters),
-          'isStatic': member.isStatic,
-          'isGetter': member.isGetter,
-        });
-      }
+  final staticFields = <Map<String, Object?>>[];
+  final instanceGetters = <Map<String, Object?>>[];
+  for (final f in cls.fields2) {
+    final fname = f.name3;
+    if (fname == null || fname.startsWith('_')) continue;
+    if (f.isStatic) {
+      staticFields.add({'name': fname, 'type': _typeStr(f.type)});
+    } else {
+      instanceGetters.add({
+        'name': fname,
+        'type': _typeStr(f.type),
+        'overrides': superHas(fname),
+      });
     }
-
-    classes.add({
-      'name': node.name.lexeme,
-      'typeParams': node.typeParameters?.typeParameters.map((tp) => tp.name.lexeme).toList() ?? <String>[],
-      'extends': node.extendsClause?.superclass.toSource(),
-      'implements': node.implementsClause?.interfaces.map((i) => i.toSource()).toList() ?? <String>[],
-      'fields': fields,
-      'methods': methods,
-    });
   }
 
-  @override
-  void visitFunctionDeclaration(FunctionDeclaration node) {
-    if (node.name.lexeme.startsWith('_')) return;
-    functions.add({
-      'name': node.name.lexeme,
-      'returnType': node.returnType?.toSource() ?? 'dynamic',
-      'params': _paramList(node.functionExpression.parameters),
-    });
+  final staticMethods = <Map<String, Object?>>[];
+  final instanceMethods = <Map<String, Object?>>[];
+  for (final m in cls.methods2) {
+    final mname = m.name3;
+    if (mname == null || mname.startsWith('_')) continue;
+    if (m.isOperator) continue;
+    final desc = {
+      'name': mname,
+      'returnType': _typeStr(m.returnType),
+      'typeParams':
+          m.typeParameters2.map((tp) => tp.name3).whereType<String>().toList(),
+      'overrides': !m.isStatic && superHas(mname),
+      'params': m.formalParameters.map(_describeParam).toList(),
+    };
+    (m.isStatic ? staticMethods : instanceMethods).add(desc);
   }
 
-  List<Map<String, Object?>> _paramList(FormalParameterList? params) {
-    if (params == null) return const [];
-    final out = <Map<String, Object?>>[];
-    for (final p in params.parameters) {
-      final normal = p is DefaultFormalParameter ? p.parameter : p;
-      if (normal is SimpleFormalParameter) {
-        out.add({
-          'name': normal.name?.lexeme ?? '_',
-          'type': normal.type?.toSource() ?? 'dynamic',
-          'named': p.isNamed,
-          'required': p.isRequired || (p is DefaultFormalParameter && p.parameter.isRequired),
-        });
-      } else if (normal is FieldFormalParameter) {
-        out.add({
-          'name': normal.name.lexeme,
-          'type': normal.type?.toSource() ?? 'dynamic',
-          'named': p.isNamed,
-          'required': p.isRequired,
-        });
-      }
+  return {
+    'name': cls.name3,
+    'abstract': cls.isAbstract,
+    'typeParams':
+        cls.typeParameters2.map((tp) => tp.name3).whereType<String>().toList(),
+    'ancestors': ancestors,
+    'constructors': constructors,
+    'staticFields': staticFields,
+    'staticMethods': staticMethods,
+    'instanceGetters': instanceGetters,
+    'instanceMethods': instanceMethods,
+  };
+}
+
+Map<String, Object?> _describeParam(FormalParameterElement p) => {
+      'name': p.name3 ?? '_',
+      'type': _typeStr(p.type),
+      'named': p.isNamed,
+      'required': p.isRequired,
+      'hasDefault': p.hasDefaultValue,
+    };
+
+/// Render a type's display string while recording the ancestor chains of
+/// every interface type it mentions (so the Scala side can collapse types
+/// it has no facade for onto the nearest facaded supertype).
+String _typeStr(DartType t) {
+  _recordAncestors(t, 0);
+  return t.getDisplayString();
+}
+
+void _recordAncestors(DartType t, int depth) {
+  if (depth > 6) return;
+  if (t is InterfaceType) {
+    final name = t.element3.name3;
+    if (name != null && !name.startsWith('_') &&
+        !typeAncestors.containsKey(name)) {
+      typeAncestors[name] = t.element3.allSupertypes
+          .map((s) => s.element3.name3)
+          .whereType<String>()
+          .where((n) => !n.startsWith('_'))
+          .toList();
     }
-    return out;
+    for (final arg in t.typeArguments) {
+      _recordAncestors(arg, depth + 1);
+    }
+  } else if (t is FunctionType) {
+    _recordAncestors(t.returnType, depth + 1);
+    for (final p in t.formalParameters) {
+      _recordAncestors(p.type, depth + 1);
+    }
   }
 }
