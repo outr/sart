@@ -104,3 +104,18 @@ class FxRanges:
   def inclusive(n: Int): List[Int] = (1 to n).toList
   def exclusive(n: Int): List[Int] = (0 until n).toList
   def squared(n: Int): List[Int]   = (0 until n).map(i => i * i).toList
+
+class FxWhileLoop:
+  def countdown(n: Int): Int =
+    var i = n
+    var total = 0
+    while i > 0 do
+      total = total + i
+      i = i - 1
+    total
+
+class FxLazyInit:
+  lazy val expensive: Int = 6 * 7
+  def local(n: Int): Int =
+    lazy val doubled = n * 2
+    doubled + 1

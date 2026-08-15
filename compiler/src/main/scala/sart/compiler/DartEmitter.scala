@@ -718,7 +718,10 @@ class DartEmitter(
 
     private def emitField(vd: ValDef): Unit =
       val isMutable = vd.symbol.flags.is(Flags.Mutable)
-      val prefix = if isMutable then "" else "final "
+      // `lazy val` fields → Dart `late final` (first-read initialization).
+      val prefix =
+        if vd.symbol.flags.is(Flags.Lazy) then "late final "
+        else if isMutable then "" else "final "
       val baseTpe = emitTypeRef(vd.tpt.tpe)
       // Null-initialised fields: Dart's sound null safety rejects
       // `Foo x = null`, so add a `?` to the type when the RHS is a
@@ -994,6 +997,8 @@ class DartEmitter(
     private def emitTerminal(t: Tree, returnLast: Boolean): Unit = t match
       case Literal(c) if c.value == () =>
         () // nothing to emit; a Unit-valued body trails off
+      case w: While =>
+        emitStmt(w) // a while loop is Unit-valued; nothing to return
       case term: Term =>
         if returnLast then line(s"return ${emitExpr(term)};")
         else line(s"${emitExpr(term)};")
@@ -1002,13 +1007,24 @@ class DartEmitter(
 
     private def emitStmt(t: Tree): Unit = t match
       case vd: ValDef =>
-        val prefix = if vd.symbol.flags.is(Flags.Mutable) then "" else "final "
+        // `lazy val` → Dart `late final`: the initializer runs on first
+        // read, which is exactly Scala's (single-threaded) lazy semantics.
+        val prefix =
+          if vd.symbol.flags.is(Flags.Lazy) then "late final "
+          else if vd.symbol.flags.is(Flags.Mutable) then ""
+          else "final "
         val init = vd.rhs.map(r => s" = ${emitExpr(r)}").getOrElse("")
         line(s"$prefix${emitTypeRef(vd.tpt.tpe)} ${vd.name}$init;")
       case Assign(lhs, rhs) =>
         line(s"${emitExpr(lhs)} = ${emitExpr(rhs)};")
       case tryTree: Try =>
         emitTryStatement(tryTree, returnLast = false)
+      case While(cond, body) =>
+        line(s"while (${emitExpr(cond)}) {")
+        indent += 1
+        emitBodyAsStatements(body, returnLast = false)
+        indent -= 1
+        line("}")
       case term: Term =>
         line(s"${emitExpr(term)};")
       case _: DefDef =>

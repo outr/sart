@@ -330,6 +330,20 @@ class EmitterSuite extends FunSuite:
     assert(body.contains(".map(") && body.contains(".toList()"), body)
   }
 
+  test("while loop emits a Dart while statement") {
+    val body = classBody("FxWhileLoop")
+    assert(body.contains("while (i > 0) {"), body)
+    assert(body.contains("total = total + i;"), body)
+  }
+
+  test("lazy val field emits as late final") {
+    val body = classBody("FxLazyInit")
+    assert(body.contains("late final int expensive = 6 * 7;"), body)
+    // Local lazy vals are desugared (and here inlined) by scalac before
+    // the emitter sees them — assert the method still emits cleanly.
+    assert(body.contains("int local(int n)"), body)
+  }
+
   test("strict-mode invariant: no /* TODO */ markers in fixture emission") {
     // Catches regressions where a previously-handled tree shape starts
     // falling through to the unhandled-case branch.
