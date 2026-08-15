@@ -10608,3 +10608,89 @@ class ListTile(
 object ListTile:
   def divideTiles(context: BuildContext = native.value, tiles: List[Widget], color: Color = native.value): List[Widget] = native.value
 
+// ─── tabs.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class Tab(
+  val key: Key = native.value,
+  val text: String = native.value,
+  val icon: Widget = native.value,
+  val iconMargin: EdgeInsetsGeometry = native.value,
+  val height: Double = native.value,
+  val child: Widget = native.value
+) extends StatelessWidget
+
+@native
+@DartImport("package:flutter/material.dart")
+class TabBar(
+  val key: Key = native.value,
+  val tabs: List[Widget],
+  val controller: DartObject = native.value,
+  val scrollController: DartObject = native.value,
+  val isScrollable: Boolean = native.value,
+  val padding: EdgeInsetsGeometry = native.value,
+  val indicatorColor: Color = native.value,
+  val automaticIndicatorColorAdjustment: Boolean = native.value,
+  val indicatorWeight: Double = native.value,
+  val indicatorPadding: EdgeInsetsGeometry = native.value,
+  val indicator: Decoration = native.value,
+  val indicatorSize: DartObject = native.value,
+  val dividerColor: Color = native.value,
+  val dividerHeight: Double = native.value,
+  val labelColor: Color = native.value,
+  val labelStyle: TextStyle = native.value,
+  val labelPadding: EdgeInsetsGeometry = native.value,
+  val unselectedLabelColor: Color = native.value,
+  val unselectedLabelStyle: TextStyle = native.value,
+  val dragStartBehavior: DartObject = native.value,
+  val overlayColor: DartObject = native.value,
+  val mouseCursor: DartObject = native.value,
+  val enableFeedback: Boolean = native.value,
+  val onTap: Int => Unit = native.value,
+  val onHover: (Boolean, Int) => Unit = native.value,
+  val onFocusChange: (Boolean, Int) => Unit = native.value,
+  val physics: DartObject = native.value,
+  val splashFactory: DartObject = native.value,
+  val splashBorderRadius: BorderRadius = native.value,
+  val tabAlignment: DartObject = native.value,
+  val textScaler: DartObject = native.value,
+  val indicatorAnimation: DartObject = native.value
+) extends StatefulWidget:
+  def tabHasTextAndIcon: Boolean = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+object TabBar:
+  def secondary(key: Key = native.value, tabs: List[Widget], controller: DartObject = native.value, scrollController: DartObject = native.value, isScrollable: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, indicatorColor: Color = native.value, automaticIndicatorColorAdjustment: Boolean = native.value, indicatorWeight: Double = native.value, indicatorPadding: EdgeInsetsGeometry = native.value, indicator: Decoration = native.value, indicatorSize: DartObject = native.value, dividerColor: Color = native.value, dividerHeight: Double = native.value, labelColor: Color = native.value, labelStyle: TextStyle = native.value, labelPadding: EdgeInsetsGeometry = native.value, unselectedLabelColor: Color = native.value, unselectedLabelStyle: TextStyle = native.value, dragStartBehavior: DartObject = native.value, overlayColor: DartObject = native.value, mouseCursor: DartObject = native.value, enableFeedback: Boolean = native.value, onTap: Int => Unit = native.value, onHover: (Boolean, Int) => Unit = native.value, onFocusChange: (Boolean, Int) => Unit = native.value, physics: DartObject = native.value, splashFactory: DartObject = native.value, splashBorderRadius: BorderRadius = native.value, tabAlignment: DartObject = native.value, textScaler: DartObject = native.value, indicatorAnimation: DartObject = native.value): TabBar = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+class TabBarView(
+  val key: Key = native.value,
+  val children: List[Widget],
+  val controller: DartObject = native.value,
+  val physics: DartObject = native.value,
+  val dragStartBehavior: DartObject = native.value,
+  val viewportFraction: Double = native.value,
+  val clipBehavior: DartObject = native.value
+) extends StatefulWidget
+
+// ─── tab_controller.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class DefaultTabController(
+  val key: Key = native.value,
+  val length: Int,
+  val initialIndex: Int = native.value,
+  val child: Widget,
+  val animationDuration: sart.stdlib.Duration = native.value
+) extends StatefulWidget
+
+@native
+@DartImport("package:flutter/material.dart")
+object DefaultTabController:
+  def maybeOf(context: BuildContext): DartObject = native.value
+  def of(context: BuildContext): DartObject = native.value
+
