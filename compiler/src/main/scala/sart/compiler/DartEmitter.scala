@@ -618,10 +618,12 @@ class DartEmitter(
         case vd: ValDef => vd
         case dd: DefDef => dd
       }.filterNot { stat =>
-        // Drop compiler-synthesised accessors for ctor params; we emit the
-        // fields ourselves.
+        // Drop compiler-synthesised accessors for ctor params (we emit the
+        // fields ourselves) and default-value getters (their literals are
+        // folded into the emitted parameter shape).
         stat.symbol.flags.is(Flags.ParamAccessor) ||
         stat.symbol.flags.is(Flags.Synthetic) ||
+        stat.symbol.name.contains("$default$") ||
         stat.symbol.name == "<init>"
       }
 
@@ -642,16 +644,20 @@ class DartEmitter(
       for p <- ctorParams do
         line(s"final ${emitTypeRef(p.tpt.tpe)} ${p.name};")
 
-      // User classes get a **positional** primary constructor (matching how
-      // Scala call sites actually invoke them). Named args in Scala source
-      // compile to the same `Apply`, so when we emit the call we strip the
-      // `NamedArg` wrapper for user-class constructions. Facade classes are
-      // different — they use Dart-native named parameters and are handled
-      // via the @native annotation path (no Dart ctor is ever emitted for
-      // them; the user writes `Widget(title = …)` and the emitter keeps the
-      // name because the facade's actual Dart class uses named params).
+      // User-class primary constructors: params without defaults stay
+      // positional (matching how Scala call sites invoke them); params
+      // with literal defaults become a Dart named section carrying the
+      // default (`{this.x = 1}`), so Scala call sites that omit them keep
+      // working. Facade classes are different — no Dart ctor is ever
+      // emitted for them; the real Dart class defines the shape.
+      val ctorShape = dartParamShape(ctor.symbol, ctorParams)
       if ctorParams.nonEmpty then
-        val paramList = ctorParams.map(p => s"this.${p.name}").mkString(", ")
+        val pos = ctorShape.positional.map(p => s"this.${p.name}")
+        val nmd = ctorShape.named.map((p, d) => s"this.${p.name} = $d")
+        val paramList =
+          if nmd.isEmpty then pos.mkString(", ")
+          else if pos.isEmpty then nmd.mkString("{", ", ", "}")
+          else pos.mkString(", ") + ", " + nmd.mkString("{", ", ", "}")
         line(s"$className($paramList);")
         blank()
 
@@ -661,7 +667,7 @@ class DartEmitter(
           case dd: DefDef => emitMethod(dd)
 
       if sym.flags.is(Flags.Case) && ctorParams.nonEmpty then
-        emitCaseClassSynths(className, ctorParams)
+        emitCaseClassSynths(className, ctorParams, ctorShape)
 
       indent -= 1
       line("}")
@@ -677,7 +683,7 @@ class DartEmitter(
      *  fields. Good enough while case-class fields are non-nullable; when
      *  `Option[T]` → `T?` lands (Phase 2), swap in a sentinel.
      */
-    private def emitCaseClassSynths(className: String, params: List[ValDef]): Unit =
+    private def emitCaseClassSynths(className: String, params: List[ValDef], shape: DartParamShape): Unit =
       val names = params.map(_.name)
       val types = params.map(p => emitTypeRef(p.tpt.tpe))
 
@@ -707,10 +713,12 @@ class DartEmitter(
       blank()
 
       // copyWith — method's own parameters are named (Dart convention for
-      // `copyWith`), but the body's constructor call is positional to
-      // match the class's positional primary ctor.
+      // `copyWith`); the body's constructor call mirrors the emitted ctor
+      // shape (positional prefix, named section for defaulted params).
       val cwParams = names.zip(types).map { case (n, t) => s"$t? $n" }.mkString(", ")
-      val cwArgs   = names.map(n => s"$n ?? this.$n").mkString(", ")
+      val cwArgs =
+        (shape.positional.map(p => s"${p.name} ?? this.${p.name}") ++
+          shape.named.map((p, _) => s"${p.name}: ${p.name} ?? this.${p.name}")).mkString(", ")
       line(s"$className copyWith({$cwParams}) =>")
       indent += 1
       line(s"$className($cwArgs);")
@@ -743,7 +751,15 @@ class DartEmitter(
 
       val retType = emitTypeRef(dd.returnTpt.tpe)
       val params = dd.paramss.flatMap(_.params).collect { case vd: ValDef => vd }
-      val paramStr = params.map(p => s"${emitTypeRef(p.tpt.tpe)} ${dartSafeName(p.name)}").mkString(", ")
+      // Params with literal Scala defaults form a Dart named section
+      // carrying the default; the rest stay positional.
+      val shape = dartParamShape(dd.symbol, params)
+      val posStr = shape.positional.map(p => s"${emitTypeRef(p.tpt.tpe)} ${dartSafeName(p.name)}")
+      val nmdStr = shape.named.map((p, d) => s"${emitTypeRef(p.tpt.tpe)} ${dartSafeName(p.name)} = $d")
+      val paramStr =
+        if nmdStr.isEmpty then posStr.mkString(", ")
+        else if posStr.isEmpty then nmdStr.mkString("{", ", ", "}")
+        else posStr.mkString(", ") + ", " + nmdStr.mkString("{", ", ", "}")
       val tparams = typeParamSig(dd)
 
       // Scala paren-less `def foo: Int = …` → Dart getter `int get foo`.
@@ -1104,12 +1120,16 @@ class DartEmitter(
       case Apply(Select(New(tpt), _), args) =>
         recordAnnotations(tpt.tpe.typeSymbol)
         val ctorName = dartName(tpt.tpe.typeSymbol)
-        val argStr = if hasNative(tpt.tpe.typeSymbol) then emitArgs(args) else emitPositionalArgs(args)
+        val argStr =
+          if hasNative(tpt.tpe.typeSymbol) then emitArgs(args)
+          else emitUserCallArgs(tpt.tpe.typeSymbol.primaryConstructor, args)
         s"$ctorName($argStr)"
       case Apply(TypeApply(Select(New(tpt), _), _), args) =>
         recordAnnotations(tpt.tpe.typeSymbol)
         val ctorName = dartName(tpt.tpe.typeSymbol)
-        val argStr = if hasNative(tpt.tpe.typeSymbol) then emitArgs(args) else emitPositionalArgs(args)
+        val argStr =
+          if hasNative(tpt.tpe.typeSymbol) then emitArgs(args)
+          else emitUserCallArgs(tpt.tpe.typeSymbol.primaryConstructor, args)
         s"$ctorName($argStr)"
 
       // `sart.stdlib.Some(x)` → just `x` — Dart promotes the non-null value
@@ -1125,10 +1145,10 @@ class DartEmitter(
       // rewrite it to the positional constructor.
       case Apply(Select(qual, "apply"), args) if isCaseClassCompanion(qual) =>
         val ctorName = caseClassNameFor(qual)
-        s"$ctorName(${emitPositionalArgs(args)})"
+        s"$ctorName(${emitUserCallArgs(companionClassCtor(qual), args)})"
       case Apply(TypeApply(Select(qual, "apply"), _), args) if isCaseClassCompanion(qual) =>
         val ctorName = caseClassNameFor(qual)
-        s"$ctorName(${emitPositionalArgs(args)})"
+        s"$ctorName(${emitUserCallArgs(companionClassCtor(qual), args)})"
 
       // `opt.getOrElse(d)` → `(opt ?? d)` — Dart's null-coalescing operator
       // is the exact native equivalent.
@@ -1254,12 +1274,12 @@ class DartEmitter(
       // cases where `f(x)(y)` really is a function-returning-function get
       // rewritten as wrong code, but the method-call shape covers 99%
       // of real Scala code.
-      case Apply(Apply(Select(qual, name), args1), args2) =>
+      case Apply(Apply(sel @ Select(qual, name), args1), args2) =>
         recordAnnotations(qual.tpe.typeSymbol)
-        emitMemberCall(qual, name, args1 ++ args2)
-      case Apply(Apply(TypeApply(Select(qual, name), _), args1), args2) =>
+        emitMemberCall(qual, name, args1 ++ args2, sel.symbol)
+      case Apply(Apply(TypeApply(sel @ Select(qual, name), _), args1), args2) =>
         recordAnnotations(qual.tpe.typeSymbol)
-        emitMemberCall(qual, name, args1 ++ args2)
+        emitMemberCall(qual, name, args1 ++ args2, sel.symbol)
       case Apply(Apply(Ident(name), args1), args2) =>
         s"$name(${emitArgs(args1 ++ args2)})"
       case Apply(Apply(TypeApply(Ident(name), _), args1), args2) =>
@@ -1283,15 +1303,15 @@ class DartEmitter(
         s"throw ${emitExpr(arg)}"
 
       // Normal call: `obj.method(args)` or `Ident(method)(args)` for local calls.
-      case Apply(Select(qual, name), args) =>
+      case Apply(sel @ Select(qual, name), args) =>
         recordAnnotations(qual.tpe.typeSymbol)
-        emitMemberCall(qual, name, args)
+        emitMemberCall(qual, name, args, sel.symbol)
       // Generic method call: `obj.method[T](args)`. Same as above but with
       // an inner `TypeApply` that Scala types but Dart's type inference
       // handles on its own — so we drop the explicit type arguments.
-      case Apply(TypeApply(Select(qual, name), _), args) =>
+      case Apply(TypeApply(sel @ Select(qual, name), _), args) =>
         recordAnnotations(qual.tpe.typeSymbol)
-        emitMemberCall(qual, name, args)
+        emitMemberCall(qual, name, args, sel.symbol)
       case Apply(fn, args) =>
         s"${emitExpr(fn)}(${emitArgs(args)})"
 
@@ -1503,7 +1523,7 @@ class DartEmitter(
      *  point found the call. Consults the `StdlibRewrite` table for
      *  receiver-aware renames / polyfills.
      */
-    private def emitMemberCall(qual: Term, name: String, args: List[Term]): String =
+    private def emitMemberCall(qual: Term, name: String, args: List[Term], fnSym: Symbol = Symbol.noSymbol): String =
       // @DartTopLevel facade method → emit as a top-level Dart call
       // (no qualifier). This is how `math.sqrt(x)` lands as `sqrt(x)`.
       if isDartTopLevel(qual) then
@@ -1525,6 +1545,20 @@ class DartEmitter(
           case "failed"     => return s"Future.error(${emitArgs(args)})"
           case _            => ()
 
+      // Case-class `.copy(x = v)` → the synthesised Dart `copyWith`, whose
+      // params are all named. `copy`'s omitted args are `$default$` refs
+      // (defaulting to the current field values) and get stripped.
+      if fnSym.exists && name == "copy" && fnSym.owner.flags.is(Flags.Case) then
+        val params = fnSym.paramSymss.flatten.filterNot(_.isType)
+        val named = args.zipWithIndex.collect {
+          case (arg, i) if !isDefaultArg(arg) =>
+            val v = arg match
+              case NamedArg(_, x) => x
+              case o              => o
+            s"${params(i).name}: ${emitExpr(v)}"
+        }
+        return s"${selectPrefix(qual)}copyWith(${named.mkString(", ")})"
+
       // Future.map/flatMap both map to Dart's `.then` — `.then` already
       // handles both the value-returning and Future-returning shapes via
       // its overloads, so we don't need the Scala distinction in Dart.
@@ -1543,7 +1577,13 @@ class DartEmitter(
 
       stdlibRewrite(qual, name, isGetter = false, argList, argStr) match
         case Some(rendered) => rendered
-        case None           => s"${selectPrefix(qual)}$name($argStr)"
+        case None =>
+          // Calls to methods Sart itself emits must match the emitted
+          // shape: named args for literal-defaulted params, positional
+          // (name-stripped) for the rest.
+          if isUserCallable(fnSym) then
+            s"${selectPrefix(qual)}$name(${emitUserCallArgs(fnSym, cleanedArgs)})"
+          else s"${selectPrefix(qual)}$name($argStr)"
 
     /** Lookup helper: walks `stdlibRewrites`, returning the first matching
      *  template's rendered output or `None`. Method-call entries receive
@@ -1918,6 +1958,17 @@ class DartEmitter(
       val companion = sym.companionClass
       if companion.exists then dartName(companion) else sym.name.stripSuffix("$")
 
+    /** Primary-constructor symbol of the case class behind a companion
+     *  reference — for shaping `Foo(args)` companion-apply call sites.
+     */
+    private def companionClassCtor(t: Term): Symbol =
+      val sym = t match
+        case id: Ident => id.symbol
+        case s: Select => s.symbol
+        case _         => Symbol.spliceOwner
+      val companion = sym.companionClass
+      if companion.exists then companion.primaryConstructor else Symbol.noSymbol
+
     /** Recognise Scala's implicit `ExecutionContext` argument so we can
      *  drop it when emitting a Dart Future call — Dart has no EC concept.
      */
@@ -1986,6 +2037,92 @@ class DartEmitter(
       case TypeApply(inner, _) => isDefaultArg(inner)
       case NamedArg(_, inner) => isDefaultArg(inner)
       case _ => false
+
+    // ── Named/default parameters for user-defined callables ─────────────
+
+    /** The Dart-side parameter shape of a user callable: positional params
+     *  first, then a named section for every param whose Scala default is
+     *  a literal we can carry over as a Dart default value. Params with
+     *  non-literal defaults stay positional-required (loud at analyze
+     *  time if omitted) until default-getter emission lands.
+     */
+    private case class DartParamShape(positional: List[ValDef], named: List[(ValDef, String)])
+
+    private def dartParamShape(callable: Symbol, params: List[ValDef]): DartParamShape =
+      val pos   = List.newBuilder[ValDef]
+      val named = List.newBuilder[(ValDef, String)]
+      params.zipWithIndex.foreach { case (p, i) =>
+        val dflt =
+          if p.symbol.flags.is(Flags.HasDefault) then literalDefaultFor(callable, i + 1)
+          else None
+        dflt match
+          case Some(d) => named += ((p, d))
+          case None    => pos += p
+      }
+      DartParamShape(pos.result(), named.result())
+
+    /** Emitted Dart literal for the `idx`-th (1-based) default of
+     *  `callable`, if that default is a plain literal. Scala stores
+     *  defaults in synthesised getters (`f$default$2` on the owner;
+     *  `$lessinit$greater$default$2` on the companion for constructors).
+     */
+    private def literalDefaultFor(callable: Symbol, idx: Int): Option[String] =
+      try
+        val (owner, base) =
+          if callable.isClassConstructor then
+            (callable.owner.companionModule, "$lessinit$greater")
+          else (callable.owner, callable.name)
+        if !owner.exists then return None
+        val getterName = s"$base$$default$$$idx"
+        val getter = owner.methodMember(getterName).headOption.orElse {
+          val mc = owner.moduleClass
+          if mc.exists then mc.methodMember(getterName).headOption else None
+        }
+        def unwrapT(t: Term): Term = t match
+          case Inlined(_, _, e) => unwrapT(e)
+          case Typed(e, _)      => unwrapT(e)
+          case other            => other
+        getter.flatMap { g =>
+          g.tree match
+            case dd: DefDef =>
+              dd.rhs.map(unwrapT).collect { case Literal(c) => emitConstant(c) }
+            case _ => None
+        }
+      catch case _: Throwable => None
+
+    /** A callable whose declaration Sart itself emits (so call sites must
+     *  match the emitted positional/named shape) — i.e. not a facade and
+     *  not part of the Scala/Java stdlib.
+     */
+    private def isUserCallable(sym: Symbol): Boolean =
+      sym.exists && {
+        val owner = sym.owner
+        owner.exists && !hasNative(owner) &&
+          !sym.fullName.startsWith("scala.") &&
+          !sym.fullName.startsWith("java.")
+      }
+
+    /** Render call args against a user callable's emitted shape: args for
+     *  literal-defaulted params become `name: value` (and Dart requires
+     *  named args after positional ones, so they're moved last); omitted
+     *  defaults are stripped — the Dart-side default takes over.
+     */
+    private def emitUserCallArgs(callable: Symbol, args: List[Term]): String =
+      val params = callable.paramSymss.flatten.filterNot(_.isType)
+      val pos    = List.newBuilder[String]
+      val named  = List.newBuilder[String]
+      args.zipWithIndex.foreach { case (arg, i) =>
+        if !isDefaultArg(arg) then
+          val pOpt  = params.lift(i)
+          val inner = arg match
+            case NamedArg(_, v) => v
+            case other          => other
+          val isNamed = pOpt.exists(p =>
+            p.flags.is(Flags.HasDefault) && literalDefaultFor(callable, i + 1).isDefined)
+          if isNamed then named += s"${pOpt.get.name}: ${emitExpr(inner)}"
+          else pos += emitExpr(inner)
+      }
+      (pos.result() ++ named.result()).mkString(", ")
 
     private def emitArgs(args: List[Term]): String =
       args.filterNot(isDefaultArg).map {

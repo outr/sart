@@ -330,6 +330,28 @@ class EmitterSuite extends FunSuite:
     assert(body.contains(".map(") && body.contains(".toList()"), body)
   }
 
+  test("literal default params emit as a Dart named section") {
+    val body = classBody("FxNamedParams")
+    assert(body.contains("String greet(String name, {String punct = '!', int times = 1})"), body)
+  }
+
+  test("call sites match the emitted named/positional shape") {
+    val body = classBody("FxNamedParams")
+    assert(body.contains("greet('a')"), body)          // omitted defaults stripped
+    assert(body.contains("greet('a', times: 3)"), body) // named stays named
+    assert(body.contains("greet('a', punct: '.')"), body) // positional-at-default becomes named
+  }
+
+  test("case-class ctor defaults emit as named ctor params; copyWith matches") {
+    val body = classBody("FxStyled")
+    assert(body.contains("FxStyled(this.label, {this.size = 12, this.bold = false});"), body)
+    assert(body.contains("size: size ?? this.size"), body)
+    val calls = classBody("FxNamedCtor")
+    assert(calls.contains("FxStyled('x')"), calls)
+    assert(calls.contains("FxStyled('x', bold: true)"), calls)
+    assert(calls.contains("copyWith(size: 20)"), calls)
+  }
+
   test("Future.successful / Future.failed emit Dart Future.value / Future.error") {
     val body = classBody("FxFutureCtor")
     assert(body.contains("Future.value(n)"), body)

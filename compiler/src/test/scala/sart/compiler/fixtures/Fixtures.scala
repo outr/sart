@@ -105,6 +105,20 @@ class FxRanges:
   def exclusive(n: Int): List[Int] = (0 until n).toList
   def squared(n: Int): List[Int]   = (0 until n).map(i => i * i).toList
 
+class FxNamedParams:
+  def greet(name: String, punct: String = "!", times: Int = 1): String =
+    name + punct + times.toString
+  def callAll(): String  = greet("a")
+  def callSome(): String = greet("a", times = 3)
+  def callPos(): String  = greet("a", ".")
+
+case class FxStyled(label: String, size: Int = 12, bold: Boolean = false)
+
+class FxNamedCtor:
+  def make(): FxStyled    = FxStyled("x")
+  def makeBig(): FxStyled = FxStyled("x", bold = true)
+  def resize(s: FxStyled): FxStyled = s.copy(size = 20)
+
 class FxFutureCtor:
   import scala.concurrent.Future
   def ready(n: Int): Future[Int]          = Future.successful(n)
