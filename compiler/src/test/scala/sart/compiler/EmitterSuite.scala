@@ -352,6 +352,12 @@ class EmitterSuite extends FunSuite:
     assert(body.contains("'name': name,"), body)
   }
 
+  test("Json.decode/encode lower to the synthesized codecs") {
+    val body = classBody("FxJsonBridge")
+    assert(body.contains("FxUser.fromJson(d as Map<String, dynamic>)"), body)
+    assert(body.contains("u.toJson()"), body)
+  }
+
   test("@JsonModel sealed hierarchy dispatches on the type tag") {
     val parent = classBody("FxWire")
     assert(parent.contains("static FxWire fromJson(Map<String, dynamic> json) {"), parent)

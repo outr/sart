@@ -1396,6 +1396,14 @@ class DartEmitter(
           else emitUserCallArgs(tpt.tpe.typeSymbol.primaryConstructor, args)
         s"$ctorName($argStr)"
 
+      // Json bridge: Scala-side entry points to the synthesized @JsonModel
+      // codecs. `Json.decode[T](d)` → `T.fromJson(d as Map<String, dynamic>)`;
+      // `Json.encode(x)` → `x.toJson()`.
+      case Apply(TypeApply(Select(q, "decode"), List(tpt)), List(arg)) if isSartRef(q, "sart.dart.Json") =>
+        s"${tpt.tpe.typeSymbol.name}.fromJson(${emitExpr(arg)} as Map<String, dynamic>)"
+      case Apply(Select(q, "encode"), List(arg)) if isSartRef(q, "sart.dart.Json") =>
+        s"${emitExpr(arg)}.toJson()"
+
       // `sart.stdlib.Some(x)` → just `x` — Dart promotes the non-null value
       // into the nullable type automatically.
       case Apply(Select(qual, "apply"), args) if isSartRef(qual, "sart.stdlib.Some") =>

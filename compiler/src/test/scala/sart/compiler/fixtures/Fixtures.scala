@@ -105,7 +105,11 @@ class FxRanges:
   def exclusive(n: Int): List[Int] = (0 until n).toList
   def squared(n: Int): List[Int]   = (0 until n).map(i => i * i).toList
 
-import sart.dart.{JsonModel, JsonTag}
+import sart.dart.{Dyn, Json, JsonModel, JsonTag}
+
+class FxJsonBridge:
+  def parse(d: Dyn): FxUser = Json.decode[FxUser](d)
+  def render(u: FxUser): Dyn = Json.encode(u)
 
 @JsonModel
 case class FxUser(name: String, age: Int, tags: List[String], nickname: Option[String])
