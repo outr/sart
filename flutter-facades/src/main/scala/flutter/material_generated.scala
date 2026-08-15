@@ -10694,3 +10694,52 @@ object DefaultTabController:
   def maybeOf(context: BuildContext): DartObject = native.value
   def of(context: BuildContext): DartObject = native.value
 
+// ─── dropdown.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class DropdownMenuItem[T](
+  val key: Key = native.value,
+  val onTap: () => Unit = native.value,
+  val value: T = native.value,
+  val enabled: Boolean = native.value,
+  val alignment: AlignmentGeometry = native.value,
+  val child: Widget
+) extends StatelessWidget
+
+@native
+@DartImport("package:flutter/material.dart")
+class DropdownButton[T](
+  val key: Key = native.value,
+  val items: List[DropdownMenuItem[T]],
+  val selectedItemBuilder: BuildContext => List[Widget] = native.value,
+  val value: T = native.value,
+  val hint: Widget = native.value,
+  val disabledHint: Widget = native.value,
+  val onChanged: T => Unit,
+  val onTap: () => Unit = native.value,
+  val elevation: Int = native.value,
+  val style: TextStyle = native.value,
+  val underline: Widget = native.value,
+  val icon: Widget = native.value,
+  val iconDisabledColor: Color = native.value,
+  val iconEnabledColor: Color = native.value,
+  val iconSize: Double = native.value,
+  val isDense: Boolean = native.value,
+  val isExpanded: Boolean = native.value,
+  val itemHeight: Double = native.value,
+  val menuWidth: Double = native.value,
+  val focusColor: Color = native.value,
+  val focusNode: DartObject = native.value,
+  val autofocus: Boolean = native.value,
+  val dropdownColor: Color = native.value,
+  val menuMaxHeight: Double = native.value,
+  val enableFeedback: Boolean = native.value,
+  val alignment: AlignmentGeometry = native.value,
+  val borderRadius: BorderRadius = native.value,
+  val padding: EdgeInsetsGeometry = native.value,
+  val barrierDismissible: Boolean = native.value,
+  val mouseCursor: DartObject = native.value,
+  val dropdownMenuItemMouseCursor: DartObject = native.value
+) extends StatefulWidget
+
