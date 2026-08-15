@@ -382,6 +382,12 @@ class EmitterSuite extends FunSuite:
     assert(body.contains("u.toJson()"), body)
   }
 
+  test("field-less sealed members still get tagged codecs") {
+    val basic = classBody("FxKindBasic")
+    assert(basic.contains("static FxKindBasic fromJson(Map<String, dynamic> json) =>"), basic)
+    assert(basic.contains("'type': 'Kind.Basic',"), basic)
+  }
+
   test("@JsonModel sealed hierarchy dispatches on the type tag") {
     val parent = classBody("FxWire")
     assert(parent.contains("static FxWire fromJson(Map<String, dynamic> json) {"), parent)

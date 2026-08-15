@@ -143,6 +143,13 @@ class FxJsonBridge:
 case class FxUser(name: String, age: Int, tags: List[String], nickname: Option[String])
 
 @JsonModel
+sealed trait FxKind
+@JsonTag("Kind.Basic")
+case class FxKindBasic() extends FxKind
+@JsonTag("Kind.Rich")
+case class FxKindRich(level: Int) extends FxKind
+
+@JsonModel
 sealed trait FxWire
 @JsonTag("Wire.Ping")
 case class FxPing(seq: Int) extends FxWire

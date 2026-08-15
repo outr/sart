@@ -820,7 +820,7 @@ class DartEmitter(
       // parent itself gets the type-tag dispatch factory.
       val sealedJsonParent = parents.extendsTpt.map(_.tpe.typeSymbol)
         .filter(p => p.flags.is(Flags.Sealed) && hasJsonModel(p))
-      if sym.flags.is(Flags.Case) && ctorParams.nonEmpty
+      if sym.flags.is(Flags.Case)
          && (hasJsonModel(sym) || sealedJsonParent.isDefined) then
         emitJsonSynths(className, ctorShape, sealedJsonParent.map(_ => jsonTagOf(sym)))
       if sym.flags.is(Flags.Sealed) && hasJsonModel(sym) then
