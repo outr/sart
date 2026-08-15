@@ -124,6 +124,7 @@ class FxLifecycle extends FxLifecycleBase:
 
 class FxForeach:
   def visitAll(xs: List[String], f: String => Unit): Unit = xs.foreach(f)
+  def join(xs: List[String], ys: List[String]): List[String] = xs ++ ys
 
 @sart.dart.native
 @sart.dart.DartImport("dart:math")

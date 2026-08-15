@@ -78,7 +78,7 @@ class LauncherHome extends StatelessWidget {
       ),
       body: ListView.builder(
         itemBuilder: (ctx, i) => (() {
-          final Demo d = demos[i];
+          final d = demos[i];
           return ListTile(
             leading: Icon(Icons.menu),
             title: Text(d.title),
@@ -508,9 +508,7 @@ class ShowcaseAppState extends State<ShowcaseApp> {
   void runLookup(String query) {
     setState(
       () => (() {
-        final List<Contact> hit = contacts
-            .where((c) => c.name == query)
-            .toList();
+        final hit = contacts.where((c) => c.name == query).toList();
         return lookupResult = (hit.isEmpty ? null : hit.first).fold(
           'no match for \'' + query.toString() + '\'',
           (c) => c.name.toString() + ' → ' + c.phone.toString(),
@@ -620,7 +618,7 @@ class ShowcaseAppState extends State<ShowcaseApp> {
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:149
   Widget get shapeCard {
     return (() {
-      final ShapeKind s = shapes[shapeIdx];
+      final s = shapes[shapeIdx];
       return section(
         'Sealed trait + match',
         Column(
@@ -1042,7 +1040,7 @@ class DynJson {
   /// Source: example/src/main/scala/example/features/DynJson.scala:18
   String nameOf(String payload) {
     return (() {
-      final dynamic json = jsonDecode(payload);
+      final json = jsonDecode(payload);
       return (json['name'] == null) ? 'unknown' : (json['name'] as String);
     })();
   }

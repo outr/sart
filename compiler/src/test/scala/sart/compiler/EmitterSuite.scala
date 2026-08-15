@@ -363,6 +363,7 @@ class EmitterSuite extends FunSuite:
     assert(body.contains("super.initState();"), body)
     val fe = classBody("FxForeach")
     assert(fe.contains("xs.forEach(f);"), fe)
+    assert(fe.contains("(xs + ys)"), fe)
   }
 
   test("scala.Some / scala.None lower like the sart.stdlib pair") {

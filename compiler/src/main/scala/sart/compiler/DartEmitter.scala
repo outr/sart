@@ -872,9 +872,9 @@ class DartEmitter(
       // copyWith — method's own parameters are named (Dart convention for
       // `copyWith`); the body's constructor call mirrors the emitted ctor
       // shape (positional prefix, named section for defaulted params).
-      // Already-nullable field types (Option-mapped) keep a single `?`.
+      // Already-nullable field types (Option-mapped, dynamic) keep as-is.
       val cwParams = names.zip(types).map { case (n, t) =>
-        val opt = if t.endsWith("?") then t else s"$t?"
+        val opt = if t.endsWith("?") || t == "dynamic" then t else s"$t?"
         s"$opt $n"
       }.mkString(", ")
       val cwArgs =
@@ -1313,12 +1313,23 @@ class DartEmitter(
       case vd: ValDef =>
         // `lazy val` → Dart `late final`: the initializer runs on first
         // read, which is exactly Scala's (single-threaded) lazy semantics.
-        val prefix =
-          if vd.symbol.flags.is(Flags.Lazy) then "late final "
-          else if vd.symbol.flags.is(Flags.Mutable) then ""
-          else "final "
+        val isNullInit = vd.rhs.exists {
+          case Literal(c) => c.value == null
+          case _          => false
+        }
         val init = vd.rhs.map(r => s" = ${emitExpr(r)}").getOrElse("")
-        line(s"$prefix${emitTypeRef(vd.tpt.tpe)} ${vd.name}$init;")
+        if vd.symbol.flags.is(Flags.Lazy) then
+          line(s"late final ${emitTypeRef(vd.tpt.tpe)} ${vd.name}$init;")
+        else if !vd.symbol.flags.is(Flags.Mutable) && vd.rhs.nonEmpty && !isNullInit then
+          // Immutable local with an initializer: let Dart infer the type.
+          // Inference keeps nullability honest (a read of a nullable field
+          // infers `T?`), which is what makes null-check promotion work —
+          // Dart never promotes fields, only locals.
+          line(s"final ${vd.name}$init;")
+        else
+          val declared = emitTypeRef(vd.tpt.tpe)
+          val tpe = if isNullInit && !declared.endsWith("?") then declared + "?" else declared
+          line(s"${if vd.symbol.flags.is(Flags.Mutable) then "" else "final "}$tpe ${vd.name}$init;")
       case Assign(lhs, rhs) =>
         line(s"${emitExpr(lhs)} = ${emitExpr(rhs)};")
       case tryTree: Try =>
@@ -1988,6 +1999,9 @@ class DartEmitter(
       // Iterable, so we force `.toList()` to keep the static type aligned.
       listCall("map")       (c => s"${c.prefix}map(${c.args}).toList()"),
       listCall("foreach")   (c => s"${c.prefix}forEach(${c.args})"),
+      // Dart's List defines `+` as concatenation — the exact analogue.
+      listCall("++")        (c => s"(${c.prefix.stripSuffix(".")} + ${c.args})"),
+      listCall("concat")    (c => s"(${c.prefix.stripSuffix(".")} + ${c.args})"),
       listCall("filter")    (c => s"${c.prefix}where(${c.args}).toList()"),
       listCall("withFilter")(c => s"${c.prefix}where(${c.args}).toList()"),
       listCall("flatMap")   (c => s"${c.prefix}expand(${c.args}).toList()"),
@@ -2760,9 +2774,18 @@ class DartEmitter(
 
     private def stmtInline(t: Tree): String = t match
       case vd: ValDef =>
-        val prefix = if vd.symbol.flags.is(Flags.Mutable) then "" else "final "
+        val isNullInit = vd.rhs.exists {
+          case Literal(c) => c.value == null
+          case _          => false
+        }
         val init = vd.rhs.map(r => s" = ${emitExpr(r)}").getOrElse("")
-        s"$prefix${emitTypeRef(vd.tpt.tpe)} ${vd.name}$init;"
+        if !vd.symbol.flags.is(Flags.Mutable) && vd.rhs.nonEmpty && !isNullInit then
+          // Type-inferred, like emitStmt — keeps nullability honest so
+          // null-check promotion works on the local.
+          s"final ${vd.name}$init;"
+        else
+          val prefix = if vd.symbol.flags.is(Flags.Mutable) then "" else "final "
+          s"$prefix${emitTypeRef(vd.tpt.tpe)} ${vd.name}$init;"
       case Assign(lhs, rhs) => s"${emitExpr(lhs)} = ${emitExpr(rhs)};"
       case term: Term       => s"${emitExpr(term)};"
       case _                => s"/* TODO stmt-inline */"

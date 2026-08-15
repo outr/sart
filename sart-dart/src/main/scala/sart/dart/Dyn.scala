@@ -15,6 +15,7 @@ package sart.dart
 @native
 class Dyn extends DartObject:
   def apply(key: String): Dyn = native.value
+  def apply(index: Int): Dyn  = native.value
   def str: String             = native.value
   def toInt: Int              = native.value
   def toBool: Boolean         = native.value
