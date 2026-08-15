@@ -54,6 +54,15 @@ final class DartName(val name: String) extends StaticAnnotation
  */
 final class DartImport(val path: String) extends StaticAnnotation
 
+/** Paired with [[DartImport]]: emits `import '<path>' as <alias>;` and
+ *  prefixes every reference to the annotated facade with `<alias>.` —
+ *  for libraries whose exports collide with Flutter's (e.g. package:web's
+ *  DOM `Text`). A separate annotation (not a default param on
+ *  [[DartImport]]) because TASTy keeps annotation applications at source
+ *  arity, so adding parameters breaks previously-compiled facades.
+ */
+final class DartAlias(val alias: String) extends StaticAnnotation
+
 /** Declares a pubspec dependency for the generated project. The Sart
  *  compiler unions every reachable [[DartPackage]] across the compiled
  *  code and writes them into `pubspec.yaml` under `dependencies:`.

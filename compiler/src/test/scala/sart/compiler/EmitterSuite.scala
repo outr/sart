@@ -352,6 +352,12 @@ class EmitterSuite extends FunSuite:
     assert(body.contains("'name': name,"), body)
   }
 
+  test("@DartImport alias prefixes references and the import line") {
+    assert(emittedMain.contains("import 'dart:math' as fxmath;"), emittedMain.linesIterator.take(8).mkString("\n"))
+    val body = classBody("FxAliasUse")
+    assert(body.contains("fxmath.sqrt(x)"), body)
+  }
+
   test("scala.Some / scala.None lower like the sart.stdlib pair") {
     val body = classBody("FxScalaOpt")
     assert(body.contains("id == 0 ? null : 'found'"), body)

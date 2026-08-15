@@ -227,7 +227,10 @@ class DartEmitter(
     // without deduplicating would double-import the shim filenames.
     val header = new StringBuilder
     for i <- imports.toList.sorted do
-      header.append(s"import '$i';\n")
+      // Entries are `path` or `path>>>alias` (aliased imports).
+      i.split(">>>") match
+        case Array(p, a) => header.append(s"import '$p' as $a;\n")
+        case _           => header.append(s"import '$i';\n")
     if imports.nonEmpty then header.append('\n')
 
     val mainDart = header.toString + bodyBuf.toString
@@ -370,7 +373,8 @@ class DartEmitter(
         annoFqn(a) match
           case "sart.dart.DartImport" =>
             constArgs(a).collectFirst { case s: String => s }.foreach { path =>
-              imports += path
+              val alias = importAlias(sym)
+              imports += alias.map(al => s"$path>>>$al").getOrElse(path)
               // If the @DartImport names a stdlib shim, register the shim
               // file for emission. The shim's own filename already lands
               // in `imports` so there's no double-import.
@@ -389,12 +393,23 @@ class DartEmitter(
             constArgs(a).collectFirst { case s: String => s }.foreach(pubspecBlocks += _)
           case _ =>
 
-    /** Pull the emitted Dart name from `@DartName(...)` if present. */
+    /** Pull the emitted Dart name from `@DartName(...)` if present, and
+     *  prefix with the facade's import alias when its `@DartImport`
+     *  declares one.
+     */
     private def dartName(sym: Symbol): String =
-      sym.annotations.collectFirst {
+      val base = sym.annotations.collectFirst {
         case a if annoFqn(a) == "sart.dart.DartName" =>
           constArgs(a).collectFirst { case s: String => s }
       }.flatten.getOrElse(sym.name)
+      importAlias(sym).map(al => s"$al.$base").getOrElse(base)
+
+    /** The import alias declared via a facade's `@DartAlias`, if any. */
+    private def importAlias(sym: Symbol): Option[String] =
+      sym.annotations.collectFirst {
+        case a if annoFqn(a) == "sart.dart.DartAlias" =>
+          constArgs(a).collectFirst { case s: String if s.nonEmpty => s }
+      }.flatten
 
     // Dart reserved words that user-chosen Scala identifiers sometimes
     // collide with. We don't need the full keyword list — just the ones
@@ -1790,10 +1805,10 @@ class DartEmitter(
      */
     private def emitMemberAccess(qual: Term, name: String): String =
       // @DartTopLevel facade field / constant → drop the qualifier so
-      // `math.pi` emits as `pi`.
+      // `math.pi` emits as `pi` (or `alias.pi` for aliased imports).
       if isDartTopLevel(qual) then
         recordAnnotations(qual.tpe.termSymbol)
-        return name
+        return importAlias(qual.tpe.termSymbol).map(al => s"$al.$name").getOrElse(name)
 
       // `Dyn` bridge getters — casts and null checks on `dynamic`.
       if isDynReceiver(qual) then
@@ -1830,7 +1845,8 @@ class DartEmitter(
       // (no qualifier). This is how `math.sqrt(x)` lands as `sqrt(x)`.
       if isDartTopLevel(qual) then
         recordAnnotations(qual.tpe.termSymbol)
-        return s"$name(${emitArgs(args)})"
+        val prefix = importAlias(qual.tpe.termSymbol).map(al => s"$al.").getOrElse("")
+        return s"$prefix$name(${emitArgs(args)})"
 
       // Scala allows zero-arg method calls to be written without parens,
       // but also compiles `s.isEmpty` as `Apply(Select, Nil)` when

@@ -113,6 +113,16 @@ case class FxKeyed(@JsonField("_id") id: String, label: String)
 class FxScalaOpt:
   def find(id: Int): Option[String] = if id == 0 then None else Some("found")
 
+@sart.dart.native
+@sart.dart.DartImport("dart:math")
+@sart.dart.DartAlias("fxmath")
+@sart.dart.DartTopLevel
+object FxMathAliased:
+  def sqrt(x: Double): Double = sart.dart.native.value
+
+class FxAliasUse:
+  def root(x: Double): Double = FxMathAliased.sqrt(x)
+
 class FxJsonBridge:
   def parse(d: Dyn): FxUser = Json.decode[FxUser](d)
   def render(u: FxUser): Dyn = Json.encode(u)
