@@ -105,6 +105,17 @@ class FxRanges:
   def exclusive(n: Int): List[Int] = (0 until n).toList
   def squared(n: Int): List[Int]   = (0 until n).map(i => i * i).toList
 
+class FxBase(val label: String):
+  def describe(): String = "base " + label
+
+class FxDerived(label: String, val extra: Int) extends FxBase(label):
+  override def describe(): String = "derived " + extra.toString
+
+trait FxClickable:
+  def click(): String = "clicked"
+
+class FxButtonish extends FxBase("btn") with FxClickable
+
 class FxNamedParams:
   def greet(name: String, punct: String = "!", times: Int = 1): String =
     name + punct + times.toString

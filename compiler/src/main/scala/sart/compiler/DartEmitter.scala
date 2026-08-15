@@ -604,6 +604,31 @@ class DartEmitter(
         !skippedParentFqns(s.fullName) && !skippedParentSimples(s.name)
       }
 
+    /** Full parent decomposition: the extends-parent with its constructor
+     *  arguments, plus every further real parent for the `with` clause.
+     */
+    private case class ParentInfo(
+      extendsTpt: Option[TypeTree],
+      superArgs: List[Term],
+      withTpts: List[TypeTree]
+    )
+
+    private def parentCtorArgs(t: Tree): List[Term] = t match
+      case Apply(inner, args) => parentCtorArgs(inner) ++ args
+      case TypeApply(inner, _) => parentCtorArgs(inner)
+      case _                   => Nil
+
+    private def parentInfo(cd: ClassDef): ParentInfo =
+      val real = cd.parents.flatMap { p =>
+        findParentType(p).filter { tt =>
+          val s = tt.tpe.typeSymbol
+          !skippedParentFqns(s.fullName) && !skippedParentSimples(s.name)
+        }.map(tt => (tt, parentCtorArgs(p)))
+      }
+      real match
+        case Nil                 => ParentInfo(None, Nil, Nil)
+        case (tt, args) :: rest  => ParentInfo(Some(tt), args, rest.map(_._1))
+
     private def emitClassDef(cd: ClassDef): Unit =
       val sym = cd.symbol
       if hasNative(sym) then
@@ -618,8 +643,12 @@ class DartEmitter(
       if sym.flags.is(Flags.Synthetic) then return
       val className = rawName
 
-      val parentTpt = realParent(cd)
-      val extendsClause = parentTpt.map(tt => s" extends ${emitTypeRef(tt.tpe)}").getOrElse("")
+      val parents = parentInfo(cd)
+      val withClause =
+        if parents.withTpts.isEmpty then ""
+        else parents.withTpts.map(tt => emitTypeRef(tt.tpe)).mkString(" with ", ", ", "")
+      val extendsClause =
+        parents.extendsTpt.map(tt => s" extends ${emitTypeRef(tt.tpe)}").getOrElse("") + withClause
 
       // Primary-constructor parameters become `final` fields in Dart, plus
       // a named constructor of the form `ClassName({required this.field});`.
@@ -647,33 +676,68 @@ class DartEmitter(
       // `@main` wrapper we used to catch via this rule is now caught by
       // `isMainWrapper` upstream. Scala traits and abstract classes both
       // map to Dart `abstract class` — Dart has no trait-specific keyword.
-      val prefix =
-        if sym.flags.is(Flags.Sealed) then "sealed "
-        else if sym.flags.is(Flags.Trait) || sym.flags.is(Flags.Abstract) then "abstract "
-        else ""
+      // Parameterless, parentless, non-sealed traits become `mixin class`
+      // — usable both in extends position and in a `with` clause (Dart 3).
+      val keyword =
+        if sym.flags.is(Flags.Sealed) then "sealed class"
+        else if sym.flags.is(Flags.Trait) && ctorParams.isEmpty
+                && parents.extendsTpt.isEmpty && parents.withTpts.isEmpty then "mixin class"
+        else if sym.flags.is(Flags.Trait) || sym.flags.is(Flags.Abstract) then "abstract class"
+        else "class"
 
       emitSourceAttribution(sym)
-      line(s"${prefix}class $className$typeParams$extendsClause {")
+      line(s"$keyword $className$typeParams$extendsClause {")
       indent += 1
 
-      for p <- ctorParams do
+      // `val` ctor params become fields. Plain params also get a
+      // private-local ParamAccessor from dotty, so those only become
+      // fields when a member body actually references them — otherwise
+      // they stay constructor-local (typically just feeding `super(...)`).
+      val publicAccessors = cd.body.collect {
+        case vd: ValDef if vd.symbol.flags.is(Flags.ParamAccessor)
+          && !vd.symbol.flags.is(Flags.PrivateLocal) => vd.name
+      }.toSet
+      def usedInMembers(name: String): Boolean =
+        val acc = new TreeAccumulator[Boolean]:
+          def foldTree(found: Boolean, tree: Tree)(owner: Symbol): Boolean =
+            found || (tree match
+              case id: Ident   => id.name == name
+              case s: Select   => s.name == name || foldOverTree(false, s)(owner)
+              case _           => foldOverTree(false, tree)(owner))
+        memberStats.exists(stat => acc.foldTree(false, stat)(sym))
+      def isFieldParam(p: ValDef): Boolean =
+        sym.flags.is(Flags.Case) || publicAccessors.contains(p.name) || usedInMembers(p.name)
+      for p <- ctorParams if isFieldParam(p) do
         line(s"final ${emitTypeRef(p.tpt.tpe)} ${p.name};")
 
       // User-class primary constructors: params without defaults stay
       // positional (matching how Scala call sites invoke them); params
       // with literal defaults become a Dart named section carrying the
       // default (`{this.x = 1}`), so Scala call sites that omit them keep
-      // working. Facade classes are different — no Dart ctor is ever
+      // working. Parent constructor arguments become a `: super(...)`
+      // initializer. Facade classes are different — no Dart ctor is ever
       // emitted for them; the real Dart class defines the shape.
       val ctorShape = dartParamShape(ctor.symbol, ctorParams)
-      if ctorParams.nonEmpty then
-        val pos = ctorShape.positional.map(p => s"this.${p.name}")
-        val nmd = ctorShape.named.map((p, d) => s"this.${p.name} = $d")
+      val superInit =
+        if parents.superArgs.isEmpty then ""
+        else
+          val parentSym = parents.extendsTpt.map(_.tpe.typeSymbol).getOrElse(Symbol.noSymbol)
+          val rendered =
+            if parentSym.exists && !hasNative(parentSym) then
+              emitUserCallArgs(parentSym.primaryConstructor, parents.superArgs)
+            else emitArgs(parents.superArgs)
+          s" : super($rendered)"
+      if ctorParams.nonEmpty || superInit.nonEmpty then
+        def ctorParamDecl(p: ValDef): String =
+          if isFieldParam(p) then s"this.${p.name}"
+          else s"${emitTypeRef(p.tpt.tpe)} ${p.name}"
+        val pos = ctorShape.positional.map(ctorParamDecl)
+        val nmd = ctorShape.named.map((p, d) => s"${ctorParamDecl(p)} = $d")
         val paramList =
           if nmd.isEmpty then pos.mkString(", ")
           else if pos.isEmpty then nmd.mkString("{", ", ", "}")
           else pos.mkString(", ") + ", " + nmd.mkString("{", ", ", "}")
-        line(s"$className($paramList);")
+        line(s"$className($paramList)$superInit;")
         blank()
 
       for stat <- memberStats do

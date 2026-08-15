@@ -1142,7 +1142,7 @@ class ForCompExample {
 }
 
 /// Source: example/src/main/scala/example/features/GivenUsing.scala:7
-abstract class Formatter<T> {
+mixin class Formatter<T> {
   /// Source: example/src/main/scala/example/features/GivenUsing.scala:8
   String format(T value);
 }
@@ -1185,7 +1185,7 @@ class intFormatter$ extends Formatter<int> {
 }
 
 /// Source: example/src/main/scala/example/features/Generics.scala:19
-abstract class HasSize {
+mixin class HasSize {
   /// Source: example/src/main/scala/example/features/Generics.scala:20
   int get size;
 }

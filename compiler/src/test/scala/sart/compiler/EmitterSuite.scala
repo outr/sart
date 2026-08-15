@@ -330,6 +330,20 @@ class EmitterSuite extends FunSuite:
     assert(body.contains(".map(") && body.contains(".toList()"), body)
   }
 
+  test("subclassing a user class emits a super(...) initializer") {
+    val body = classBody("FxDerived")
+    assert(body.contains("FxDerived(String label, this.extra) : super(label);"), body)
+    assert(!body.contains("final String label;"), body) // non-val param is not a field
+  }
+
+  test("trait in second parent position emits as a with-clause mixin") {
+    val mixin = classBody("FxClickable")
+    assert(emittedMain.contains("mixin class FxClickable"), mixin)
+    val cls = classBody("FxButtonish")
+    assert(cls.contains("extends FxBase with FxClickable"), cls)
+    assert(cls.contains(": super('btn');"), cls)
+  }
+
   test("literal default params emit as a Dart named section") {
     val body = classBody("FxNamedParams")
     assert(body.contains("String greet(String name, {String punct = '!', int times = 1})"), body)
