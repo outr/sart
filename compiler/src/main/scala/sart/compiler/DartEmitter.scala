@@ -432,12 +432,19 @@ class DartEmitter(
           ()
         else if name.endsWith("$") then
           // A module class. Interesting varieties:
+          //   - @native facade object              → record annotations, skip
           //   - enum companion                     → emit the Dart enum
           //   - `case object Foo` module           → emit `class Foo {}`
           //   - given-value module with impl body  → emit as concrete class
           //   - plain case-class / other companion → skip
           val companion = sym.companionClass
-          if companion.exists && companion.flags.is(Flags.Enum) then
+          val moduleVal = sym.companionModule
+          if hasNative(sym) || (moduleVal.exists && hasNative(moduleVal))
+             || (companion.exists && hasNative(companion)) then
+            recordAnnotations(sym)
+            if moduleVal.exists then recordAnnotations(moduleVal)
+            if companion.exists then recordAnnotations(companion)
+          else if companion.exists && companion.flags.is(Flags.Enum) then
             emitEnumFromCompanion(cd, companion)
           else if sym.flags.is(Flags.Case) then
             emitCaseObject(cd)
@@ -455,7 +462,15 @@ class DartEmitter(
         if dd.symbol.flags.is(Flags.ExtensionMethod) then emitExtensionMethod(dd)
         else emitTopLevelDef(dd)
       case vd: ValDef =>
-        emitTopLevelVal(vd)
+        // The value side of a facade `object` (`val Uri = Uri$()`) has no
+        // Dart existence — record its annotations and move on.
+        val tpeSym = vd.tpt.tpe.typeSymbol
+        val nativeModule = hasNative(vd.symbol) || (tpeSym.exists && (hasNative(tpeSym) || {
+          val c = tpeSym.companionClass
+          c.exists && hasNative(c)
+        }))
+        if nativeModule then recordAnnotations(vd.symbol)
+        else emitTopLevelVal(vd)
       case _ =>
         line(s"/* TODO top-level: ${t.getClass.getSimpleName} */")
 
@@ -1280,9 +1295,11 @@ class DartEmitter(
       case Apply(Apply(TypeApply(sel @ Select(qual, name), _), args1), args2) =>
         recordAnnotations(qual.tpe.typeSymbol)
         emitMemberCall(qual, name, args1 ++ args2, sel.symbol)
-      case Apply(Apply(Ident(name), args1), args2) =>
+      case Apply(Apply(id @ Ident(name), args1), args2) =>
+        recordOwnerAnnotations(id.symbol)
         s"$name(${emitArgs(args1 ++ args2)})"
-      case Apply(Apply(TypeApply(Ident(name), _), args1), args2) =>
+      case Apply(Apply(TypeApply(id @ Ident(name), _), args1), args2) =>
+        recordOwnerAnnotations(id.symbol)
         s"$name(${emitArgs(args1 ++ args2)})"
 
       // `fn.apply(args)` on a Scala FunctionN → `fn(args)`. Scala renders
@@ -1312,6 +1329,15 @@ class DartEmitter(
       case Apply(TypeApply(sel @ Select(qual, name), _), args) =>
         recordAnnotations(qual.tpe.typeSymbol)
         emitMemberCall(qual, name, args, sel.symbol)
+      case Apply(id: Ident, args) =>
+        // Wildcard-imported members of facade objects arrive as bare
+        // Idents — record the owning object's annotations so its
+        // @DartImport / @DartPackage still reach the output.
+        recordOwnerAnnotations(id.symbol)
+        s"${dartSafeName(id.name)}(${emitArgs(args)})"
+      case Apply(TypeApply(id: Ident, _), args) =>
+        recordOwnerAnnotations(id.symbol)
+        s"${dartSafeName(id.name)}(${emitArgs(args)})"
       case Apply(fn, args) =>
         s"${emitExpr(fn)}(${emitArgs(args)})"
 
@@ -1502,6 +1528,15 @@ class DartEmitter(
         recordAnnotations(qual.tpe.termSymbol)
         return name
 
+      // `Dyn` bridge getters — casts and null checks on `dynamic`.
+      if isDynReceiver(qual) then
+        name match
+          case "str"    => return s"(${emitExpr(qual)} as String)"
+          case "toInt"  => return s"(${emitExpr(qual)} as int)"
+          case "toBool" => return s"(${emitExpr(qual)} as bool)"
+          case "isNull" => return s"(${emitExpr(qual)} == null)"
+          case _        => ()
+
       // Receiver-aware rewrites win first — they may translate to a
       // wholly different shape (e.g. `s.toInt` on a String receiver
       // becomes `int.parse(s)`, NOT `s.toInt()`). Falling back to the
@@ -1537,6 +1572,14 @@ class DartEmitter(
       // the parens we'd otherwise emit.
       if args.isEmpty && dartGetterNames(name) then
         return emitMemberAccess(qual, name)
+
+      // `Dyn` bridge: index access and getter-shaped calls on `dynamic`.
+      if isDynReceiver(qual) then
+        name match
+          case "apply" => return s"${emitExpr(qual)}[${emitArgs(args)}]"
+          case "str" | "toInt" | "toBool" | "isNull" if args.isEmpty =>
+            return emitMemberAccess(qual, name)
+          case _ => ()
 
       // Future companion constructors: Dart spells them differently.
       if isFutureCompanion(qual) then
@@ -1868,6 +1911,22 @@ class DartEmitter(
       val sym = t.tpe.typeSymbol
       sym.exists && sym.fullName.startsWith("scala.collection.") &&
         !isMapReceiver(t) && !isSetReceiver(t)
+
+    /** Record the annotations of a bare Ident's owning facade object (and
+     *  its companions) — no-op for non-facade owners.
+     */
+    private def recordOwnerAnnotations(sym: Symbol): Unit =
+      if sym.exists then
+        val owner = sym.owner
+        if owner.exists then
+          recordAnnotations(owner)
+          val mv = owner.companionModule
+          if mv.exists then recordAnnotations(mv)
+
+    /** True when `t`'s static type is Sart's `Dyn` (Dart `dynamic`). */
+    private def isDynReceiver(t: Term): Boolean =
+      val sym = t.tpe.typeSymbol
+      sym.exists && sym.fullName == "sart.dart.Dyn"
 
     /** True when `t` is the `scala.concurrent.Future` companion object. */
     private def isFutureCompanion(t: Term): Boolean =
@@ -2356,27 +2415,26 @@ class DartEmitter(
      */
     private def inlineTempValBlock(stats: List[ValDef], expr: Term): String =
       val marker = "__SART_DEFAULT_ARG__"
-      val subs: Map[String, String] = stats.map { vd =>
-        val value = vd.rhs match
-          case Some(rhs) if isDefaultArg(rhs) => marker
-          case Some(rhs)                      => emitExpr(rhs)
-          case None                           => ""
-        vd.name -> value
-      }.toMap
-
-      var out = emitExpr(expr)
-      for (name, value) <- subs do
-        // Not `\b`: compiler temps like `$1$` start/end with `$`, which
-        // isn't a regex word character, so `\b` never matches around it.
-        out = out.replaceAll(
+      // Not `\b`: compiler temps like `$1$` start/end with `$`, which
+      // isn't a regex word character, so `\b` never matches around it.
+      def substitute(in: String, name: String, value: String): String =
+        in.replaceAll(
           s"(?<![A-Za-z0-9_$$])${java.util.regex.Pattern.quote(name)}(?![A-Za-z0-9_$$])",
           java.util.regex.Matcher.quoteReplacement(value)
         )
+      def occurrences(in: String, name: String): Int =
+        s"(?<![A-Za-z0-9_$$])${java.util.regex.Pattern.quote(name)}(?![A-Za-z0-9_$$])".r
+          .findAllMatchIn(in).size
+
+      val (defaultVals, realVals) = stats.partition(_.rhs.exists(isDefaultArg))
+
+      var out = emitExpr(expr)
+      for vd <- defaultVals do out = substitute(out, vd.name, marker)
 
       // Strip arguments whose value is the default-arg marker. Handle the
       // various surrounding-comma/paren shapes that can appear.
       val id = "[a-zA-Z_$][a-zA-Z_0-9$]*"
-      out
+      out = out
         .replaceAll(s"$id: $marker, ",        "")
         .replaceAll(s", $id: $marker",        "")
         .replaceAll(s"$marker, ",             "")
@@ -2384,6 +2442,29 @@ class DartEmitter(
         .replaceAll(s"\\($marker\\)",         "()")
         .replaceAll(s"$id: $marker",          "")
         .replaceAll(marker,                   "null")  // any survivor → `null`
+
+      // Inline the remaining vals only when each is referenced at most
+      // once — substituting a multi-use val would duplicate its
+      // computation (e.g. re-running a jsonDecode or an http call).
+      // Process in reverse declaration order so a later val's inlined
+      // RHS still gets earlier vals substituted into it.
+      val preSubstituted = out
+      var dup = false
+      for vd <- realVals.reverse if !dup do
+        if occurrences(out, vd.name) > 1 then dup = true
+        else out = substitute(out, vd.name, vd.rhs.map(emitExpr).getOrElse(""))
+
+      if !dup then out
+      else
+        // Fall back to an IIFE that declares the vals and returns the
+        // (marker-stripped, un-inlined) expression.
+        val sb = new StringBuilder("(() { ")
+        realVals.foreach { vd =>
+          sb.append(stmtInline(vd))
+          sb.append(' ')
+        }
+        sb.append("return ").append(preSubstituted).append("; })()")
+        sb.toString
 
     private def stmtInline(t: Tree): String = t match
       case vd: ValDef =>
@@ -2408,6 +2489,9 @@ class DartEmitter(
         // type position it's just "any Dart object".
         case "sart.dart.DartObject" =>
           return "Object"
+        // The dynamic bridge: Sart's face of Dart `dynamic`.
+        case "sart.dart.Dyn" =>
+          return "dynamic"
         case "sart.stdlib.Option" | "scala.Option" =>
           // Both the hand-ported `sart.stdlib.Option` and Scala's built-in
           // `scala.Option` map to Dart's `T?` nullable. Flag the shim AND

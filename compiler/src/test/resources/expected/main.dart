@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'sart_either.dart';
@@ -76,14 +77,17 @@ class LauncherHome extends StatelessWidget {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: ListView.builder(
-        itemBuilder: (ctx, i) => ListTile(
-          leading: Icon(Icons.menu),
-          title: Text(demos[i].title),
-          subtitle: Text(demos[i].subtitle),
-          onTap: () {
-            Navigator.of(ctx).push(MaterialPageRoute(builder: demos[i].build));
-          },
-        ),
+        itemBuilder: (ctx, i) => (() {
+          final Demo d = demos[i];
+          return ListTile(
+            leading: Icon(Icons.menu),
+            title: Text(d.title),
+            subtitle: Text(d.subtitle),
+            onTap: () {
+              Navigator.of(ctx).push(MaterialPageRoute(builder: d.build));
+            },
+          );
+        })(),
         itemCount: demos.length,
       ),
     );
@@ -503,14 +507,15 @@ class ShowcaseAppState extends State<ShowcaseApp> {
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:67
   void runLookup(String query) {
     setState(
-      () => lookupResult =
-          (contacts.where((c) => c.name == query).toList().isEmpty
-                  ? null
-                  : contacts.where((c) => c.name == query).toList().first)
-              .fold(
-                'no match for \'' + query.toString() + '\'',
-                (c) => c.name.toString() + ' → ' + c.phone.toString(),
-              ),
+      () => (() {
+        final List<Contact> hit = contacts
+            .where((c) => c.name == query)
+            .toList();
+        return lookupResult = (hit.isEmpty ? null : hit.first).fold(
+          'no match for \'' + query.toString() + '\'',
+          (c) => c.name.toString() + ' → ' + c.phone.toString(),
+        );
+      })(),
     );
   }
 
@@ -614,26 +619,25 @@ class ShowcaseAppState extends State<ShowcaseApp> {
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:149
   Widget get shapeCard {
-    return section(
-      'Sealed trait + match',
-      Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Text(
-            shapeLabel(shapes[shapeIdx]).toString() +
-                '  area = ' +
-                area(shapes[shapeIdx]).toString(),
-          ),
-          SizedBox(height: 6.0),
-          ElevatedButton(
-            onPressed: () => setState(() {
-              shapeIdx = (shapeIdx + 1) % shapes.length;
-            }),
-            child: Text('Next shape'),
-          ),
-        ],
-      ),
-    );
+    return (() {
+      final ShapeKind s = shapes[shapeIdx];
+      return section(
+        'Sealed trait + match',
+        Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Text(shapeLabel(s).toString() + '  area = ' + area(s).toString()),
+            SizedBox(height: 6.0),
+            ElevatedButton(
+              onPressed: () => setState(() {
+                shapeIdx = (shapeIdx + 1) % shapes.length;
+              }),
+              child: Text('Next shape'),
+            ),
+          ],
+        ),
+      );
+    })();
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:168
@@ -1030,6 +1034,27 @@ class DecorationsExample extends StatelessWidget {
       height: 120.0,
       child: Center(child: Text('Hello, styled world')),
     );
+  }
+}
+
+/// Source: example/src/main/scala/example/features/DynJson.scala:17
+class DynJson {
+  /// Source: example/src/main/scala/example/features/DynJson.scala:18
+  String nameOf(String payload) {
+    return (() {
+      final dynamic json = jsonDecode(payload);
+      return (json['name'] == null) ? 'unknown' : (json['name'] as String);
+    })();
+  }
+
+  /// Source: example/src/main/scala/example/features/DynJson.scala:22
+  int ageOf(String payload) {
+    return (jsonDecode(payload)['age'] as int);
+  }
+
+  /// Source: example/src/main/scala/example/features/DynJson.scala:25
+  String render(String name, int age) {
+    return jsonEncode({'name': name, 'age': age});
   }
 }
 
