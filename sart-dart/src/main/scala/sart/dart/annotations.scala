@@ -123,3 +123,18 @@ final class JsonTag(val tag: String) extends StaticAnnotation
  *  (e.g. LightDB's `_id`).
  */
 final class JsonField(val name: String) extends StaticAnnotation
+
+/** Dart's non-null assertion. `nn(expr)` emits `expr!` — for facade APIs
+ *  that are nullable on the Dart side (e.g. `GlobalKey.currentState`),
+ *  where the Scala facade surfaces the value type directly.
+ */
+object nn:
+  def apply[T](value: T): T = value
+
+/** Future helpers with direct Dart lowerings. */
+object Futures:
+  /** `Futures.ensure(f, action)` → Dart `f.whenComplete(action)` — the
+   *  `try/finally` of futures: `action` runs on success AND failure, and
+   *  the original value/error propagates.
+   */
+  def ensure[T](f: scala.concurrent.Future[T], action: () => Unit): scala.concurrent.Future[T] = f

@@ -264,12 +264,23 @@ class DartEmitter(
         b.append(s"  ${p.name}: ${p.version}\n")
       else
         b.append(s"  ${p.name}: any\n")
-    for block <- pubspecBlocks do
-      val normalized = normalizePubspecBlock(block)
-      if normalized.nonEmpty then
-        b.append('\n')
-        b.append(normalized)
-        if !normalized.endsWith("\n") then b.append('\n')
+    // Multiple annotations may each contribute a `flutter:` section
+    // (uses-material-design from the Widget facade, assets from the app).
+    // YAML forbids duplicate mapping keys, so those sections merge into
+    // one — their child lines concatenated under a single `flutter:`.
+    val normalized = pubspecBlocks.toList.map(normalizePubspecBlock).filter(_.nonEmpty)
+    val (flutterBlocks, otherBlocks) =
+      normalized.partition(_.linesIterator.nextOption().exists(_.trim == "flutter:"))
+    for block <- otherBlocks do
+      b.append('\n')
+      b.append(block)
+      if !block.endsWith("\n") then b.append('\n')
+    if flutterBlocks.nonEmpty then
+      b.append("\nflutter:\n")
+      for block <- flutterBlocks do
+        for line <- block.linesIterator.drop(1) do
+          b.append(line)
+          b.append('\n')
     b.toString
 
   /** Produce a canonical indentation for a `@DartPubspec` block so a
@@ -430,11 +441,26 @@ class DartEmitter(
 
     // ── Top-level driver ─────────────────────────────────────────────────
 
-    def run(tree: Tree): Unit = tree match
-      case p: PackageClause =>
-        p.stats.foreach(runTop)
-      case other =>
-        runTop(other)
+    def run(tree: Tree): Unit =
+      // Pre-register companion modules of user-emitted classes before
+      // walking, so merge decisions don't depend on declaration order.
+      registerCompanions(tree)
+      tree match
+        case p: PackageClause => p.stats.foreach(runTop)
+        case other            => runTop(other)
+
+    // Companion modules whose members fold into their class's emission as
+    // Dart statics (a same-named separate class would be a collision).
+    private val companionModules = mutable.Map[Symbol, ClassDef]()
+
+    private def registerCompanions(t: Tree): Unit = t match
+      case p: PackageClause => p.stats.foreach(registerCompanions)
+      case cd: ClassDef if cd.symbol.name.endsWith("$") && !hasNative(cd.symbol) =>
+        val companion = cd.symbol.companionClass
+        if companion.exists && !hasNative(companion) && !companion.flags.is(Flags.Enum)
+           && !companion.name.contains("$") then
+          companionModules(companion) = cd
+      case _ => ()
 
     private def runTop(t: Tree): Unit = t match
       case _: Import =>
@@ -473,6 +499,8 @@ class DartEmitter(
             if companion.exists then recordAnnotations(companion)
           else if companion.exists && companion.flags.is(Flags.Enum) then
             emitEnumFromCompanion(cd, companion)
+          else if companion.exists && companionModules.contains(companion) then
+            () // Statics merged into the companion class's own emission.
           else if sym.flags.is(Flags.Case) then
             emitCaseObject(cd)
           else if hasUserDefinedBody(cd) || hasUserFields(cd) then
@@ -596,10 +624,8 @@ class DartEmitter(
      *  line up because the Scala module reference prints as the bare
      *  object name.
      */
-    private def emitStaticObject(cd: ClassDef): Unit =
-      val sym = cd.symbol
-      val objName = sym.name.stripSuffix("$")
-      val memberStats = cd.body.collect {
+    private def staticObjectMembers(cd: ClassDef): List[Definition] =
+      cd.body.collect {
         case vd: ValDef => vd
         case dd: DefDef => dd
       }.filterNot { stat =>
@@ -610,6 +636,11 @@ class DartEmitter(
         stat.symbol.name.endsWith("_=") ||
         stat.symbol.name == "<init>"
       }
+
+    private def emitStaticObject(cd: ClassDef): Unit =
+      val sym = cd.symbol
+      val objName = sym.name.stripSuffix("$")
+      val memberStats = staticObjectMembers(cd)
       emitSourceAttribution(sym)
       line(s"class $objName {")
       indent += 1
@@ -827,6 +858,16 @@ class DartEmitter(
         emitJsonSynths(className, ctorShape, sealedJsonParent.map(_ => jsonTagOf(sym)))
       if sym.flags.is(Flags.Sealed) && hasJsonModel(sym) then
         emitSealedJsonDispatch(className, sym)
+
+      // Companion-object members land here as Dart statics.
+      companionModules.get(sym).foreach { moduleCd =>
+        val statics = staticObjectMembers(moduleCd)
+        if statics.nonEmpty then blank()
+        for stat <- statics do
+          stat match
+            case vd: ValDef => emitField(vd, static = true)
+            case dd: DefDef => emitMethod(dd, static = true)
+      }
 
       indent -= 1
       line("}")
@@ -1386,9 +1427,13 @@ class DartEmitter(
           case other                              => other
         emitInterpolationParts(parts, actualArgs)
 
-      // List(a, b, ...) → [a, b, ...]  (empty `List()` → `[]`)
-      case Apply(TypeApply(Select(Ident("List"), "apply"), _), List(arg)) if isVarargs(arg) =>
-        varargsItems(arg).map(emitExpr).mkString("[", ", ", "]")
+      // List(a, b, ...) → [a, b, ...]. An EMPTY `List()` keeps its element
+      // type (`<Widget>[]`) — a bare `[]` is List<dynamic>, which poisons
+      // `+`-concatenation chains feeding List<Widget> parameters.
+      case Apply(TypeApply(Select(Ident("List"), "apply"), List(tpt)), List(arg)) if isVarargs(arg) =>
+        val items = varargsItems(arg)
+        if items.isEmpty then s"<${emitTypeRef(tpt.tpe)}>[]"
+        else items.map(emitExpr).mkString("[", ", ", "]")
       case Apply(Select(Ident("List"), "apply"), List(arg)) if isVarargs(arg) =>
         varargsItems(arg).map(emitExpr).mkString("[", ", ", "]")
 
@@ -1443,6 +1488,20 @@ class DartEmitter(
       case Apply(Select(q, "encode"), List(arg)) if isSartRef(q, "sart.dart.Json") =>
         s"${emitExpr(arg)}.toJson()"
 
+      // `nn(x)` → `x!` — Dart's non-null assertion, for facade members
+      // that are nullable on the Dart side.
+      case Apply(TypeApply(Select(q, "apply"), _), List(arg)) if isSartRef(q, "sart.dart.nn") =>
+        s"${emitExpr(arg)}!"
+      case Apply(Select(q, "apply"), List(arg)) if isSartRef(q, "sart.dart.nn") =>
+        s"${emitExpr(arg)}!"
+
+      // `Futures.ensure(f, action)` → `f.whenComplete(action)` — the
+      // try/finally of futures.
+      case Apply(TypeApply(Select(q, "ensure"), _), List(f, action)) if isSartRef(q, "sart.dart.Futures") =>
+        s"${emitExpr(f)}.whenComplete(${emitExpr(action)})"
+      case Apply(Select(q, "ensure"), List(f, action)) if isSartRef(q, "sart.dart.Futures") =>
+        s"${emitExpr(f)}.whenComplete(${emitExpr(action)})"
+
       // `sart.stdlib.Some(x)` → just `x` — Dart promotes the non-null value
       // into the nullable type automatically.
       case Apply(Select(qual, "apply"), args) if isSartRef(qual, "sart.stdlib.Some") || isSartRef(qual, "scala.Some") =>
@@ -1461,12 +1520,13 @@ class DartEmitter(
         val ctorName = caseClassNameFor(qual)
         s"$ctorName(${emitUserCallArgs(companionClassCtor(qual), args)})"
 
-      // `opt.getOrElse(d)` → `(opt ?? d)` — Dart's null-coalescing operator
-      // is the exact native equivalent.
+      // `opt.getOrElse(d)` → `(opt ?? (d))` — Dart's null-coalescing
+      // operator is the exact native equivalent. The default is
+      // parenthesized: `a ?? cond ? x : y` would parse as `(a ?? cond) ? …`.
       case Apply(Select(recv, "getOrElse"), List(arg)) if isOptionReceiver(recv) =>
-        s"(${emitExpr(recv)} ?? ${emitExpr(arg)})"
+        s"(${emitExpr(recv)} ?? (${emitExpr(arg)}))"
       case Apply(TypeApply(Select(recv, "getOrElse"), _), List(arg)) if isOptionReceiver(recv) =>
-        s"(${emitExpr(recv)} ?? ${emitExpr(arg)})"
+        s"(${emitExpr(recv)} ?? (${emitExpr(arg)}))"
 
       // Presence checks → Dart null-comparison. Handles both getter-style
       // `Select` and zero-arg `Apply(Select(...), Nil)` tree shapes.
@@ -1476,6 +1536,14 @@ class DartEmitter(
       case Apply(Select(recv, "isDefined"), Nil) if isOptionReceiver(recv) => s"(${emitExpr(recv)} != null)"
       case Apply(Select(recv, "isEmpty"),   Nil) if isOptionReceiver(recv) => s"(${emitExpr(recv)} == null)"
       case Apply(Select(recv, "nonEmpty"),  Nil) if isOptionReceiver(recv) => s"(${emitExpr(recv)} != null)"
+
+      // `opt.orNull` — identity: Option[T] already IS `T?` in Dart. The
+      // one-arg Apply shape is scala.Option's `orNull(implicit ev)`.
+      case Select(recv, "orNull") if isOptionReceiver(recv) => emitExpr(recv)
+      case TypeApply(Select(recv, "orNull"), _) if isOptionReceiver(recv) => emitExpr(recv)
+      case Apply(Select(recv, "orNull"), Nil) if isOptionReceiver(recv) => emitExpr(recv)
+      case Apply(TypeApply(Select(recv, "orNull"), _), Nil) if isOptionReceiver(recv) => emitExpr(recv)
+      case Apply(TypeApply(Select(recv, "orNull"), _), List(_)) if isOptionReceiver(recv) => emitExpr(recv)
 
       // (`sart.stdlib.None` is handled at the top of `emitExpr` — before
       //  the generic `Ident` fallback — so a bare `None` reference lands
@@ -2002,7 +2070,10 @@ class DartEmitter(
       listCall("map")       (c => s"${c.prefix}map(${c.args}).toList()"),
       listCall("foreach")   (c => s"${c.prefix}forEach(${c.args})"),
       // Dart's List defines `+` as concatenation — the exact analogue.
-      listCall("++")        (c => s"(${c.prefix.stripSuffix(".")} + ${c.args})"),
+      // Spread, not `+`: Dart's `List<E>.+` demands both sides share E,
+      // but a spread literal computes the element LUB — matching Scala's
+      // `++` unification (List[Text] ++ List[Card] → List[Widget]).
+      listCall("++")        (c => s"[...(${c.prefix.stripSuffix(".")}), ...(${c.args})]"),
       listCall("concat")    (c => s"(${c.prefix.stripSuffix(".")} + ${c.args})"),
       listCall("filter")    (c => s"${c.prefix}where(${c.args}).toList()"),
       listCall("withFilter")(c => s"${c.prefix}where(${c.args}).toList()"),
@@ -2448,7 +2519,14 @@ class DartEmitter(
         getter.flatMap { g =>
           g.tree match
             case dd: DefDef =>
-              dd.rhs.map(unwrapT).collect { case Literal(c) => emitConstant(c) }
+              dd.rhs.map(unwrapT).flatMap {
+                case Literal(c) => Some(emitConstant(c))
+                // `= None` (Option default) — a `null` literal in Dart, so
+                // the param stays named-with-default instead of positional.
+                case t: Term if isSartRef(t, "scala.None") || isSartRef(t, "sart.stdlib.None") =>
+                  Some("null")
+                case _ => None
+              }
             case _ => None
         }
       catch case _: Throwable => None
@@ -2774,6 +2852,11 @@ class DartEmitter(
         sb.append("return ").append(preSubstituted).append("; })()")
         sb.toString
 
+    private def isUnitLiteral(t: Tree): Boolean = t match
+      case Literal(c) => c.value == ()
+      case Block(Nil, inner) => isUnitLiteral(inner)
+      case _ => false
+
     private def stmtInline(t: Tree): String = t match
       case vd: ValDef =>
         val isNullInit = vd.rhs.exists {
@@ -2789,6 +2872,13 @@ class DartEmitter(
           val prefix = if vd.symbol.flags.is(Flags.Mutable) then "" else "final "
           s"$prefix${emitTypeRef(vd.tpt.tpe)} ${vd.name}$init;"
       case Assign(lhs, rhs) => s"${emitExpr(lhs)} = ${emitExpr(rhs)};"
+      // Statement-position `if` without a meaningful else — a real Dart
+      // `if` statement, NOT a ternary (`cond ? voidCall() : null` is a
+      // use_of_void_result error).
+      case If(cond, thenp, elsep) if isUnitLiteral(elsep) =>
+        s"if (${emitExpr(cond)}) { ${stmtInline(thenp)} }"
+      case If(cond, thenp, elsep) =>
+        s"if (${emitExpr(cond)}) { ${stmtInline(thenp)} } else { ${stmtInline(elsep)} }"
       case term: Term       => s"${emitExpr(term)};"
       case _                => s"/* TODO stmt-inline */"
 

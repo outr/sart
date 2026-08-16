@@ -43,7 +43,10 @@ case class ClassInfo(
   instanceGetters: List[Getter],
   instanceMethods: List[Method],
   inheritedGetters: List[Getter] = Nil,
-  inheritedMethods: List[Method] = Nil
+  inheritedMethods: List[Method] = Nil,
+  // Dart `extension Foo on T` carrying static members: no instances
+  // exist, so only an object of statics is rendered.
+  extensionStatics: Boolean = false
 )
 
 case class EnumInfo(name: String, constants: List[String])

@@ -28,6 +28,10 @@ abstract class Option[+T]:
   // where the lambda returns Unit. Avoids the `R extends Object`
   // generic constraint on `.map` that the Dart shim uses.
   def foreach(f: T => Unit): Unit               = native.value
+  // Identity unwrap: `Option[T]` IS `T?` in Dart, so `orNull` emits the
+  // receiver unchanged — for passing into facade params that are nullable
+  // on the Dart side.
+  def orNull[U >: T]: U                         = native.value
 
 @native
 object Some:

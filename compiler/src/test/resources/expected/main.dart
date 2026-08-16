@@ -288,7 +288,7 @@ class DiceApp extends StatefulWidget {
 /// Source: example/src/main/scala/example/apps/DiceApp.scala:29
 class DiceAppState extends State<DiceApp> {
   final Random rng = Random();
-  List<Roll> history = [];
+  List<Roll> history = <Never>[];
 
   /// Source: example/src/main/scala/example/apps/DiceApp.scala:33
   void roll() {
@@ -301,7 +301,7 @@ class DiceAppState extends State<DiceApp> {
   /// Source: example/src/main/scala/example/apps/DiceApp.scala:39
   void clearHistory() {
     setState(() {
-      history = [];
+      history = <Never>[];
     });
   }
 
@@ -782,7 +782,7 @@ class TodoApp extends StatefulWidget {
 
 /// Source: example/src/main/scala/example/apps/TodoApp.scala:23
 class TodoAppState extends State<TodoApp> {
-  List<TodoItem> todos = [];
+  List<TodoItem> todos = <Never>[];
   final TextEditingController controller = TextEditingController();
 
   /// Source: example/src/main/scala/example/apps/TodoApp.scala:27
@@ -795,7 +795,7 @@ class TodoAppState extends State<TodoApp> {
   /// Source: example/src/main/scala/example/apps/TodoApp.scala:30
   void clearAll() {
     setState(() {
-      todos = [];
+      todos = <Never>[];
     });
   }
 
@@ -884,7 +884,7 @@ class AsyncBuildersExample {
   Widget futureWidget(Future<String> f) {
     return FutureBuilder(
       future: f,
-      builder: (ctx, snap) => Text((snap.data ?? 'loading…')),
+      builder: (ctx, snap) => Text((snap.data ?? ('loading…'))),
     );
   }
 
@@ -1407,7 +1407,7 @@ class OptionExample {
 
   /// Source: example/src/main/scala/example/features/Options.scala:17
   int valueOrZero(int? o) {
-    return (o ?? 0);
+    return (o ?? (0));
   }
 
   /// Source: example/src/main/scala/example/features/Options.scala:18

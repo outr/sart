@@ -47,11 +47,27 @@ object FacadeWriter:
         keptClasses.map(c => c.name -> c.typeParams.size).toMap
     // Parents must be constructible from an `extends P` clause with no
     // arguments: curated anchors, kept enums, or kept classes whose
-    // primary constructor has no parameters.
+    // primary constructor is callable with zero args (no params, or all
+    // params optional — generated params default to `native.value`).
     val safeParents: Set[String] =
       config.curated ++ keptEnums ++
-        keptClasses.filter(c => c.ctors.find(_.name == "").forall(_.params.isEmpty))
+        keptClasses.filter(c => c.ctors.find(_.name == "")
+            .forall(_.params.forall(p => !p.required || p.hasDefault)))
           .map(_.name)
+    // Parents whose primary ctor HAS params (all optional) need explicit
+    // `()` in the extends clause — Scala only elides it for parameterless
+    // constructors.
+    val parenParents: Set[String] =
+      keptClasses.filter(c => c.ctors.find(_.name == "").exists(_.params.nonEmpty))
+        .map(_.name).toSet
+    // Emitted member names per kept class (ctor vals + getters): a subclass
+    // whose ctor re-declares one of its facaded parent's members needs the
+    // `override` modifier (e.g. Center(key, child) extends Align(key, child)).
+    val memberNames: Map[String, Set[String]] =
+      keptClasses.map { c =>
+        c.name -> (c.ctors.find(_.name == "").map(_.params.map(_.name).toSet).getOrElse(Set.empty)
+          ++ c.instanceGetters.map(_.name))
+      }.toMap
     val ctx = new Ctx(arity, dump.typeAncestors)
 
     val sb = new StringBuilder
@@ -70,7 +86,7 @@ object FacadeWriter:
       if kept.nonEmpty || file.enums.exists(e => keep.contains(e.name)) then
         sb.append(s"// ─── ${file.path.split('/').last} ").append("─" * 40).append("\n\n")
       for cls <- kept do
-        renderClass(sb, cls, config, ctx, safeParents)
+        renderClass(sb, cls, config, ctx, safeParents, parenParents, memberNames)
         sb.append('\n')
       for en <- file.enums if keep.contains(en.name) do
         renderEnum(sb, en, config)
@@ -91,11 +107,44 @@ object FacadeWriter:
   // ── Classes ──────────────────────────────────────────────────────────
 
   private def renderClass(
-    sb: StringBuilder, cls: ClassInfo, config: GenConfig, ctx: Ctx, safeParents: Set[String]
+    sb: StringBuilder, cls: ClassInfo, config: GenConfig, ctx: Ctx,
+    safeParents: Set[String], parenParents: Set[String],
+    memberNames: Map[String, Set[String]]
   ): Unit =
+    // A Dart `extension Foo on T` with static members has no instances —
+    // render only the object of statics. Call sites read exactly like the
+    // Dart originals (`FlexThemeData.dark(...)`).
+    if cls.extensionStatics then
+      annotate(sb, config)
+      sb.append("object ").append(safeName(cls.name)).append(":\n")
+      for f <- cls.staticFields.filter(f => isPlainName(f.name)).distinctBy(_.name) do
+        sb.append(s"  def ${safeName(f.name)}: ${ctx.scalaType(f.tpe, Set.empty)} = native.value\n")
+      for m <- cls.staticMethods.filter(m => isPlainName(m.name)).distinctBy(_.name) do
+        sb.append("  ")
+        renderMethodDecl(sb, m, m.typeParams.toSet, m.typeParams, ctx)
+        sb.append(" = native.value\n")
+      return
+
     val tparams = cls.typeParams.toSet
-    val parent  = cls.ancestors.find(a => safeParents.contains(a) && ctx.arityOf(a) == 0)
+    // A generic parent is kept when its arity matches this class's own
+    // type params — rendered as `P[T…]` on the assumption (near-universal
+    // in Flutter/pub code: PopupMenuItem<T> extends PopupMenuEntry<T>,
+    // WidgetStatePropertyAll<T> implements WidgetStateProperty<T>) that
+    // the params pass through in order.
+    val parentName = cls.ancestors.find(a => safeParents.contains(a) &&
+      (ctx.arityOf(a) == 0 || ctx.arityOf(a) == cls.typeParams.size))
+    val parent = parentName
+      .map { a =>
+        val args   = if ctx.arityOf(a) == 0 then "" else cls.typeParams.mkString("[", ", ", "]")
+        val parens = if parenParents.contains(a) then "()" else ""
+        a + args + parens
+      }
       .getOrElse("DartObject")
+    // Members the kept parent already declares — ctor vals re-declared
+    // here must carry `override`. One level deep: kept-parent chains in
+    // practice bottom out in curated anchors (which declare no vals).
+    val parentMembers: Set[String] =
+      parentName.flatMap(memberNames.get).getOrElse(Set.empty)
 
     annotate(sb, config)
     if cls.isAbstract then sb.append("abstract ")
@@ -110,7 +159,8 @@ object FacadeWriter:
         sb.append("(\n")
         sb.append(ctor.params.map { p =>
           val dflt = if p.required && !p.hasDefault then "" else " = native.value"
-          s"  val ${safeName(p.name)}: ${ctx.scalaType(p.tpe, tparams)}$dflt"
+          val ovr  = if parentMembers.contains(p.name) then "override " else ""
+          s"  ${ovr}val ${safeName(p.name)}: ${ctx.scalaType(p.tpe, tparams)}$dflt"
         }.mkString(",\n"))
         sb.append("\n)")
       case _ => ()
@@ -172,10 +222,13 @@ object FacadeWriter:
         sb.append(s": $selfType = native.value\n")
       for m <- statics do
         sb.append("  ")
-        // Statics referencing the class's type params get those params on the def.
+        // Statics referencing the class's type params get those params on the
+        // def — but a static's OWN type param of the same name shadows the
+        // class's (Dart statics can't see class params), so dedupe by name.
         val referenced = cls.typeParams.filter(tp =>
           (m.returnType +: m.params.map(_.tpe)).exists(t => mentions(t, tp)))
-        renderMethodDecl(sb, m, (referenced ++ m.typeParams).toSet, referenced ++ m.typeParams, ctx)
+        val declTps = (referenced ++ m.typeParams).distinct
+        renderMethodDecl(sb, m, declTps.toSet, declTps, ctx)
         sb.append(" = native.value\n")
 
   private def renderMethodDecl(

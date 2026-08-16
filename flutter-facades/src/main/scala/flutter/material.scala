@@ -54,7 +54,8 @@ abstract class State[W <: StatefulWidget] extends DartObject:
 
 @native
 @DartImport("package:flutter/material.dart")
-class BuildContext extends DartObject
+class BuildContext extends DartObject:
+  def mounted: Boolean = native.value
 
 @native
 @DartImport("package:flutter/material.dart")
@@ -119,9 +120,34 @@ class AsyncSnapshot[T] extends DartObject:
 
 // Kept curated: `clear`/`dispose` are inherited from ValueNotifier /
 // ChangeNotifier, which the generator's type-collapse folds away.
+// `text` is a var: Dart exposes a setter (`controller.text = "..."`).
 @native
 @DartImport("package:flutter/material.dart")
 class TextEditingController extends DartObject:
-  def text: String = native.value
+  var text: String = native.value
   def clear(): Unit = native.value
   def dispose(): Unit = native.value
+
+// ─── Keys ──────────────────────────────────────────────────────────────────
+
+// Curated: the real signature is `GlobalKey<T extends State<StatefulWidget>>`
+// with a nullable `currentState`; we surface `S` directly — callers
+// null-check before use, mirroring the Dart `!` sites.
+@native
+@DartImport("package:flutter/material.dart")
+class GlobalKey[S] extends Key:
+  def currentState: S = native.value
+
+// ─── Bindings ──────────────────────────────────────────────────────────────
+
+// Curated: WidgetsBinding is a mixin composition in the SDK; all callers
+// need is the post-frame hook off the singleton.
+@native
+@DartImport("package:flutter/material.dart")
+class WidgetsBindingInstance extends DartObject:
+  def addPostFrameCallback(fn: DartObject => Unit): Unit = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+object WidgetsBinding:
+  def instance: WidgetsBindingInstance = native.value

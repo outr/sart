@@ -87,6 +87,13 @@ object SartPlugin extends AutoPlugin {
       "Directory holding checked-in golden Dart for sartGoldenVerify / Accept."
     )
 
+    val sartAssets = settingKey[Seq[File]](
+      "Files or directories bundled as Flutter assets: each entry is copied " +
+        "into <sartOutDir>/assets/ on sartEmit (a directory contributes its " +
+        "contents). Declare the matching `flutter: assets:` pubspec section " +
+        "with @DartPubspec in project code."
+    )
+
     // ── Tasks ──────────────────────────────────────────────────────────
 
     @transient val sartEmit          = taskKey[Unit]("Compile this project and emit Dart into <sartOutDir>/lib/")
@@ -111,6 +118,7 @@ object SartPlugin extends AutoPlugin {
     sartOutDir     := baseDirectory.value / "out",
     sartSourceRoot := baseDirectory.value,
     sartGoldenDir  := baseDirectory.value / "sart-golden",
+    sartAssets     := Seq.empty,
 
     // Register hidden Ivy configurations so the Sart jars resolve via
     // `update` without polluting the user's main classpath. Users still
@@ -174,6 +182,20 @@ object SartPlugin extends AutoPlugin {
         pubName,
         pubDesc
       )
+
+      // Bundle declared assets before the emitter runs so a failed emit
+      // never leaves a half-updated assets tree ahead of stale Dart.
+      val assets = sartAssets.value
+      if (assets.nonEmpty) {
+        val assetsDir = outDir / "assets"
+        IO.createDirectory(assetsDir)
+        assets.foreach { entry =>
+          if (entry.isDirectory) IO.copyDirectory(entry, assetsDir)
+          else if (entry.isFile) IO.copyFile(entry, assetsDir / entry.getName)
+          else log.warn(s"sbt-sart: asset entry does not exist: $entry")
+        }
+        log.info(s"sbt-sart: bundled ${assets.size} asset entr${if (assets.size == 1) "y" else "ies"} into $assetsDir")
+      }
 
       log.info(s"sbt-sart: emitting Dart into $outDir")
       val rc = sys.process.Process(

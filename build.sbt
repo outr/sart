@@ -444,7 +444,11 @@ lazy val root = (project in file("."))
       val runCp = (`sart-facadegen` / Runtime / fullClasspath).value
         .map(e => conv.toPath(e.data).toAbsolutePath.toString)
         .mkString(java.io.File.pathSeparator)
-      val conf = baseDirectory.value / "flutter-facades" / "facadegen.conf"
+      // Every facadegen*.conf in flutter-facades/ is a manifest — the main
+      // material set plus satellite sets (e.g. facadegen-services.conf).
+      val confs = (baseDirectory.value / "flutter-facades")
+        .listFiles((_, n) => n.startsWith("facadegen") && n.endsWith(".conf"))
+        .toSeq.sortBy(_.getName)
       val flutterRoot = sys.env.get("FLUTTER_ROOT").orElse {
         sys.env.get("PATH").flatMap(_.split(java.io.File.pathSeparator)
           .map(d => new File(d, sartFlutterCmd))
@@ -453,12 +457,15 @@ lazy val root = (project in file("."))
       }.getOrElse(sys.error(
         "sartFacadesRegen: set FLUTTER_ROOT or put `flutter` on PATH"))
       log.info(s"sart: regenerating facades from Flutter SDK at $flutterRoot")
-      val rc = sys.process.Process(
-        Seq("java", "-cp", runCp, "sart.facadegen.Main", "--config", conf.getAbsolutePath),
-        baseDirectory.value,
-        "FLUTTER_ROOT" -> flutterRoot
-      ).!
-      if (rc != 0) sys.error(s"sart-facadegen exited $rc")
+      confs.foreach { conf =>
+        log.info(s"sart: facadegen manifest ${conf.getName}")
+        val rc = sys.process.Process(
+          Seq("java", "-cp", runCp, "sart.facadegen.Main", "--config", conf.getAbsolutePath),
+          baseDirectory.value,
+          "FLUTTER_ROOT" -> flutterRoot
+        ).!
+        if (rc != 0) sys.error(s"sart-facadegen exited $rc for ${conf.getName}")
+      }
     },
 
     // Single-command bootstrap: publish the 4 core modules plus the

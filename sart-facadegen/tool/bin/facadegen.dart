@@ -101,6 +101,10 @@ Map<String, Object?> _describeLibrary(String key, LibraryElement2 lib) {
     if (name == null || name.startsWith('_')) continue;
     classes.add(_describeClass(cls));
   }
+  for (final ext in lib.extensions) {
+    final desc = _describeExtensionStatics(ext);
+    if (desc != null) classes.add(desc);
+  }
   for (final en in lib.enums) {
     final name = en.name3;
     if (name == null || name.startsWith('_')) continue;
@@ -125,6 +129,10 @@ Map<String, Object?> _describeFile(String path, ResolvedUnitResult result) {
     if (name == null || name.startsWith('_')) continue;
     classes.add(_describeClass(cls));
   }
+  for (final ext in lib.extensions) {
+    final desc = _describeExtensionStatics(ext);
+    if (desc != null) classes.add(desc);
+  }
   for (final en in lib.enums) {
     final name = en.name3;
     if (name == null || name.startsWith('_')) continue;
@@ -137,6 +145,50 @@ Map<String, Object?> _describeFile(String path, ResolvedUnitResult result) {
     });
   }
   return {'path': path, 'classes': classes, 'enums': enums};
+}
+
+/// A Dart `extension Foo on T` can carry static members that read like
+/// statics of a class named `Foo` (e.g. flex_color_scheme's
+/// `FlexThemeData.dark(...)`). Instances never exist, so only the statics
+/// are described; returns null when the extension is unnamed or has none.
+Map<String, Object?>? _describeExtensionStatics(ExtensionElement2 ext) {
+  final name = ext.name3;
+  if (name == null || name.startsWith('_')) return null;
+  final staticFields = <Map<String, Object?>>[];
+  for (final f in ext.fields2) {
+    final fname = f.name3;
+    if (fname == null || fname.startsWith('_') || !f.isStatic) continue;
+    staticFields.add({'name': fname, 'type': _typeStr(f.type)});
+  }
+  final staticMethods = <Map<String, Object?>>[];
+  for (final m in ext.methods2) {
+    final mname = m.name3;
+    if (mname == null || mname.startsWith('_') || !m.isStatic) continue;
+    if (m.isOperator) continue;
+    staticMethods.add({
+      'name': mname,
+      'returnType': _typeStr(m.returnType),
+      'typeParams':
+          m.typeParameters2.map((tp) => tp.name3).whereType<String>().toList(),
+      'overrides': false,
+      'params': m.formalParameters.map(_describeParam).toList(),
+    });
+  }
+  if (staticFields.isEmpty && staticMethods.isEmpty) return null;
+  return {
+    'name': name,
+    'abstract': false,
+    'extensionStatics': true,
+    'typeParams': const <String>[],
+    'ancestors': const <String>[],
+    'constructors': const <Map<String, Object?>>[],
+    'staticFields': staticFields,
+    'staticMethods': staticMethods,
+    'instanceGetters': const <Map<String, Object?>>[],
+    'instanceMethods': const <Map<String, Object?>>[],
+    'inheritedGetters': const <Map<String, Object?>>[],
+    'inheritedMethods': const <Map<String, Object?>>[],
+  };
 }
 
 Map<String, Object?> _describeClass(ClassElement2 cls) {

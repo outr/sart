@@ -63,7 +63,8 @@ object JsonParser:
         instanceGetters = arr(o, "instanceGetters").map(toGetter),
         instanceMethods = arr(o, "instanceMethods").map(toMethod),
         inheritedGetters = arr(o, "inheritedGetters").map(toGetter),
-        inheritedMethods = arr(o, "inheritedMethods").map(toMethod)
+        inheritedMethods = arr(o, "inheritedMethods").map(toMethod),
+        extensionStatics = o.members.contains("extensionStatics") && bool(o, "extensionStatics")
       )
     case _ => sys.error(s"expected class object, got $v")
 
