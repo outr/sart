@@ -146,13 +146,15 @@ class TextEditingController extends DartObject:
 
 // ─── Keys ──────────────────────────────────────────────────────────────────
 
-// Curated: the real signature is `GlobalKey<T extends State<StatefulWidget>>`
-// with a nullable `currentState`; we surface `S` directly — callers
-// null-check before use, mirroring the Dart `!` sites.
+// Curated: the real signature is `GlobalKey<T extends State<StatefulWidget>>`.
+// `currentState`/`currentContext` are nullable in Dart, so they surface as
+// Option — `key.currentState.get.validate()` emits the original's
+// `key.currentState!.validate()` exactly.
 @native
 @DartImport("package:flutter/material.dart")
 class GlobalKey[S] extends Key:
-  def currentState: S = native.value
+  def currentState: sart.stdlib.Option[S] = native.value
+  def currentContext: sart.stdlib.Option[BuildContext] = native.value
 
 // ─── Bindings ──────────────────────────────────────────────────────────────
 

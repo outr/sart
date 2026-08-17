@@ -45,7 +45,7 @@ class LauncherHome extends StatelessWidget:
       ),
       body = ListView.builder(
         itemCount = demos.size,
-        itemBuilder = (ctx: BuildContext, i: Int) =>
+        itemBuilder = (ctx: BuildContext, i: Int) => sart.stdlib.Some {
           val d: Demo = demos(i)
           ListTile(
             leading = Icon(Icons.menu),
@@ -55,5 +55,6 @@ class LauncherHome extends StatelessWidget:
               MaterialPageRoute[Unit](builder = d.build)
             )
           )
+        }
       )
     )

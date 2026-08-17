@@ -15,25 +15,17 @@ class Demo {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Demo &&
-          other.title == title &&
-          other.subtitle == subtitle &&
-          other.build == build;
+    identical(this, other) ||
+    other is Demo && other.title == title && other.subtitle == subtitle && other.build == build;
 
   @override
   int get hashCode => Object.hash(title, subtitle, build);
 
   @override
-  String toString() =>
-      'Demo(title: $title, subtitle: $subtitle, build: $build)';
+  String toString() => 'Demo(title: $title, subtitle: $subtitle, build: $build)';
 
-  Demo copyWith({
-    String? title,
-    String? subtitle,
-    Widget Function(BuildContext)? build,
-  }) =>
-      Demo(title ?? this.title, subtitle ?? this.subtitle, build ?? this.build);
+  Demo copyWith({String? title, String? subtitle, Widget Function(BuildContext)? build}) =>
+    Demo(title ?? this.title, subtitle ?? this.subtitle, build ?? this.build);
 }
 
 /// Source: example/src/main/scala/example/LauncherApp.scala:11
@@ -46,52 +38,20 @@ class LauncherApp extends StatelessWidget {
   /// Source: example/src/main/scala/example/LauncherApp.scala:20
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: LauncherHome(),
-      title: 'Sart Showcase',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-    );
+    return MaterialApp(home: LauncherHome(), title: 'Sart Showcase', theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple)));
   }
+
 }
 
 /// Source: example/src/main/scala/example/LauncherApp.scala:30
 class LauncherHome extends StatelessWidget {
-  final List<Demo> demos = [
-    Demo('Showcase', 'Kitchen-sink feature demo', (ctx) => ShowcaseApp()),
-    Demo('Counter', 'Classic Flutter counter', (ctx) => MyHomePage('Counter')),
-    Demo('Todos', 'TextField + list + state', (ctx) => TodoApp()),
-    Demo('Dice', 'Random + history + Navigator', (ctx) => DiceApp()),
-    Demo('Stopwatch', 'Timer.periodic', (ctx) => ClockApp()),
-    Demo('Two-screen', 'Navigator.push demo', (ctx) => HomeScreen()),
-  ];
-
+  final List<Demo> demos = [Demo('Showcase', 'Kitchen-sink feature demo', (ctx) => ShowcaseApp()), Demo('Counter', 'Classic Flutter counter', (ctx) => MyHomePage('Counter')), Demo('Todos', 'TextField + list + state', (ctx) => TodoApp()), Demo('Dice', 'Random + history + Navigator', (ctx) => DiceApp()), Demo('Stopwatch', 'Timer.periodic', (ctx) => ClockApp()), Demo('Two-screen', 'Navigator.push demo', (ctx) => HomeScreen())];
   /// Source: example/src/main/scala/example/LauncherApp.scala:40
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Sart Demos'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: ListView.builder(
-        itemBuilder: (ctx, i) => (() {
-          final d = demos[i];
-          return ListTile(
-            leading: Icon(Icons.menu),
-            title: Text(d.title),
-            subtitle: Text(d.subtitle),
-            onTap: () {
-              Navigator.of(ctx).push(MaterialPageRoute(builder: d.build));
-            },
-          );
-        })(),
-        itemCount: demos.length,
-      ),
-    );
+    return Scaffold(appBar: AppBar(title: Text('Sart Demos'), backgroundColor: Theme.of(context).colorScheme.inversePrimary), body: ListView.builder(itemBuilder: (ctx, i) => (() { final d = demos[i]; return ListTile(leading: Icon(Icons.menu), title: Text(d.title), subtitle: Text(d.subtitle), onTap: () { Navigator.of(ctx).push(MaterialPageRoute<void>(builder: d.build)); }); })(), itemCount: demos.length));
   }
+
 }
 
 /// Source: example/src/main/scala/example/CounterApp.scala:5
@@ -99,15 +59,9 @@ class MyApp extends StatelessWidget {
   /// Source: example/src/main/scala/example/CounterApp.scala:6
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: MyHomePage('Flutter Demo Home Page'),
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-    );
+    return MaterialApp(home: MyHomePage('Flutter Demo Home Page'), title: 'Flutter Demo', theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple)));
   }
+
 }
 
 /// Source: example/src/main/scala/example/CounterApp.scala:16
@@ -120,43 +74,23 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() {
     return MyHomePageState();
   }
+
 }
 
 /// Source: example/src/main/scala/example/CounterApp.scala:20
 class MyHomePageState extends State<MyHomePage> {
   int counter = 0;
-
   /// Source: example/src/main/scala/example/CounterApp.scala:23
   void incrementCounter() {
-    setState(() {
-      counter = counter + 1;
-    });
+    setState(() { counter = counter + 1; });
   }
 
   /// Source: example/src/main/scala/example/CounterApp.scala:26
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('You have pushed the button this many times:'),
-            Text('$counter', style: Theme.of(context).textTheme.headlineMedium),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        child: Icon(Icons.add),
-        tooltip: 'Increment',
-        onPressed: () => incrementCounter(),
-      ),
-    );
+    return Scaffold(appBar: AppBar(title: Text(widget.title), backgroundColor: Theme.of(context).colorScheme.inversePrimary), body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text('You have pushed the button this many times:'), Text('${counter}', style: Theme.of(context).textTheme.headlineMedium)])), floatingActionButton: FloatingActionButton(child: Icon(Icons.add), tooltip: 'Increment', onPressed: () => incrementCounter()));
   }
+
 }
 
 /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:18
@@ -166,7 +100,8 @@ class CircleK extends ShapeKind {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is CircleK && other.radius == radius;
+    identical(this, other) ||
+    other is CircleK && other.radius == radius;
 
   @override
   int get hashCode => radius.hashCode;
@@ -174,7 +109,8 @@ class CircleK extends ShapeKind {
   @override
   String toString() => 'CircleK(radius: $radius)';
 
-  CircleK copyWith({double? radius}) => CircleK(radius ?? this.radius);
+  CircleK copyWith({double? radius}) =>
+    CircleK(radius ?? this.radius);
 }
 
 /// Source: example/src/main/scala/example/apps/ClockApp.scala:11
@@ -184,63 +120,34 @@ class ClockApp extends StatefulWidget {
   State<ClockApp> createState() {
     return ClockAppState();
   }
+
 }
 
 /// Source: example/src/main/scala/example/apps/ClockApp.scala:14
 class ClockAppState extends State<ClockApp> {
   int seconds = 0;
   Timer? timer = null;
-
   /// Source: example/src/main/scala/example/apps/ClockApp.scala:18
   void start() {
-    setState(
-      () => timer = Timer.periodic(
-        Duration(seconds: 1),
-        (t) => setState(() {
-          seconds = seconds + 1;
-        }),
-      ),
-    );
+    setState(() => timer = Timer.periodic(Duration(seconds: 1), (t) => setState(() { seconds = seconds + 1; })));
   }
 
   /// Source: example/src/main/scala/example/apps/ClockApp.scala:28
   void stop() {
-    setState(() {
-      timer.foreach((t) => t.cancel());
-      timer = null;
-    });
+    setState(() { timer.foreach((t) => t.cancel()); timer = null; });
   }
 
   /// Source: example/src/main/scala/example/apps/ClockApp.scala:34
   void reset() {
-    setState(() {
-      seconds = 0;
-    });
+    setState(() { seconds = 0; });
   }
 
   /// Source: example/src/main/scala/example/apps/ClockApp.scala:37
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Stopwatch')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Elapsed: ' + seconds.toString() + 's'),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(onPressed: () => start(), child: Text('Start')),
-                ElevatedButton(onPressed: () => stop(), child: Text('Stop')),
-                ElevatedButton(onPressed: () => reset(), child: Text('Reset')),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+    return Scaffold(appBar: AppBar(title: Text('Stopwatch')), body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text('Elapsed: ' + seconds.toString() + 's'), Row(mainAxisAlignment: MainAxisAlignment.center, children: [ElevatedButton(onPressed: () => start(), child: Text('Start')), ElevatedButton(onPressed: () => stop(), child: Text('Stop')), ElevatedButton(onPressed: () => reset(), child: Text('Reset'))])])));
   }
+
 }
 
 /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:22
@@ -251,8 +158,8 @@ class Contact {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Contact && other.name == name && other.phone == phone;
+    identical(this, other) ||
+    other is Contact && other.name == name && other.phone == phone;
 
   @override
   int get hashCode => Object.hash(name, phone);
@@ -261,7 +168,7 @@ class Contact {
   String toString() => 'Contact(name: $name, phone: $phone)';
 
   Contact copyWith({String? name, String? phone}) =>
-      Contact(name ?? this.name, phone ?? this.phone);
+    Contact(name ?? this.name, phone ?? this.phone);
 }
 
 /// Source: example/src/main/scala/example/apps/TwoScreenApp.scala:26
@@ -269,11 +176,9 @@ class DetailScreen extends StatelessWidget {
   /// Source: example/src/main/scala/example/apps/TwoScreenApp.scala:27
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Detail')),
-      body: Center(child: Text('You made it!')),
-    );
+    return Scaffold(appBar: AppBar(title: Text('Detail')), body: Center(child: Text('You made it!')));
   }
+
 }
 
 /// Source: example/src/main/scala/example/apps/DiceApp.scala:26
@@ -283,26 +188,21 @@ class DiceApp extends StatefulWidget {
   State<DiceApp> createState() {
     return DiceAppState();
   }
+
 }
 
 /// Source: example/src/main/scala/example/apps/DiceApp.scala:29
 class DiceAppState extends State<DiceApp> {
   final Random rng = Random();
   List<Roll> history = <Never>[];
-
   /// Source: example/src/main/scala/example/apps/DiceApp.scala:33
   void roll() {
-    setState(
-      () =>
-          history = [...history, Roll(rng.nextInt(6) + 1, history.length + 1)],
-    );
+    setState(() => history = [...history, Roll(rng.nextInt(6) + 1, history.length + 1)]);
   }
 
   /// Source: example/src/main/scala/example/apps/DiceApp.scala:39
   void clearHistory() {
-    setState(() {
-      history = <Never>[];
-    });
+    setState(() { history = <Never>[]; });
   }
 
   /// Source: example/src/main/scala/example/apps/DiceApp.scala:42
@@ -318,50 +218,9 @@ class DiceAppState extends State<DiceApp> {
   /// Source: example/src/main/scala/example/apps/DiceApp.scala:48
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Dice'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Center(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16.0),
-                boxShadow: [BoxShadow(color: Colors.grey, blurRadius: 8.0)],
-              ),
-              width: 120.0,
-              height: 120.0,
-              child: Center(child: Text(faceLabel(latestRoll))),
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(onPressed: () => roll(), child: Text('Roll')),
-              ElevatedButton(
-                onPressed: () => clearHistory(),
-                child: Text('Clear'),
-              ),
-            ],
-          ),
-          Text('Rolled ' + history.length.toString() + ' times'),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        child: Icon(Icons.menu),
-        tooltip: 'History',
-        onPressed: () {
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (ctx) => HistoryScreen(history)));
-        },
-      ),
-    );
+    return Scaffold(appBar: AppBar(title: Text('Dice'), backgroundColor: Theme.of(context).colorScheme.inversePrimary), body: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Center(child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16.0), boxShadow: [BoxShadow(color: Colors.grey, blurRadius: 8.0)]), width: 120.0, height: 120.0, child: Center(child: Text(faceLabel(latestRoll))))), Row(mainAxisAlignment: MainAxisAlignment.center, children: [ElevatedButton(onPressed: () => roll(), child: Text('Roll')), ElevatedButton(onPressed: () => clearHistory(), child: Text('Clear'))]), Text('Rolled ' + history.length.toString() + ' times')]), floatingActionButton: FloatingActionButton(child: Icon(Icons.menu), tooltip: 'History', onPressed: () { Navigator.of(context).push(MaterialPageRoute<void>(builder: (ctx) => HistoryScreen(history))); }));
   }
+
 }
 
 /// Source: example/src/main/scala/example/apps/DiceApp.scala:93
@@ -372,18 +231,9 @@ class HistoryScreen extends StatelessWidget {
   /// Source: example/src/main/scala/example/apps/DiceApp.scala:94
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('History')),
-      body: ListView.builder(
-        itemBuilder: (ctx, i) => ListTile(
-          leading: Icon(Icons.check),
-          title: Text('Roll #' + history[i].index.toString()),
-          trailing: Text(history[i].face.toString()),
-        ),
-        itemCount: history.length,
-      ),
-    );
+    return Scaffold(appBar: AppBar(title: Text('History')), body: ListView.builder(itemBuilder: (ctx, i) => ListTile(leading: Icon(Icons.check), title: Text('Roll #' + history[i].index.toString()), trailing: Text(history[i].face.toString())), itemCount: history.length));
   }
+
 }
 
 /// Source: example/src/main/scala/example/apps/TwoScreenApp.scala:9
@@ -391,20 +241,9 @@ class HomeScreen extends StatelessWidget {
   /// Source: example/src/main/scala/example/apps/TwoScreenApp.scala:10
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Home')),
-      body: Center(
-        child: ElevatedButton(
-          onPressed: () {
-            Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (ctx) => DetailScreen()));
-          },
-          child: Text('Go to detail'),
-        ),
-      ),
-    );
+    return Scaffold(appBar: AppBar(title: Text('Home')), body: Center(child: ElevatedButton(onPressed: () { Navigator.of(context).push(MaterialPageRoute<void>(builder: (ctx) => DetailScreen())); }, child: Text('Go to detail'))));
   }
+
 }
 
 /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:20
@@ -415,7 +254,8 @@ class RectK extends ShapeKind {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is RectK && other.w == w && other.h == h;
+    identical(this, other) ||
+    other is RectK && other.w == w && other.h == h;
 
   @override
   int get hashCode => Object.hash(w, h);
@@ -423,7 +263,8 @@ class RectK extends ShapeKind {
   @override
   String toString() => 'RectK(w: $w, h: $h)';
 
-  RectK copyWith({double? w, double? h}) => RectK(w ?? this.w, h ?? this.h);
+  RectK copyWith({double? w, double? h}) =>
+    RectK(w ?? this.w, h ?? this.h);
 }
 
 /// Source: example/src/main/scala/example/apps/DiceApp.scala:24
@@ -434,8 +275,8 @@ class Roll {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Roll && other.face == face && other.index == index;
+    identical(this, other) ||
+    other is Roll && other.face == face && other.index == index;
 
   @override
   int get hashCode => Object.hash(face, index);
@@ -444,11 +285,12 @@ class Roll {
   String toString() => 'Roll(face: $face, index: $index)';
 
   Roll copyWith({int? face, int? index}) =>
-      Roll(face ?? this.face, index ?? this.index);
+    Roll(face ?? this.face, index ?? this.index);
 }
 
 /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:17
-sealed class ShapeKind {}
+sealed class ShapeKind {
+}
 
 /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:24
 class ShowcaseApp extends StatefulWidget {
@@ -457,17 +299,14 @@ class ShowcaseApp extends StatefulWidget {
   State<ShowcaseApp> createState() {
     return ShowcaseAppState();
   }
+
 }
 
 /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:27
 class ShowcaseAppState extends State<ShowcaseApp> {
   final Random rng = Random();
   final RegExp emailRegex = RegExp('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+\$');
-  final List<Contact> contacts = [
-    Contact('Ada', '+44 20 1234 5678'),
-    Contact('Grace', '+1 212 555 0100'),
-    Contact('Alan', '+44 20 7946 0018'),
-  ];
+  final List<Contact> contacts = [Contact('Ada', '+44 20 1234 5678'), Contact('Grace', '+1 212 555 0100'), Contact('Alan', '+44 20 7946 0018')];
   final List<ShapeKind> shapes = [CircleK(3.0), SquareK(4.0), RectK(3.0, 5.0)];
   int counter = 0;
   int face = 1;
@@ -479,7 +318,6 @@ class ShowcaseAppState extends State<ShowcaseApp> {
   final TextEditingController emailCtrl = TextEditingController();
   bool emailValid = false;
   bool emailTyped = false;
-
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:54
   String faceGlyph(int n) {
     return '⚀⚁⚂⚃⚄⚅'.substring(n - 1, n);
@@ -487,34 +325,17 @@ class ShowcaseAppState extends State<ShowcaseApp> {
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:57
   double area(ShapeKind s) {
-    return switch (s) {
-      CircleK(radius: var r) => (3.14159 * r) * r,
-      SquareK(side: var a) => a * a,
-      RectK(w: var w, h: var h) => w * h,
-    };
+    return switch (s) { CircleK(radius: var r) => (3.14159 * r) * r, SquareK(side: var a) => a * a, RectK(w: var w, h: var h) => w * h };
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:62
   String shapeLabel(ShapeKind s) {
-    return switch (s) {
-      CircleK(radius: var r) => 'Circle(r=' + r.toString() + ')',
-      SquareK(side: var a) => 'Square(side=' + a.toString() + ')',
-      RectK(w: var w, h: var h) =>
-        'Rect(' + w.toString() + 'x' + h.toString() + ')',
-    };
+    return switch (s) { CircleK(radius: var r) => 'Circle(r=' + r.toString() + ')', SquareK(side: var a) => 'Square(side=' + a.toString() + ')', RectK(w: var w, h: var h) => 'Rect(' + w.toString() + 'x' + h.toString() + ')' };
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:67
   void runLookup(String query) {
-    setState(
-      () => (() {
-        final hit = contacts.where((c) => c.name == query).toList();
-        return lookupResult = (hit.isEmpty ? null : hit.first).fold(
-          'no match for \'' + query.toString() + '\'',
-          (c) => c.name.toString() + ' → ' + c.phone.toString(),
-        );
-      })(),
-    );
+    setState(() => (() { final hit = contacts.where((c) => c.name == query).toList(); return lookupResult = (hit.isEmpty ? null : hit.first).fold('no match for \'' + query.toString() + '\'', (c) => c.name.toString() + ' → ' + c.phone.toString()); })());
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:75
@@ -533,224 +354,60 @@ class ShowcaseAppState extends State<ShowcaseApp> {
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:83
   void runDivide() {
-    setState(() {
-      divideResult = switch (tryDivide(divisor)) {
-        Success<double>(value: var n) =>
-          '100 / ' + divisor.toString() + ' = ' + n.toString(),
-        Failure<double>(error: _) => 'failed on divisor ' + divisor.toString(),
-      };
-      divisor = (divisor + 1) % 4;
-    });
+    setState(() { divideResult = switch (tryDivide(divisor)) { Success<double>(value: var n) => '100 / ' + divisor.toString() + ' = ' + n.toString(), Failure<double>(error: _) => 'failed on divisor ' + divisor.toString() }; divisor = (divisor + 1) % 4; });
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:91
   void runEmail(String raw) {
-    setState(() {
-      emailTyped = raw.length > 0;
-      emailValid = emailRegex.hasMatch(raw);
-    });
+    setState(() { emailTyped = raw.length > 0; emailValid = emailRegex.hasMatch(raw); });
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:97
   Widget section(String title, Widget body) {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(12.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            SizedBox(height: 8.0),
-            body,
-          ],
-        ),
-      ),
-    );
+    return Card(child: Padding(padding: EdgeInsets.all(12.0), child: Column(mainAxisAlignment: MainAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.titleMedium), SizedBox(height: 8.0), body])));
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:112
   Widget get counterCard {
-    return section(
-      'setState counter',
-      Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Text('value: ' + counter.toString()),
-          SizedBox(width: 12.0),
-          ElevatedButton(
-            onPressed: () => setState(() {
-              counter = counter + 1;
-            }),
-            child: Text('+'),
-          ),
-          SizedBox(width: 8.0),
-          ElevatedButton(
-            onPressed: () => setState(() {
-              counter = counter - 1;
-            }),
-            child: Text('-'),
-          ),
-        ],
-      ),
-    );
+    return section('setState counter', Row(mainAxisAlignment: MainAxisAlignment.start, children: [Text('value: ' + counter.toString()), SizedBox(width: 12.0), ElevatedButton(onPressed: () => setState(() { counter = counter + 1; }), child: Text('+')), SizedBox(width: 8.0), ElevatedButton(onPressed: () => setState(() { counter = counter - 1; }), child: Text('-'))]));
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:133
   Widget get diceCard {
-    return section(
-      'Random + unicode',
-      Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Text(faceGlyph(face).toString() + '  (' + face.toString() + ')'),
-          SizedBox(width: 12.0),
-          ElevatedButton(
-            onPressed: () => setState(() {
-              face = rng.nextInt(6) + 1;
-            }),
-            child: Text('Roll'),
-          ),
-        ],
-      ),
-    );
+    return section('Random + unicode', Row(mainAxisAlignment: MainAxisAlignment.start, children: [Text(faceGlyph(face).toString() + '  (' + face.toString() + ')'), SizedBox(width: 12.0), ElevatedButton(onPressed: () => setState(() { face = rng.nextInt(6) + 1; }), child: Text('Roll'))]));
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:149
   Widget get shapeCard {
-    return (() {
-      final s = shapes[shapeIdx];
-      return section(
-        'Sealed trait + match',
-        Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Text(shapeLabel(s).toString() + '  area = ' + area(s).toString()),
-            SizedBox(height: 6.0),
-            ElevatedButton(
-              onPressed: () => setState(() {
-                shapeIdx = (shapeIdx + 1) % shapes.length;
-              }),
-              child: Text('Next shape'),
-            ),
-          ],
-        ),
-      );
-    })();
+    return (() { final s = shapes[shapeIdx]; return section('Sealed trait + match', Column(mainAxisAlignment: MainAxisAlignment.start, children: [Text(shapeLabel(s).toString() + '  area = ' + area(s).toString()), SizedBox(height: 6.0), ElevatedButton(onPressed: () => setState(() { shapeIdx = (shapeIdx + 1) % shapes.length; }), child: Text('Next shape'))])); })();
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:168
   Widget get lookupCard {
-    return section(
-      'Option via List.filter.headOption',
-      Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          TextField(
-            controller: lookupCtrl,
-            decoration: InputDecoration(
-              labelText: 'name (try Ada, Grace, Alan)',
-            ),
-            onChanged: (s) => runLookup(s),
-          ),
-          SizedBox(height: 6.0),
-          Text(lookupResult),
-        ],
-      ),
-    );
+    return section('Option via List.filter.headOption', Column(mainAxisAlignment: MainAxisAlignment.start, children: [TextField(controller: lookupCtrl, decoration: InputDecoration(labelText: 'name (try Ada, Grace, Alan)'), onChanged: (s) => runLookup(s)), SizedBox(height: 6.0), Text(lookupResult)]));
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:187
   Widget get tryCard {
-    return section(
-      'Try + throw + pattern match',
-      Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Text('next divisor: ' + divisor.toString()),
-          SizedBox(height: 6.0),
-          ElevatedButton(
-            onPressed: () => runDivide(),
-            child: Text('Compute 100 / divisor'),
-          ),
-          SizedBox(height: 6.0),
-          Text(divideResult),
-        ],
-      ),
-    );
+    return section('Try + throw + pattern match', Column(mainAxisAlignment: MainAxisAlignment.start, children: [Text('next divisor: ' + divisor.toString()), SizedBox(height: 6.0), ElevatedButton(onPressed: () => runDivide(), child: Text('Compute 100 / divisor')), SizedBox(height: 6.0), Text(divideResult)]));
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:205
   Widget get tableCard {
-    return section(
-      'for-comprehension (4×4 times-table)',
-      Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [1, 2, 3, 4]
-            .map(
-              (r) => Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [1, 2, 3, 4]
-                    .map(
-                      (c) => SizedBox(
-                        width: 40.0,
-                        child: Text((r * c).toString()),
-                      ),
-                    )
-                    .toList(),
-              ),
-            )
-            .toList(),
-      ),
-    );
+    return section('for-comprehension (4×4 times-table)', Column(mainAxisAlignment: MainAxisAlignment.start, children: [1, 2, 3, 4].map((r) => Row(mainAxisAlignment: MainAxisAlignment.start, children: [1, 2, 3, 4].map((c) => SizedBox(width: 40.0, child: Text((r * c).toString()))).toList())).toList()));
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:220
   Widget get emailCard {
-    return section(
-      'Regex email validator',
-      Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          TextField(
-            controller: emailCtrl,
-            decoration: InputDecoration(labelText: 'email'),
-            onChanged: (s) => runEmail(s),
-          ),
-          SizedBox(height: 6.0),
-          Text(
-            !emailTyped
-                ? '— type something —'
-                : emailValid
-                ? '✓ looks like an email'
-                : '✗ not a valid email',
-          ),
-        ],
-      ),
-    );
+    return section('Regex email validator', Column(mainAxisAlignment: MainAxisAlignment.start, children: [TextField(controller: emailCtrl, decoration: InputDecoration(labelText: 'email'), onChanged: (s) => runEmail(s)), SizedBox(height: 6.0), Text(!emailTyped ? '— type something —' : emailValid ? '✓ looks like an email' : '✗ not a valid email')]));
   }
 
   /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:241
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Showcase'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: ListView(
-        padding: EdgeInsets.all(8.0),
-        children: [
-          counterCard,
-          diceCard,
-          shapeCard,
-          lookupCard,
-          tryCard,
-          tableCard,
-          emailCard,
-        ],
-      ),
-    );
+    return Scaffold(appBar: AppBar(title: Text('Showcase'), backgroundColor: Theme.of(context).colorScheme.inversePrimary), body: ListView(padding: EdgeInsets.all(8.0), children: [counterCard, diceCard, shapeCard, lookupCard, tryCard, tableCard, emailCard]));
   }
+
 }
 
 /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:19
@@ -760,7 +417,8 @@ class SquareK extends ShapeKind {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is SquareK && other.side == side;
+    identical(this, other) ||
+    other is SquareK && other.side == side;
 
   @override
   int get hashCode => side.hashCode;
@@ -768,7 +426,8 @@ class SquareK extends ShapeKind {
   @override
   String toString() => 'SquareK(side: $side)';
 
-  SquareK copyWith({double? side}) => SquareK(side ?? this.side);
+  SquareK copyWith({double? side}) =>
+    SquareK(side ?? this.side);
 }
 
 /// Source: example/src/main/scala/example/apps/TodoApp.scala:20
@@ -778,25 +437,21 @@ class TodoApp extends StatefulWidget {
   State<TodoApp> createState() {
     return TodoAppState();
   }
+
 }
 
 /// Source: example/src/main/scala/example/apps/TodoApp.scala:23
 class TodoAppState extends State<TodoApp> {
   List<TodoItem> todos = <Never>[];
   final TextEditingController controller = TextEditingController();
-
   /// Source: example/src/main/scala/example/apps/TodoApp.scala:27
   void addTodoItem() {
-    setState(() {
-      todos = [...todos, TodoItem(controller.text, false)];
-    });
+    setState(() { todos = [...todos, TodoItem(controller.text, false)]; });
   }
 
   /// Source: example/src/main/scala/example/apps/TodoApp.scala:30
   void clearAll() {
-    setState(() {
-      todos = <Never>[];
-    });
+    setState(() { todos = <Never>[]; });
   }
 
   /// Source: example/src/main/scala/example/apps/TodoApp.scala:36
@@ -806,55 +461,15 @@ class TodoAppState extends State<TodoApp> {
 
   /// Source: example/src/main/scala/example/apps/TodoApp.scala:37
   List<TodoItem> markDone(int i) {
-    return [
-      ...todos.sublist(0, i),
-      TodoItem('done', true),
-      ...todos.sublist(i + 1),
-    ];
+    return [...todos.sublist(0, i), TodoItem('done', true), ...todos.sublist(i + 1)];
   }
 
   /// Source: example/src/main/scala/example/apps/TodoApp.scala:40
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Todos')),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.all(8.0),
-            child: TextField(
-              controller: controller,
-              decoration: InputDecoration(labelText: 'What needs doing?'),
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: () => addTodoItem(),
-                child: Text('Add'),
-              ),
-              SizedBox(width: 8.0),
-              ElevatedButton(
-                onPressed: () => clearAll(),
-                child: Text('Clear all'),
-              ),
-            ],
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemBuilder: (ctx, i) => ListTile(
-                leading: Icon(todos[i].done ? Icons.check : Icons.edit),
-                title: Text(todos[i].text),
-              ),
-              itemCount: todos.length,
-            ),
-          ),
-        ],
-      ),
-    );
+    return Scaffold(appBar: AppBar(title: Text('Todos')), body: Column(mainAxisAlignment: MainAxisAlignment.start, children: [Padding(padding: EdgeInsets.all(8.0), child: TextField(controller: controller, decoration: InputDecoration(labelText: 'What needs doing?'))), Row(mainAxisAlignment: MainAxisAlignment.center, children: [ElevatedButton(onPressed: () => addTodoItem(), child: Text('Add')), SizedBox(width: 8.0), ElevatedButton(onPressed: () => clearAll(), child: Text('Clear all'))]), Expanded(child: ListView.builder(itemBuilder: (ctx, i) => ListTile(leading: Icon(todos[i].done ? Icons.check : Icons.edit), title: Text(todos[i].text)), itemCount: todos.length))]));
   }
+
 }
 
 /// Source: example/src/main/scala/example/apps/TodoApp.scala:18
@@ -865,8 +480,8 @@ class TodoItem {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is TodoItem && other.text == text && other.done == done;
+    identical(this, other) ||
+    other is TodoItem && other.text == text && other.done == done;
 
   @override
   int get hashCode => Object.hash(text, done);
@@ -875,31 +490,26 @@ class TodoItem {
   String toString() => 'TodoItem(text: $text, done: $done)';
 
   TodoItem copyWith({String? text, bool? done}) =>
-      TodoItem(text ?? this.text, done ?? this.done);
+    TodoItem(text ?? this.text, done ?? this.done);
 }
 
 /// Source: example/src/main/scala/example/features/AsyncBuilders.scala:9
 class AsyncBuildersExample {
   /// Source: example/src/main/scala/example/features/AsyncBuilders.scala:10
   Widget futureWidget(Future<String> f) {
-    return FutureBuilder(
-      future: f,
-      builder: (ctx, snap) => Text((snap.data ?? ('loading…'))),
-    );
+    return FutureBuilder<String>(future: f, builder: (ctx, snap) => Text((snap.data ?? ('loading…'))));
   }
 
   /// Source: example/src/main/scala/example/features/AsyncBuilders.scala:17
   Widget streamWidget(Stream<int> s) {
-    return StreamBuilder(
-      stream: s,
-      builder: (ctx, snap) => Text(snap.data.fold('-', (n) => n.toString())),
-    );
+    return StreamBuilder<int>(stream: s, builder: (ctx, snap) => Text(snap.data.fold('-', (n) => n.toString())));
   }
 
   /// Source: example/src/main/scala/example/features/AsyncBuilders.scala:24
   StreamController<int> makeController() {
     return StreamController.broadcast();
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/FunctionTypes.scala:10
@@ -911,6 +521,7 @@ class BinaryOp {
   int apply(int a, int b) {
     return op(a, b);
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/Generics.scala:22
@@ -922,6 +533,7 @@ class BoundedBox<T extends HasSize> {
   int get measure {
     return inner.size;
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/Generics.scala:9
@@ -933,6 +545,7 @@ class Box<T> {
   T get() {
     return value;
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/FunctionTypes.scala:7
@@ -944,6 +557,7 @@ class Callback {
   void invoke() {
     fn();
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:7
@@ -953,7 +567,8 @@ class Circle extends Shape {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is Circle && other.radius == radius;
+    identical(this, other) ||
+    other is Circle && other.radius == radius;
 
   @override
   int get hashCode => radius.hashCode;
@@ -961,36 +576,27 @@ class Circle extends Shape {
   @override
   String toString() => 'Circle(radius: $radius)';
 
-  Circle copyWith({double? radius}) => Circle(radius ?? this.radius);
+  Circle copyWith({double? radius}) =>
+    Circle(radius ?? this.radius);
 }
 
 /// Source: example/src/main/scala/example/features/CtorPatterns.scala:11
 class CtorPatternsExample {
   /// Source: example/src/main/scala/example/features/CtorPatterns.scala:12
   String describe(Vec p) {
-    return switch (p) {
-      Vec(x: 0, y: 0) => 'origin',
-      Vec(x: 0, y: _) => 'on y-axis',
-      Vec(x: _, y: 0) => 'on x-axis',
-      Vec(x: var a, y: var b) => '(' + a.toString() + ', ' + b.toString() + ')',
-    };
+    return switch (p) { Vec(x: 0, y: 0) => 'origin', Vec(x: 0, y: _) => 'on y-axis', Vec(x: _, y: 0) => 'on x-axis', Vec(x: var a, y: var b) => '(' + a.toString() + ', ' + b.toString() + ')' };
   }
 
   /// Source: example/src/main/scala/example/features/CtorPatterns.scala:19
   int recover(Try<int> t) {
-    return switch (t) {
-      Success<int>(value: var v) => v,
-      Failure<int>(error: _) => -1,
-    };
+    return switch (t) { Success<int>(value: var v) => v, Failure<int>(error: _) => -1 };
   }
 
   /// Source: example/src/main/scala/example/features/CtorPatterns.scala:24
   String eitherToString(Either<String, int> e) {
-    return switch (e) {
-      Left<String, int>(value: var err) => 'err: ' + err,
-      Right<String, int>(value: var v) => 'ok: ' + v.toString(),
-    };
+    return switch (e) { Left<String, int>(value: var err) => 'err: ' + err, Right<String, int>(value: var v) => 'ok: ' + v.toString() };
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/Currying.scala:6
@@ -1009,6 +615,7 @@ class CurryingExample {
   int invoke() {
     return userDefined(3, 4);
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/Decorations.scala:8
@@ -1016,33 +623,16 @@ class DecorationsExample extends StatelessWidget {
   /// Source: example/src/main/scala/example/features/Decorations.scala:9
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Color.fromARGB(255, 200, 230, 255),
-        borderRadius: BorderRadius.circular(12.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey,
-            offset: Offset(0.0, 4.0),
-            blurRadius: 8.0,
-          ),
-        ],
-      ),
-      width: 200.0,
-      height: 120.0,
-      child: Center(child: Text('Hello, styled world')),
-    );
+    return Container(decoration: BoxDecoration(color: Color.fromARGB(255, 200, 230, 255), borderRadius: BorderRadius.circular(12.0), boxShadow: [BoxShadow(color: Colors.grey, offset: Offset(0.0, 4.0), blurRadius: 8.0)]), width: 200.0, height: 120.0, child: Center(child: Text('Hello, styled world')));
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/DynJson.scala:17
 class DynJson {
   /// Source: example/src/main/scala/example/features/DynJson.scala:18
   String nameOf(String payload) {
-    return (() {
-      final json = jsonDecode(payload);
-      return (json['name'] == null) ? 'unknown' : (json['name'] as String);
-    })();
+    return (() { final json = jsonDecode(payload); return (json['name'] == null) ? 'unknown' : (json['name'] as String); })();
   }
 
   /// Source: example/src/main/scala/example/features/DynJson.scala:22
@@ -1054,6 +644,7 @@ class DynJson {
   String render(String name, int age) {
     return jsonEncode({'name': name, 'age': age});
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/TryEither.scala:20
@@ -1075,10 +666,7 @@ class EitherExampleSart {
 
   /// Source: example/src/main/scala/example/features/TryEither.scala:27
   String extract(Either<String, int> e) {
-    return e.fold(
-      (err) => 'error: ' + err.toString(),
-      (n) => 'ok: ' + n.toString(),
-    );
+    return e.fold((err) => 'error: ' + err.toString(), (n) => 'ok: ' + n.toString());
   }
 
   /// Source: example/src/main/scala/example/features/TryEither.scala:31
@@ -1095,6 +683,7 @@ class EitherExampleSart {
   Either<int, String> flip(Either<String, int> e) {
     return e.swap;
   }
+
 }
 
 extension SartIntSquared on int {
@@ -1137,6 +726,7 @@ class ForCompExample {
   List<int> pairsSum(List<int> xs, List<int> ys) {
     return xs.expand((x) => ys.map((y) => x + y).toList()).toList();
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/GivenUsing.scala:7
@@ -1156,6 +746,7 @@ class FutureExample {
   Future<int> compose(Future<int> a, Future<int> b) {
     return a.then((x) => b.then((y) => x + y));
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/GivenUsing.scala:13
@@ -1169,6 +760,7 @@ class GivenExample {
   String get demo {
     return greet(42, intFormatter);
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/GivenUsing.scala:10
@@ -1180,6 +772,7 @@ class intFormatter$ extends Formatter<int> {
   String format(int value) {
     return 'int=' + value.toString();
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/Generics.scala:19
@@ -1194,6 +787,7 @@ class InlineExample {
   int tripleWrap(int n) {
     return doubled(n) + n;
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/Inlines.scala:8
@@ -1202,7 +796,8 @@ int doubled(int x) {
 }
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:12
-sealed class Json {}
+sealed class Json {
+}
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:15
 class JsonBool extends Json {
@@ -1211,7 +806,8 @@ class JsonBool extends Json {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is JsonBool && other.value == value;
+    identical(this, other) ||
+    other is JsonBool && other.value == value;
 
   @override
   int get hashCode => value.hashCode;
@@ -1219,7 +815,8 @@ class JsonBool extends Json {
   @override
   String toString() => 'JsonBool(value: $value)';
 
-  JsonBool copyWith({bool? value}) => JsonBool(value ?? this.value);
+  JsonBool copyWith({bool? value}) =>
+    JsonBool(value ?? this.value);
 }
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:16
@@ -1232,7 +829,8 @@ class JsonNumber extends Json {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is JsonNumber && other.value == value;
+    identical(this, other) ||
+    other is JsonNumber && other.value == value;
 
   @override
   int get hashCode => value.hashCode;
@@ -1240,7 +838,8 @@ class JsonNumber extends Json {
   @override
   String toString() => 'JsonNumber(value: $value)';
 
-  JsonNumber copyWith({double? value}) => JsonNumber(value ?? this.value);
+  JsonNumber copyWith({double? value}) =>
+    JsonNumber(value ?? this.value);
 }
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:13
@@ -1250,7 +849,8 @@ class JsonString extends Json {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is JsonString && other.value == value;
+    identical(this, other) ||
+    other is JsonString && other.value == value;
 
   @override
   int get hashCode => value.hashCode;
@@ -1258,7 +858,8 @@ class JsonString extends Json {
   @override
   String toString() => 'JsonString(value: $value)';
 
-  JsonString copyWith({String? value}) => JsonString(value ?? this.value);
+  JsonString copyWith({String? value}) =>
+    JsonString(value ?? this.value);
 }
 
 /// Source: example/src/main/scala/example/features/LayoutFacades.scala:8
@@ -1266,23 +867,9 @@ class LayoutFacadesExample extends StatelessWidget {
   /// Source: example/src/main/scala/example/features/LayoutFacades.scala:9
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 2.0,
-      child: Stack(
-        children: [
-          Image.network('https://flutter.dev/assets/logo.png'),
-          Positioned(
-            left: 16.0,
-            bottom: 16.0,
-            child: Align(
-              alignment: Alignment.bottomLeft,
-              child: GestureDetector(child: Text('tap me'), onTap: () => null),
-            ),
-          ),
-        ],
-      ),
-    );
+    return Card(elevation: 2.0, child: Stack(children: [Image.network('https://flutter.dev/assets/logo.png'), Positioned(left: 16.0, bottom: 16.0, child: Align(alignment: Alignment.bottomLeft, child: GestureDetector(child: Text('tap me'), onTap: () => null)))]));
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/Lists.scala:8
@@ -1296,6 +883,7 @@ class ListExample {
   List<int> triple(List<int> xs) {
     return xs;
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/ListOps.scala:7
@@ -1339,6 +927,7 @@ class ListOpsExample {
   int largest(List<int> xs) {
     return xs.reduce((a, b) => a > b ? a : b);
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/Maps.scala:9
@@ -1357,6 +946,7 @@ class MapSetExample {
   bool contains(Map<String, int> m, String key) {
     return m.containsKey(key);
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/FunctionTypes.scala:13
@@ -1368,6 +958,7 @@ class Mapper<A, B> {
   B run(A a) {
     return f(a);
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/MathRegex.scala:8
@@ -1396,6 +987,7 @@ class MathRegexExample {
   bool matchesNumber(String s) {
     return RegExp('^\\d+\$').hasMatch(s);
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/Options.scala:11
@@ -1434,6 +1026,7 @@ class OptionExample {
   String describe(int? o) {
     return o.fold('nothing', (x) => 'got ' + x.toString());
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/Generics.scala:12
@@ -1444,8 +1037,8 @@ class Pair<A, B> {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Pair && other.first == first && other.second == second;
+    identical(this, other) ||
+    other is Pair && other.first == first && other.second == second;
 
   @override
   int get hashCode => Object.hash(first, second);
@@ -1454,46 +1047,31 @@ class Pair<A, B> {
   String toString() => 'Pair(first: $first, second: $second)';
 
   Pair copyWith({A? first, B? second}) =>
-      Pair(first ?? this.first, second ?? this.second);
+    Pair(first ?? this.first, second ?? this.second);
 }
 
 /// Source: example/src/main/scala/example/features/PatternMatching.scala:5
 class PatternMatchExample {
   /// Source: example/src/main/scala/example/features/PatternMatching.scala:6
   String label(int n) {
-    return switch (n) {
-      0 => 'zero',
-      1 => 'one',
-      _ => 'other',
-    };
+    return switch (n) { 0 => 'zero', 1 => 'one', _ => 'other' };
   }
 
   /// Source: example/src/main/scala/example/features/PatternMatching.scala:12
   String classifyEnum(Filter f) {
-    return switch (f) {
-      Filter.All => 'all',
-      Filter.Active => 'active',
-      Filter.Completed => 'completed',
-    };
+    return switch (f) { Filter.All => 'all', Filter.Active => 'active', Filter.Completed => 'completed' };
   }
 
   /// Source: example/src/main/scala/example/features/PatternMatching.scala:18
   String positiveOnly(int n) {
-    return switch (n) {
-      var x when x > 0 => 'positive',
-      0 => 'zero',
-      _ => 'negative',
-    };
+    return switch (n) { var x when x > 0 => 'positive', 0 => 'zero', _ => 'negative' };
   }
 
   /// Source: example/src/main/scala/example/features/PatternMatching.scala:24
   String typeClassify(dynamic x) {
-    return switch (x) {
-      String _ => 'string',
-      int _ => 'int',
-      _ => 'other',
-    };
+    return switch (x) { String _ => 'string', int _ => 'int', _ => 'other' };
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/CaseClasses.scala:6
@@ -1504,7 +1082,8 @@ class Point {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is Point && other.x == x && other.y == y;
+    identical(this, other) ||
+    other is Point && other.x == x && other.y == y;
 
   @override
   int get hashCode => Object.hash(x, y);
@@ -1512,7 +1091,8 @@ class Point {
   @override
   String toString() => 'Point(x: $x, y: $y)';
 
-  Point copyWith({int? x, int? y}) => Point(x ?? this.x, y ?? this.y);
+  Point copyWith({int? x, int? y}) =>
+    Point(x ?? this.x, y ?? this.y);
 }
 
 /// Source: example/src/main/scala/example/features/Enums.scala:11
@@ -1532,11 +1112,9 @@ class RangeExample {
 
   /// Source: example/src/main/scala/example/features/Ranges.scala:14
   List<int> squared(int n) {
-    return List<int>.generate(
-      n - 0,
-      (i) => 0 + i,
-    ).map((i) => i * i).toList().toList();
+    return List<int>.generate(n - 0, (i) => 0 + i).map((i) => i * i).toList().toList();
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:8
@@ -1547,8 +1125,8 @@ class Rectangle extends Shape {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Rectangle && other.width == width && other.height == height;
+    identical(this, other) ||
+    other is Rectangle && other.width == width && other.height == height;
 
   @override
   int get hashCode => Object.hash(width, height);
@@ -1557,11 +1135,12 @@ class Rectangle extends Shape {
   String toString() => 'Rectangle(width: $width, height: $height)';
 
   Rectangle copyWith({double? width, double? height}) =>
-      Rectangle(width ?? this.width, height ?? this.height);
+    Rectangle(width ?? this.width, height ?? this.height);
 }
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:6
-sealed class Shape {}
+sealed class Shape {
+}
 
 /// Source: example/src/main/scala/example/features/Strings.scala:7
 class StringExample {
@@ -1599,6 +1178,7 @@ class StringExample {
   int len(String s) {
     return s.length;
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/CaseClasses.scala:8
@@ -1610,11 +1190,8 @@ class Todo {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Todo &&
-          other.id == id &&
-          other.text == text &&
-          other.done == done;
+    identical(this, other) ||
+    other is Todo && other.id == id && other.text == text && other.done == done;
 
   @override
   int get hashCode => Object.hash(id, text, done);
@@ -1623,7 +1200,7 @@ class Todo {
   String toString() => 'Todo(id: $id, text: $text, done: $done)';
 
   Todo copyWith({int? id, String? text, bool? done}) =>
-      Todo(id ?? this.id, text ?? this.text, done ?? this.done);
+    Todo(id ?? this.id, text ?? this.text, done ?? this.done);
 }
 
 /// Source: example/src/main/scala/example/features/TryCatch.scala:10
@@ -1648,8 +1225,10 @@ class TryExample {
       return 'ok';
     } on Object {
       return 'failed';
-    } finally {}
+    } finally {
+    }
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/TryEither.scala:11
@@ -1678,6 +1257,7 @@ class TryExampleSart {
   int? maybe(Try<int> t) {
     return t.toOption;
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/Tuples.scala:11
@@ -1704,10 +1284,7 @@ class TupleExample {
 
   /// Source: example/src/main/scala/example/features/Tuples.scala:18
   List<(int, String)> zipped(List<int> xs, List<String> ys) {
-    return List.generate(
-      (xs.length < ys.length ? xs.length : ys.length),
-      (i) => (xs[i], ys[i]),
-    );
+    return List.generate((xs.length < ys.length ? xs.length : ys.length), (i) => (xs[i], ys[i]));
   }
 
   /// Source: example/src/main/scala/example/features/Tuples.scala:19
@@ -1717,16 +1294,14 @@ class TupleExample {
 
   /// Source: example/src/main/scala/example/features/Tuples.scala:20
   (List<int>, List<int>) split(List<int> xs) {
-    return (
-      xs.where((_$1) => _$1 > 0).toList(),
-      xs.where((x) => !((_$1) => _$1 > 0)(x)).toList(),
-    );
+    return (xs.where((_$1) => _$1 > 0).toList(), xs.where((x) => !((_$1) => _$1 > 0)(x)).toList());
   }
 
   /// Source: example/src/main/scala/example/features/Tuples.scala:23
   Map<String, int> addEntry(Map<String, int> m, String k, int v) {
     return {...m, k: v};
   }
+
 }
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:9
@@ -1741,11 +1316,8 @@ class User {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is User &&
-          other.name == name &&
-          other.email == email &&
-          other.age == age;
+    identical(this, other) ||
+    other is User && other.name == name && other.email == email && other.age == age;
 
   @override
   int get hashCode => Object.hash(name, email, age);
@@ -1754,7 +1326,7 @@ class User {
   String toString() => 'User(name: $name, email: $email, age: $age)';
 
   User copyWith({String? name, String? email, int? age}) =>
-      User(name ?? this.name, email ?? this.email, age ?? this.age);
+    User(name ?? this.name, email ?? this.email, age ?? this.age);
 }
 
 /// Source: example/src/main/scala/example/features/CtorPatterns.scala:9
@@ -1765,7 +1337,8 @@ class Vec {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is Vec && other.x == x && other.y == y;
+    identical(this, other) ||
+    other is Vec && other.x == x && other.y == y;
 
   @override
   int get hashCode => Object.hash(x, y);
@@ -1773,13 +1346,16 @@ class Vec {
   @override
   String toString() => 'Vec(x: $x, y: $y)';
 
-  Vec copyWith({int? x, int? y}) => Vec(x ?? this.x, y ?? this.y);
+  Vec copyWith({int? x, int? y}) =>
+    Vec(x ?? this.x, y ?? this.y);
 }
 
 /// Source: example/src/main/scala/example/features/Generics.scala:15
 class Wrapping {
   /// Source: example/src/main/scala/example/features/Generics.scala:16
   Box<T> wrap<T>(T value) {
-    return Box(value);
+    return Box<T>(value);
   }
+
 }
+

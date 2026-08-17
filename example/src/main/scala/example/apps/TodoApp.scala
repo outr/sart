@@ -67,13 +67,14 @@ class TodoAppState extends State[TodoApp]:
           Expanded(
             child = ListView.builder(
               itemCount = todos.size,
-              itemBuilder = (ctx: BuildContext, i: Int) =>
+              itemBuilder = (ctx: BuildContext, i: Int) => sart.stdlib.Some(
                 ListTile(
                   leading = Icon(
                     if todos(i).done then Icons.check else Icons.edit
                   ),
                   title = Text(todos(i).text)
                 )
+              )
             )
           )
         )

@@ -25,9 +25,11 @@ final class Left<L, R> extends Either<L, R> {
   @override
   Either<L, R2> map<R2>(R2 Function(R) f) => Left<L, R2>(value);
   @override
-  Either<L, R2> flatMap<R2>(Either<L, R2> Function(R) f) => Left<L, R2>(value);
+  Either<L, R2> flatMap<R2>(Either<L, R2> Function(R) f) =>
+      Left<L, R2>(value);
   @override
-  X fold<X>(X Function(L) onLeft, X Function(R) onRight) => onLeft(value);
+  X fold<X>(X Function(L) onLeft, X Function(R) onRight) =>
+      onLeft(value);
   @override
   bool get isLeft => true;
   @override
@@ -49,7 +51,8 @@ final class Right<L, R> extends Either<L, R> {
   @override
   Either<L, R2> flatMap<R2>(Either<L, R2> Function(R) f) => f(value);
   @override
-  X fold<X>(X Function(L) onLeft, X Function(R) onRight) => onRight(value);
+  X fold<X>(X Function(L) onLeft, X Function(R) onRight) =>
+      onRight(value);
   @override
   bool get isLeft => false;
   @override

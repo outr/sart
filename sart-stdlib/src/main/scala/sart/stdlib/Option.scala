@@ -32,6 +32,12 @@ abstract class Option[+T]:
   // receiver unchanged — for passing into facade params that are nullable
   // on the Dart side.
   def orNull[U >: T]: U                         = native.value
+  // Dart's `!`: `opt.get` emits `receiver!` — throws on null exactly as
+  // Scala's Option.get throws on None.
+  def get: T                                    = native.value
+  def exists(p: T => Boolean): Boolean          = native.value
+  def forall(p: T => Boolean): Boolean          = native.value
+  def nonEmpty: Boolean                         = native.value
 
 @native
 object Some:

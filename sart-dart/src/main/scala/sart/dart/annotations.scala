@@ -131,6 +131,22 @@ final class JsonField(val name: String) extends StaticAnnotation
 object nn:
   def apply[T](value: T): T = value
 
+/** Dart `await`. Usable anywhere in a method or lambda body — the
+ *  enclosing emitted function becomes `async`. Compile-only (a Sart app
+ *  never runs on the JVM), so the "synchronous" return type is safe.
+ */
+object await:
+  def apply[T](future: scala.concurrent.Future[T]): T =
+    throw new Error("sart.dart.await evaluated at runtime — Sart apps only run as Dart")
+
+/** Marks a whole method body as `async` when the method's declared type
+ *  is `Future[T]` but the body is written in direct style:
+ *  `def load(): Future[Int] = async { await(fetch()) + 1 }`.
+ */
+object async:
+  def apply[T](body: T): scala.concurrent.Future[T] =
+    scala.concurrent.Future.successful(body)
+
 /** Future helpers with direct Dart lowerings. */
 object Futures:
   /** `Futures.ensure(f, action)` → Dart `f.whenComplete(action)` — the
@@ -138,3 +154,8 @@ object Futures:
    *  the original value/error propagates.
    */
   def ensure[T](f: scala.concurrent.Future[T], action: () => Unit): scala.concurrent.Future[T] = f
+
+  /** `Futures.onError(f, handler)` → Dart `f.catchError(handler)` — the
+   *  `catch` of futures.
+   */
+  def onError[T](f: scala.concurrent.Future[T], handler: Any => T): scala.concurrent.Future[T] = f

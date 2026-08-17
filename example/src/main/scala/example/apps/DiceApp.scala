@@ -96,11 +96,12 @@ class HistoryScreen(val history: List[Roll]) extends StatelessWidget:
       appBar = AppBar(title = Text("History")),
       body = ListView.builder(
         itemCount = history.size,
-        itemBuilder = (ctx: BuildContext, i: Int) =>
+        itemBuilder = (ctx: BuildContext, i: Int) => sart.stdlib.Some(
           ListTile(
             leading = Icon(Icons.check),
             title = Text("Roll #" + history(i).index.toString),
             trailing = Text(history(i).face.toString)
           )
+        )
       )
     )

@@ -463,3 +463,27 @@ class EmitterSuite extends FunSuite:
       .toList
     assert(todos.isEmpty, todos.mkString("\n"))
   }
+
+  test("await/async: direct-style bodies emit Dart async functions") {
+    val body = classBody("FxAsync")
+    assert(body.contains("Future<int> load() async {"), body)
+    assert(body.contains("(await fetch())"), body)
+    assert(body.contains("void fire() async {"), body)
+  }
+
+  test("Option match lowers to a null-check on a promoted local") {
+    val body = classBody("FxOptionMatch")
+    assert(body.contains("final v = o;"), body)
+    assert(body.contains("if (v != null)"), body)
+    assert(body.contains("return 'none';"), body)
+  }
+
+  test("extension-method call sites emit as receiver.method(args)") {
+    val body = classBody("FxExtUse")
+    assert(body.contains("s.fxRepeat(2)"), body)
+  }
+
+  test("parented parameterless trait emits as mixin-on") {
+    assert(emittedMain.contains("mixin FxMixinOn on FxCounter {"), emittedMain)
+    assert(emittedMain.contains("class FxWithMixinOn extends FxCounter with FxMixinOn"), emittedMain)
+  }

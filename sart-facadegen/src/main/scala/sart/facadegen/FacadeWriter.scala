@@ -339,8 +339,17 @@ object FacadeWriter:
         case "Object"  => "Any"
         case "Never"   => "Nothing"
         case FunctionT(retTpe, argList) =>
-          val args = functionArgs(argList).map(scalaType(_, tparams))
-          val r    = scalaType(retTpe.trim, tparams)
+          // Nullability survives INSIDE function types (validator:
+          // `String? Function(String?)` → `Option[String] => Option[String]`)
+          // — collapsing it produced Dart-side type mismatches whenever a
+          // callback flowed through a typed variable.
+          def component(d: String): String =
+            val c = d.trim
+            if c.endsWith("?") && c.length > 1 then
+              s"sart.stdlib.Option[${scalaType(c.dropRight(1).trim, tparams)}]"
+            else scalaType(c, tparams)
+          val args = functionArgs(argList).map(component)
+          val r    = component(retTpe.trim)
           if args.isEmpty then s"() => $r"
           else if args.size == 1 then s"${args.head} => $r"
           else args.mkString("(", ", ", s") => $r")

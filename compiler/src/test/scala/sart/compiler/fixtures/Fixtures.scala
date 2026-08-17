@@ -208,3 +208,31 @@ class FxLazyInit:
   def local(n: Int): Int =
     lazy val doubled = n * 2
     doubled + 1
+
+class FxAsync:
+  import scala.concurrent.Future
+  import sart.dart.{async, await}
+  def fetch(): Future[Int] = Future.successful(1)
+  def load(): Future[Int] = async {
+    val n = await(fetch())
+    n + 1
+  }
+  def fire(): Unit =
+    val x = await(fetch())
+    var sink = x
+    sink = sink + 1
+
+class FxOptionMatch:
+  def render(o: Option[String]): String = o match
+    case Some(v) => v
+    case None    => "none"
+
+extension (s: String) def fxRepeat(n: Int): String = s + n.toString
+
+class FxExtUse:
+  def go(s: String): String = s.fxRepeat(2)
+
+trait FxMixinOn extends FxCounter:
+  def label(): String = "m"
+
+class FxWithMixinOn extends FxCounter with FxMixinOn
