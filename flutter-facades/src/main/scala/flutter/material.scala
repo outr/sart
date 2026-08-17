@@ -51,6 +51,22 @@ abstract class State[W <: StatefulWidget] extends DartObject:
   // exactly as in Dart.
   def initState(): Unit = native.value
   def dispose(): Unit = native.value
+  def didChangeDependencies(): Unit = native.value
+
+// ─── State mixins ──────────────────────────────────────────────────────────
+
+// Curated: Dart mixins aren't collected by the facade generator. These
+// exist so Scala `with`-clauses emit the matching Dart mixin application.
+@native
+@DartImport("package:flutter/material.dart")
+trait TickerProviderStateMixin extends DartObject
+
+@native
+@DartImport("package:flutter/material.dart")
+trait AutomaticKeepAliveClientMixin extends DartObject:
+  // Overriders write `override def wantKeepAlive: Boolean = true` — the
+  // paren-less def emits as the Dart getter the mixin requires.
+  def wantKeepAlive: Boolean = native.value
 
 @native
 @DartImport("package:flutter/material.dart")
