@@ -289,8 +289,11 @@ object FacadeWriter:
   private def mentions(tpe: String, tparam: String): Boolean =
     tpe.split("[^A-Za-z0-9_]").contains(tparam)
 
+  // JVM-final Object members a Scala class can never re-declare.
+  private val jvmReserved = Set("wait", "notify", "notifyAll", "getClass", "clone", "finalize")
+
   private def isPlainName(n: String): Boolean =
-    n.nonEmpty && !n.contains('$') && !n.startsWith("_")
+    n.nonEmpty && !n.contains('$') && !n.startsWith("_") && !jvmReserved.contains(n)
 
   // ── Types ────────────────────────────────────────────────────────────
 

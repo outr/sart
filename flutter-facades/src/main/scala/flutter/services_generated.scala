@@ -149,6 +149,51 @@ object TextInputAction:
   val emergencyCall: TextInputAction = native.value
   val newline: TextInputAction = native.value
 
+// ─── mouse_cursor.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/services.dart")
+abstract class SystemMouseCursors extends DartObject
+
+@native
+@DartImport("package:flutter/services.dart")
+object SystemMouseCursors:
+  def none: DartObject = native.value
+  def basic: DartObject = native.value
+  def click: DartObject = native.value
+  def forbidden: DartObject = native.value
+  def progress: DartObject = native.value
+  def contextMenu: DartObject = native.value
+  def help: DartObject = native.value
+  def text: DartObject = native.value
+  def verticalText: DartObject = native.value
+  def cell: DartObject = native.value
+  def precise: DartObject = native.value
+  def move: DartObject = native.value
+  def grab: DartObject = native.value
+  def grabbing: DartObject = native.value
+  def noDrop: DartObject = native.value
+  def alias: DartObject = native.value
+  def copy: DartObject = native.value
+  def disappearing: DartObject = native.value
+  def allScroll: DartObject = native.value
+  def resizeLeftRight: DartObject = native.value
+  def resizeUpDown: DartObject = native.value
+  def resizeUpLeftDownRight: DartObject = native.value
+  def resizeUpRightDownLeft: DartObject = native.value
+  def resizeUp: DartObject = native.value
+  def resizeDown: DartObject = native.value
+  def resizeLeft: DartObject = native.value
+  def resizeRight: DartObject = native.value
+  def resizeUpLeft: DartObject = native.value
+  def resizeUpRight: DartObject = native.value
+  def resizeDownLeft: DartObject = native.value
+  def resizeDownRight: DartObject = native.value
+  def resizeColumn: DartObject = native.value
+  def resizeRow: DartObject = native.value
+  def zoomIn: DartObject = native.value
+  def zoomOut: DartObject = native.value
+
 // ─── text_formatter.dart ────────────────────────────────────────
 
 @native

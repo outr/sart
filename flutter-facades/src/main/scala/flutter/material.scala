@@ -161,6 +161,12 @@ class TextEditingController extends DartObject:
 @DartImport("package:flutter/material.dart")
 class ValueKey[T](val value: T) extends Key
 
+// Curated for the same reason as ValueKey (generic chain through
+// ValueKey<T> → LocalKey → Key).
+@native
+@DartImport("package:flutter/material.dart")
+class PageStorageKey[T](val value: T) extends Key
+
 @native
 @DartImport("package:flutter/material.dart")
 class Semantics(
@@ -196,6 +202,15 @@ class StatefulBuilder(
   val builder: (BuildContext, (() => Unit) => Unit) => Widget,
   val key: Key = native.value
 ) extends StatefulWidget
+
+// flutter/foundation's top-level odds and ends (re-exported through
+// material).
+@native
+@DartImport("package:flutter/foundation.dart")
+@DartTopLevel
+object foundation:
+  def debugPrint(message: String): Unit = native.value
+  def kIsWeb: Boolean = native.value
 
 // ─── Canvas / painting (curated: dart:ui types with cascade-style
 // mutation and subclassable CustomPainter) ─────────────────────────────────
@@ -238,6 +253,13 @@ abstract class CustomPainter extends DartObject:
   def paint(canvas: Canvas, size: Size): Unit = native.value
   def shouldRepaint(oldDelegate: CustomPainter): Boolean = native.value
 
+// The repaint-boundary render object (PNG capture). `toImage` hands
+// back a dart:ui Image (see flutter.ui).
+@native
+@DartImport("package:flutter/rendering.dart")
+class RenderRepaintBoundary extends DartObject:
+  def toImage(pixelRatio: Double = native.value): scala.concurrent.Future[flutter.ui.Image] = native.value
+
 // vector_math_64's Matrix4 (re-exported through flutter/widgets).
 @native
 @DartImport("package:flutter/material.dart")
@@ -272,6 +294,7 @@ class AnimationController(
   def repeat(): DartObject = native.value
   def stop(): Unit = native.value
   def dispose(): Unit = native.value
+  def isAnimating: Boolean = native.value
 
 // Pointer/gesture payloads reach facades as DartObject — cast to these.
 @native
@@ -279,6 +302,8 @@ class AnimationController(
 class PointerEvent extends DartObject:
   def buttons: Int = native.value
   def localPosition: Offset = native.value
+  def localDelta: Offset = native.value
+  def delta: Offset = native.value
   def position: Offset = native.value
 
 @native

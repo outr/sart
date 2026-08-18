@@ -1013,6 +1013,15 @@ object Text:
 
 @native
 @DartImport("package:flutter/material.dart")
+class Opacity(
+  val key: Key = native.value,
+  val opacity: Double,
+  val alwaysIncludeSemantics: Boolean = native.value,
+  val child: Widget = native.value
+) extends Widget
+
+@native
+@DartImport("package:flutter/material.dart")
 class CustomPaint(
   val key: Key = native.value,
   val painter: DartObject = native.value,
@@ -1590,18 +1599,18 @@ class ScrollController(
   val initialScrollOffset: Double = native.value,
   val keepScrollOffset: Boolean = native.value,
   val debugLabel: String = native.value,
-  val onAttach: ChangeNotifier => Unit = native.value,
-  val onDetach: ChangeNotifier => Unit = native.value
+  val onAttach: ScrollPosition => Unit = native.value,
+  val onDetach: ScrollPosition => Unit = native.value
 ) extends ChangeNotifier:
-  def positions: List[ChangeNotifier] = native.value
+  def positions: List[ScrollPosition] = native.value
   def hasClients: Boolean = native.value
-  def position: ChangeNotifier = native.value
+  def position: ScrollPosition = native.value
   def offset: Double = native.value
   def animateTo(offset: Double, duration: sart.stdlib.Duration, curve: DartObject): scala.concurrent.Future[Unit] = native.value
   def jumpTo(value: Double): Unit = native.value
-  def attach(position: ChangeNotifier): Unit = native.value
-  def detach(position: ChangeNotifier): Unit = native.value
-  def createScrollPosition(physics: DartObject, context: DartObject, oldPosition: ChangeNotifier): ChangeNotifier = native.value
+  def attach(position: ScrollPosition): Unit = native.value
+  def detach(position: ScrollPosition): Unit = native.value
+  def createScrollPosition(physics: DartObject, context: DartObject, oldPosition: ScrollPosition): ScrollPosition = native.value
   def debugFillDescription(description: List[String]): Unit = native.value
 
 // ─── overlay.dart ────────────────────────────────────────
@@ -1942,6 +1951,105 @@ object Focus:
   def of(context: BuildContext, scopeOk: Boolean = native.value, createDependency: Boolean = native.value): FocusNode = native.value
   def maybeOf(context: BuildContext, scopeOk: Boolean = native.value, createDependency: Boolean = native.value): FocusNode = native.value
   def isAt(context: BuildContext): Boolean = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+class FocusScope(
+  val key: Key = native.value,
+  val node: FocusNode = native.value,
+  val parentNode: FocusNode = native.value,
+  val child: Widget,
+  val autofocus: Boolean = native.value,
+  val onFocusChange: Boolean => Unit = native.value,
+  val canRequestFocus: Boolean = native.value,
+  val skipTraversal: Boolean = native.value,
+  val onKeyEvent: (FocusNode, DartObject) => KeyEventResult = native.value,
+  val onKey: (FocusNode, DartObject) => KeyEventResult = native.value,
+  val debugLabel: String = native.value,
+  val includeSemantics: Boolean = native.value,
+  val descendantsAreFocusable: Boolean = native.value,
+  val descendantsAreTraversable: Boolean = native.value
+) extends StatefulWidget
+
+@native
+@DartImport("package:flutter/material.dart")
+object FocusScope:
+  def withExternalFocusNode(key: Key = native.value, child: Widget, focusScopeNode: FocusNode, parentNode: FocusNode = native.value, autofocus: Boolean = native.value, includeSemantics: Boolean = native.value, onFocusChange: Boolean => Unit = native.value): FocusScope = native.value
+  def of(context: BuildContext, createDependency: Boolean = native.value): FocusNode = native.value
+
+// ─── tap_region.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class TapRegion(
+  val key: Key = native.value,
+  val child: Widget,
+  val enabled: Boolean = native.value,
+  val behavior: HitTestBehavior = native.value,
+  val onTapOutside: DartObject => Unit = native.value,
+  val onTapInside: DartObject => Unit = native.value,
+  val onTapUpOutside: DartObject => Unit = native.value,
+  val onTapUpInside: DartObject => Unit = native.value,
+  val groupId: Any = native.value,
+  val consumeOutsideTaps: Boolean = native.value,
+  val debugLabel: String = native.value
+) extends Widget
+
+// ─── scroll_position.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+abstract class ScrollPosition(
+  val physics: DartObject,
+  val context: DartObject,
+  val keepScrollOffset: Boolean = native.value,
+  val oldPosition: ScrollPosition = native.value,
+  val debugLabel: String = native.value
+) extends ChangeNotifier:
+  def isScrollingNotifier: ValueNotifier[Boolean] = native.value
+  def minScrollExtent: Double = native.value
+  def maxScrollExtent: Double = native.value
+  def hasContentDimensions: Boolean = native.value
+  def pixels: Double = native.value
+  def hasPixels: Boolean = native.value
+  def viewportDimension: Double = native.value
+  def hasViewportDimension: Boolean = native.value
+  def haveDimensions: Boolean = native.value
+  def shouldIgnorePointer: Boolean = native.value
+  def devicePixelRatio: Double = native.value
+  def allowImplicitScrolling: Boolean = native.value
+  def activity: DartObject = native.value
+  def absorb(other: ScrollPosition): Unit = native.value
+  def setPixels(newPixels: Double): Double = native.value
+  def correctPixels(value: Double): Unit = native.value
+  def correctBy(correction: Double): Unit = native.value
+  def forcePixels(value: Double): Unit = native.value
+  def saveScrollOffset(): Unit = native.value
+  def restoreScrollOffset(): Unit = native.value
+  def restoreOffset(offset: Double, initialRestore: Boolean = native.value): Unit = native.value
+  def saveOffset(): Unit = native.value
+  def applyBoundaryConditions(value: Double): Double = native.value
+  def applyViewportDimension(viewportDimension: Double): Boolean = native.value
+  def applyContentDimensions(minScrollExtent: Double, maxScrollExtent: Double): Boolean = native.value
+  def correctForNewDimensions(oldPosition: DartObject, newPosition: DartObject): Boolean = native.value
+  def applyNewDimensions(): Unit = native.value
+  def ensureVisible(`object`: DartObject, alignment: Double = native.value, duration: sart.stdlib.Duration = native.value, curve: DartObject = native.value, alignmentPolicy: DartObject = native.value, targetRenderObject: DartObject = native.value): scala.concurrent.Future[Unit] = native.value
+  def animateTo(to: Double, duration: sart.stdlib.Duration, curve: DartObject): scala.concurrent.Future[Unit] = native.value
+  def jumpTo(value: Double): Unit = native.value
+  def pointerScroll(delta: Double): Unit = native.value
+  def moveTo(to: Double, duration: sart.stdlib.Duration = native.value, curve: DartObject = native.value, clamp: Boolean = native.value): scala.concurrent.Future[Unit] = native.value
+  def jumpToWithoutSettling(value: Double): Unit = native.value
+  def hold(holdCancelCallback: () => Unit): DartObject = native.value
+  def drag(details: DartObject, dragCancelCallback: () => Unit): DartObject = native.value
+  def beginActivity(newActivity: DartObject): Unit = native.value
+  def didStartScroll(): Unit = native.value
+  def didUpdateScrollPositionBy(delta: Double): Unit = native.value
+  def didEndScroll(): Unit = native.value
+  def didOverscrollBy(value: Double): Unit = native.value
+  def didUpdateScrollDirection(direction: DartObject): Unit = native.value
+  def didUpdateScrollMetrics(): Unit = native.value
+  def recommendDeferredLoading(context: BuildContext): Boolean = native.value
+  def debugFillDescription(description: List[String]): Unit = native.value
 
 // ─── keyboard_listener.dart ────────────────────────────────────────
 
@@ -11406,6 +11514,30 @@ object SnackBar:
 
 @native
 @DartImport("package:flutter/material.dart")
+class LinearProgressIndicator(
+  val key: Key = native.value,
+  val value: Double = native.value,
+  val backgroundColor: Color = native.value,
+  val color: Color = native.value,
+  val valueColor: DartObject = native.value,
+  val minHeight: Double = native.value,
+  val semanticsLabel: String = native.value,
+  val semanticsValue: String = native.value,
+  val borderRadius: BorderRadiusGeometry = native.value,
+  val stopIndicatorColor: Color = native.value,
+  val stopIndicatorRadius: Double = native.value,
+  val trackGap: Double = native.value,
+  val year2023: Boolean = native.value,
+  val controller: DartObject = native.value
+) extends StatefulWidget
+
+@native
+@DartImport("package:flutter/material.dart")
+object LinearProgressIndicator:
+  def defaultAnimationDuration: sart.stdlib.Duration = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
 class CircularProgressIndicator(
   val key: Key = native.value,
   val value: Double = native.value,
@@ -11581,6 +11713,210 @@ class ActionChip(
 @DartImport("package:flutter/material.dart")
 object ActionChip:
   def elevated(key: Key = native.value, avatar: Widget = native.value, label: Widget, labelStyle: TextStyle = native.value, labelPadding: EdgeInsetsGeometry = native.value, onPressed: () => Unit = native.value, pressElevation: Double = native.value, tooltip: String = native.value, side: BorderSide = native.value, shape: DartObject = native.value, clipBehavior: Clip = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, color: WidgetStateProperty[Color] = native.value, backgroundColor: Color = native.value, disabledColor: Color = native.value, padding: EdgeInsetsGeometry = native.value, visualDensity: VisualDensity = native.value, materialTapTargetSize: MaterialTapTargetSize = native.value, elevation: Double = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, iconTheme: DartObject = native.value, avatarBoxConstraints: BoxConstraints = native.value, chipAnimationStyle: DartObject = native.value, mouseCursor: DartObject = native.value): ActionChip = native.value
+
+// ─── chip.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class Chip(
+  val key: Key = native.value,
+  val avatar: Widget = native.value,
+  val label: Widget,
+  val labelStyle: TextStyle = native.value,
+  val labelPadding: EdgeInsetsGeometry = native.value,
+  val deleteIcon: Widget = native.value,
+  val onDeleted: () => Unit = native.value,
+  val deleteIconColor: Color = native.value,
+  val deleteButtonTooltipMessage: String = native.value,
+  val side: BorderSide = native.value,
+  val shape: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
+  val focusNode: FocusNode = native.value,
+  val autofocus: Boolean = native.value,
+  val color: WidgetStateProperty[Color] = native.value,
+  val backgroundColor: Color = native.value,
+  val padding: EdgeInsetsGeometry = native.value,
+  val visualDensity: VisualDensity = native.value,
+  val materialTapTargetSize: MaterialTapTargetSize = native.value,
+  val elevation: Double = native.value,
+  val shadowColor: Color = native.value,
+  val surfaceTintColor: Color = native.value,
+  val iconTheme: DartObject = native.value,
+  val avatarBoxConstraints: BoxConstraints = native.value,
+  val deleteIconBoxConstraints: BoxConstraints = native.value,
+  val chipAnimationStyle: DartObject = native.value,
+  val mouseCursor: DartObject = native.value
+) extends StatelessWidget
+
+// ─── filter_chip.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class FilterChip(
+  val key: Key = native.value,
+  val avatar: Widget = native.value,
+  val label: Widget,
+  val labelStyle: TextStyle = native.value,
+  val labelPadding: EdgeInsetsGeometry = native.value,
+  val selected: Boolean = native.value,
+  val onSelected: Boolean => Unit,
+  val deleteIcon: Widget = native.value,
+  val onDeleted: () => Unit = native.value,
+  val deleteIconColor: Color = native.value,
+  val deleteButtonTooltipMessage: String = native.value,
+  val pressElevation: Double = native.value,
+  val disabledColor: Color = native.value,
+  val selectedColor: Color = native.value,
+  val tooltip: String = native.value,
+  val side: BorderSide = native.value,
+  val shape: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
+  val focusNode: FocusNode = native.value,
+  val autofocus: Boolean = native.value,
+  val color: WidgetStateProperty[Color] = native.value,
+  val backgroundColor: Color = native.value,
+  val padding: EdgeInsetsGeometry = native.value,
+  val visualDensity: VisualDensity = native.value,
+  val materialTapTargetSize: MaterialTapTargetSize = native.value,
+  val elevation: Double = native.value,
+  val shadowColor: Color = native.value,
+  val surfaceTintColor: Color = native.value,
+  val iconTheme: DartObject = native.value,
+  val selectedShadowColor: Color = native.value,
+  val showCheckmark: Boolean = native.value,
+  val checkmarkColor: Color = native.value,
+  val avatarBorder: DartObject = native.value,
+  val avatarBoxConstraints: BoxConstraints = native.value,
+  val deleteIconBoxConstraints: BoxConstraints = native.value,
+  val chipAnimationStyle: DartObject = native.value,
+  val mouseCursor: DartObject = native.value
+) extends StatelessWidget
+
+@native
+@DartImport("package:flutter/material.dart")
+object FilterChip:
+  def elevated(key: Key = native.value, avatar: Widget = native.value, label: Widget, labelStyle: TextStyle = native.value, labelPadding: EdgeInsetsGeometry = native.value, selected: Boolean = native.value, onSelected: Boolean => Unit, deleteIcon: Widget = native.value, onDeleted: () => Unit = native.value, deleteIconColor: Color = native.value, deleteButtonTooltipMessage: String = native.value, pressElevation: Double = native.value, disabledColor: Color = native.value, selectedColor: Color = native.value, tooltip: String = native.value, side: BorderSide = native.value, shape: DartObject = native.value, clipBehavior: Clip = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, color: WidgetStateProperty[Color] = native.value, backgroundColor: Color = native.value, padding: EdgeInsetsGeometry = native.value, visualDensity: VisualDensity = native.value, materialTapTargetSize: MaterialTapTargetSize = native.value, elevation: Double = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, iconTheme: DartObject = native.value, selectedShadowColor: Color = native.value, showCheckmark: Boolean = native.value, checkmarkColor: Color = native.value, avatarBorder: DartObject = native.value, avatarBoxConstraints: BoxConstraints = native.value, deleteIconBoxConstraints: BoxConstraints = native.value, chipAnimationStyle: DartObject = native.value, mouseCursor: DartObject = native.value): FilterChip = native.value
+
+// ─── slider.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class Slider(
+  val key: Key = native.value,
+  val value: Double,
+  val secondaryTrackValue: Double = native.value,
+  val onChanged: Double => Unit,
+  val onChangeStart: Double => Unit = native.value,
+  val onChangeEnd: Double => Unit = native.value,
+  val min: Double = native.value,
+  val max: Double = native.value,
+  val divisions: Int = native.value,
+  val label: String = native.value,
+  val activeColor: Color = native.value,
+  val inactiveColor: Color = native.value,
+  val secondaryActiveColor: Color = native.value,
+  val thumbColor: Color = native.value,
+  val overlayColor: WidgetStateProperty[Color] = native.value,
+  val mouseCursor: DartObject = native.value,
+  val semanticFormatterCallback: Double => String = native.value,
+  val focusNode: FocusNode = native.value,
+  val autofocus: Boolean = native.value,
+  val allowedInteraction: DartObject = native.value,
+  val padding: EdgeInsetsGeometry = native.value,
+  val showValueIndicator: DartObject = native.value,
+  val year2023: Boolean = native.value
+) extends StatefulWidget
+
+@native
+@DartImport("package:flutter/material.dart")
+object Slider:
+  def adaptive(key: Key = native.value, value: Double, secondaryTrackValue: Double = native.value, onChanged: Double => Unit, onChangeStart: Double => Unit = native.value, onChangeEnd: Double => Unit = native.value, min: Double = native.value, max: Double = native.value, divisions: Int = native.value, label: String = native.value, mouseCursor: DartObject = native.value, activeColor: Color = native.value, inactiveColor: Color = native.value, secondaryActiveColor: Color = native.value, thumbColor: Color = native.value, overlayColor: WidgetStateProperty[Color] = native.value, semanticFormatterCallback: Double => String = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, allowedInteraction: DartObject = native.value, showValueIndicator: DartObject = native.value, year2023: Boolean = native.value): Slider = native.value
+
+// ─── range_slider.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class RangeSlider(
+  val key: Key = native.value,
+  val values: RangeValues,
+  val onChanged: RangeValues => Unit,
+  val onChangeStart: RangeValues => Unit = native.value,
+  val onChangeEnd: RangeValues => Unit = native.value,
+  val min: Double = native.value,
+  val max: Double = native.value,
+  val divisions: Int = native.value,
+  val labels: RangeLabels = native.value,
+  val activeColor: Color = native.value,
+  val inactiveColor: Color = native.value,
+  val overlayColor: WidgetStateProperty[Color] = native.value,
+  val mouseCursor: WidgetStateProperty[DartObject] = native.value,
+  val semanticFormatterCallback: Double => String = native.value,
+  val padding: EdgeInsetsGeometry = native.value,
+  val year2023: Boolean = native.value
+) extends StatefulWidget
+
+// ─── range_slider_parts.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class RangeValues(
+  val start: Double,
+  val `end`: Double
+) extends DartObject
+
+@native
+@DartImport("package:flutter/material.dart")
+class RangeLabels(
+  val start: String,
+  val `end`: String
+) extends DartObject
+
+// ─── selectable_text.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class SelectableText(
+  val data: String,
+  val key: Key = native.value,
+  val focusNode: FocusNode = native.value,
+  val style: TextStyle = native.value,
+  val strutStyle: DartObject = native.value,
+  val textAlign: TextAlign = native.value,
+  val textDirection: DartObject = native.value,
+  val textScaleFactor: Double = native.value,
+  val textScaler: DartObject = native.value,
+  val showCursor: Boolean = native.value,
+  val autofocus: Boolean = native.value,
+  val toolbarOptions: DartObject = native.value,
+  val minLines: Int = native.value,
+  val maxLines: Int = native.value,
+  val cursorWidth: Double = native.value,
+  val cursorHeight: Double = native.value,
+  val cursorRadius: Radius = native.value,
+  val cursorColor: Color = native.value,
+  val selectionColor: Color = native.value,
+  val selectionHeightStyle: DartObject = native.value,
+  val selectionWidthStyle: DartObject = native.value,
+  val dragStartBehavior: DartObject = native.value,
+  val enableInteractiveSelection: Boolean = native.value,
+  val selectionControls: DartObject = native.value,
+  val onTap: () => Unit = native.value,
+  val scrollPhysics: DartObject = native.value,
+  val scrollBehavior: DartObject = native.value,
+  val semanticsLabel: String = native.value,
+  val textHeightBehavior: DartObject = native.value,
+  val textWidthBasis: DartObject = native.value,
+  val onSelectionChanged: (DartObject, sart.stdlib.Option[DartObject]) => Unit = native.value,
+  val contextMenuBuilder: (BuildContext, State[?]) => Widget = native.value,
+  val magnifierConfiguration: DartObject = native.value
+) extends StatefulWidget:
+  def textSpan: TextSpan = native.value
+  def selectionEnabled: Boolean = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+object SelectableText:
+  def rich(textSpan: TextSpan, key: Key = native.value, focusNode: FocusNode = native.value, style: TextStyle = native.value, strutStyle: DartObject = native.value, textAlign: TextAlign = native.value, textDirection: DartObject = native.value, textScaleFactor: Double = native.value, textScaler: DartObject = native.value, showCursor: Boolean = native.value, autofocus: Boolean = native.value, toolbarOptions: DartObject = native.value, minLines: Int = native.value, maxLines: Int = native.value, cursorWidth: Double = native.value, cursorHeight: Double = native.value, cursorRadius: Radius = native.value, cursorColor: Color = native.value, selectionColor: Color = native.value, selectionHeightStyle: DartObject = native.value, selectionWidthStyle: DartObject = native.value, dragStartBehavior: DartObject = native.value, enableInteractiveSelection: Boolean = native.value, selectionControls: DartObject = native.value, onTap: () => Unit = native.value, scrollPhysics: DartObject = native.value, scrollBehavior: DartObject = native.value, semanticsLabel: String = native.value, textHeightBehavior: DartObject = native.value, textWidthBasis: DartObject = native.value, onSelectionChanged: (DartObject, sart.stdlib.Option[DartObject]) => Unit = native.value, contextMenuBuilder: (BuildContext, State[?]) => Widget = native.value, magnifierConfiguration: DartObject = native.value): SelectableText = native.value
 
 // ─── divider.dart ────────────────────────────────────────
 
