@@ -1719,6 +1719,13 @@ class DartEmitter(
         recordAnnotations(extensionSym(fn))
         s"${emitExpr(recv)}.${extensionCallName(fn)}(${emitUserCallArgs(extensionSym(fn), args, dropParams = 1)})"
 
+      // Parameterless extension defs (`s.codeUnits`) — the receiver clause
+      // is the only argument list, and Dart-side these are getters.
+      case Apply(fn, List(recv)) if isExtensionRef(fn)
+          && extensionSym(fn).paramSymss.count(_.exists(_.isTerm)) == 1 =>
+        recordAnnotations(extensionSym(fn))
+        s"${selectPrefix(recv)}${extensionCallName(fn)}"
+
       // `opt match { case Some(v) => a; case None => b }` — Dart has no
       // Option, so the match lowers to a null-check on a promoted local
       // named after the binder.
@@ -1878,6 +1885,15 @@ class DartEmitter(
       // Dart's operator precedence matches Scala's grouping — otherwise
       // `(x + 1) % y` silently emits as `x + 1 % y` and reparses as
       // `x + (1 % y)`.
+      // Bitwise/shift operators — Dart and Scala disagree on their
+      // precedence relative to comparisons, so the whole expression is
+      // always parenthesized.
+      case Apply(Select(lhs, op), List(rhs)) if Set("<<", ">>", ">>>", "&", "|", "^").contains(op) =>
+        val l = emitExpr(lhs); val r = emitExpr(rhs)
+        val lp = if needsParensAsReceiver(lhs) then s"($l)" else l
+        val rp = if needsParensAsReceiver(rhs) then s"($r)" else r
+        s"($lp $op $rp)"
+
       case Apply(Select(lhs, op), List(rhs)) if isBinaryOp(op) =>
         val l = emitExpr(lhs); val r = emitExpr(rhs)
         val lp = if needsParensAsReceiver(lhs) then s"($l)" else l
@@ -2057,7 +2073,8 @@ class DartEmitter(
      */
     private val dartMethodNamesNeedingParens = Set(
       "toList", "toSet", "toMap", "toString", "toInt", "toDouble",
-      "trim", "toUpperCase", "toLowerCase", "clear", "dispose"
+      "trim", "toUpperCase", "toLowerCase", "clear", "dispose",
+      "round", "abs", "floor", "ceil"
     )
 
     /** Does this term have an Option-like static type? Covers both the
@@ -2299,6 +2316,13 @@ class DartEmitter(
           case "str" | "toInt" | "toBool" | "isNull" | "toList" if args.isEmpty =>
             return emitMemberAccess(qual, name)
           case _ => ()
+
+      // Index assignment on facade types: `x(k) = v` → `x[k] = v`. Scala
+      // sugars this to `x.update(k, v)` — any @native-owned `update` with
+      // exactly two args is Dart's `[]=` operator.
+      if name == "update" && args.sizeIs == 2
+         && fnSym.exists && hasNative(fnSym.owner) then
+        return s"${emitExpr(qual)}[${emitExpr(args(0))}] = ${emitExpr(args(1))}"
 
       // Future companion constructors: Dart spells them differently.
       if isFutureCompanion(qual) then

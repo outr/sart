@@ -39,7 +39,7 @@ object math:
 
 @native
 @DartImport("dart:math")
-class Random:
+class Random(val seed: Int = native.value):
   def nextInt(max: Int): Int    = native.value
   def nextDouble(): Double       = native.value
   def nextBool(): Boolean        = native.value
