@@ -24,6 +24,12 @@ object DartBool:
   /** Compile-time define — the emitter prefixes `const`. */
   def fromEnvironment(name: String, defaultValue: Boolean = native.value): Boolean = native.value
 
+/** dart:core's top-level `print`. */
+@native
+@DartTopLevel
+object core:
+  def print(obj: Any): Unit = native.value
+
 /** dart:core FormatException — positional message ctor. */
 @native
 class FormatException(message: String = native.value) extends RuntimeException
