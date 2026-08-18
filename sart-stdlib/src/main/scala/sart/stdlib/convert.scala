@@ -32,6 +32,6 @@ object JsonEncoder:
 @native
 @DartImport("dart:convert")
 object utf8:
-  def encode(input: String): List[Int] = native.value
+  def encode(input: String): Uint8List = native.value
   def decode(codeUnits: List[Int]): String = native.value
   def decode(bytes: Uint8List): String = native.value

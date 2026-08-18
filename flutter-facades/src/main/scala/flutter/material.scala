@@ -52,6 +52,7 @@ abstract class State[W <: StatefulWidget] extends DartObject:
   def initState(): Unit = native.value
   def dispose(): Unit = native.value
   def didChangeDependencies(): Unit = native.value
+  def didUpdateWidget(oldWidget: W): Unit = native.value
 
 // ─── State mixins ──────────────────────────────────────────────────────────
 
@@ -139,6 +140,28 @@ class AsyncSnapshot[T] extends DartObject:
   def error: sart.stdlib.Option[Object]     = native.value
   def connectionState: ConnectionState      = native.value
 
+// ─── Autocomplete (curated: FutureOr optionsBuilder and the
+// fieldViewBuilder arity defeat the generator) ─────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class TextEditingValue extends DartObject:
+  def text: String = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+class Autocomplete[V](
+  val optionsBuilder: TextEditingValue => List[V],
+  val displayStringForOption: V => String = native.value,
+  val onSelected: V => Unit = native.value,
+  val fieldViewBuilder: (BuildContext, TextEditingController, FocusNode, () => Unit) => Widget = native.value
+) extends Widget
+
+@native
+@DartImport("package:flutter/material.dart")
+object RawAutocomplete:
+  def defaultStringForOption(option: Any): String = native.value
+
 // ─── Text editing ──────────────────────────────────────────────────────────
 
 // Kept curated: `clear`/`dispose` are inherited from ValueNotifier /
@@ -211,6 +234,18 @@ class StatefulBuilder(
 object foundation:
   def debugPrint(message: String): Unit = native.value
   def kIsWeb: Boolean = native.value
+
+/** dart:ui Shadow (re-exported through material) — `TextStyle.shadows`.
+ *  Curated: the generator only collects BoxShadow, its box-specific
+ *  subclass.
+ */
+@native
+@DartImport("package:flutter/material.dart")
+class Shadow(
+  val color: Color = native.value,
+  val offset: Offset = native.value,
+  val blurRadius: Double = native.value
+) extends DartObject
 
 /** flutter/services' top-level `rootBundle` asset accessor. */
 @native

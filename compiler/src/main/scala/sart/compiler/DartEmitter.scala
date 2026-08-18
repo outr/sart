@@ -2263,11 +2263,12 @@ class DartEmitter(
       // `Dyn` bridge getters — casts and null checks on `dynamic`.
       if isDynReceiver(qual) then
         name match
-          case "str"    => return s"(${emitExpr(qual)} as String)"
-          case "toInt"  => return s"(${emitExpr(qual)} as int)"
-          case "toBool" => return s"(${emitExpr(qual)} as bool)"
-          case "isNull" => return s"(${emitExpr(qual)} == null)"
-          case "toList" => return s"(${emitExpr(qual)} as List<dynamic>)"
+          case "str"      => return s"(${emitExpr(qual)} as String)"
+          case "toInt"    => return s"(${emitExpr(qual)} as int)"
+          case "toDouble" => return s"(${emitExpr(qual)} as num).toDouble()"
+          case "toBool"   => return s"(${emitExpr(qual)} as bool)"
+          case "isNull"   => return s"(${emitExpr(qual)} == null)"
+          case "toList"   => return s"(${emitExpr(qual)} as List<dynamic>)"
           case _        => ()
 
       // Receiver-aware rewrites win first — they may translate to a
@@ -2283,6 +2284,12 @@ class DartEmitter(
       // `int.toDouble()`, `iter.toList()`). Never applies to members of
       // native facade *objects* (`Icons.clear` is an IconData getter, not
       // a call) — facades declare real methods with explicit parens.
+      // `Long.toInt` is an identity: Dart has no long/int split, and Long
+      // only arises from Scala APIs like `Double.round` whose Dart
+      // counterparts already yield `int`.
+      if name == "toInt" && isLongType(qual) then
+        return emitExpr(qual)
+
       if dartMethodNamesNeedingParens(name) && !isNativeSingleton(qual) then
         return s"${selectPrefix(qual)}$name()"
 
@@ -2313,7 +2320,7 @@ class DartEmitter(
       if isDynReceiver(qual) then
         name match
           case "apply" => return s"${emitExpr(qual)}[${emitArgs(args)}]"
-          case "str" | "toInt" | "toBool" | "isNull" | "toList" if args.isEmpty =>
+          case "str" | "toInt" | "toDouble" | "toBool" | "isNull" | "toList" if args.isEmpty =>
             return emitMemberAccess(qual, name)
           case _ => ()
 
@@ -2838,6 +2845,9 @@ class DartEmitter(
 
     private def isFunctionType(tpe: TypeRepr): Boolean =
       tpe.typeSymbol.fullName.matches("scala\\.Function\\d+")
+
+    private def isLongType(t: Term): Boolean =
+      t.tpe.widen.dealias.typeSymbol.fullName == "scala.Long"
 
     /** Extract the items of a Scala varargs argument. Matches both the
      *  `Typed(Repeated(items, _), _)` shape (most common) and a bare

@@ -21,6 +21,7 @@ class Stream[T] extends DartObject:
 object Stream:
   def value[T](v: T): Stream[T]               = native.value
   def fromIterable[T](xs: List[T]): Stream[T] = native.value
+  def periodic[T](period: Duration, computation: Int => T): Stream[T] = native.value
 
 @native
 @DartImport("dart:async")

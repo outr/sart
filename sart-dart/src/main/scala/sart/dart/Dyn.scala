@@ -10,6 +10,7 @@ package sart.dart
  *    - `d(key) = v` → `d[key] = v`    (index assignment)
  *    - `d.str`    → `(d as String)`
  *    - `d.toInt`  → `(d as int)`
+ *    - `d.toDouble` → `(d as num).toDouble()`
  *    - `d.toBool` → `(d as bool)`
  *    - `d.isNull` → `(d == null)`
  *    - `d.toList` → `(d as List<dynamic>)`
@@ -21,6 +22,7 @@ class Dyn extends DartObject:
   def update(key: String, value: Any): Unit = native.value
   def str: String             = native.value
   def toInt: Int              = native.value
+  def toDouble: Double        = native.value
   def toBool: Boolean         = native.value
   def isNull: Boolean         = native.value
   def toList: List[Dyn]       = native.value
