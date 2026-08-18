@@ -186,7 +186,7 @@ class EmitterSuite extends FunSuite:
 
   test("Option.orElse / contains map to nullable polyfills") {
     val body = classBody("FxOptionOps")
-    assert(body.contains("(o ?? d)"),     body)
+    assert(body.contains("(o ?? (d))"),   body)
     assert(body.contains("(o == x)"),     body)
   }
 

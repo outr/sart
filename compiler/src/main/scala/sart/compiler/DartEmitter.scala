@@ -260,6 +260,7 @@ class DartEmitter(
         |    deprecated_member_use: ignore
         |    must_be_immutable: ignore
         |    unnecessary_import: ignore
+        |    experimental_member_use: ignore
         |""".stripMargin, StandardCharsets.UTF_8)
 
   /** Lower-bound Dart SDK version the emitter targets. Single source of
@@ -1513,8 +1514,15 @@ class DartEmitter(
           line(s"final ${vd.name}$init;")
         else
           val declared = emitTypeRef(vd.tpt.tpe)
-          val tpe = if isNullInit && !declared.endsWith("?") && declared != "dynamic" then declared + "?" else declared
-          line(s"${if vd.symbol.flags.is(Flags.Mutable) then "" else "final "}$tpe ${vd.name}$init;")
+          // A null-initialised MUTABLE local of a non-nullable type is the
+          // Scala spelling of Dart's `late T x;` (assigned before read) —
+          // same convention as the field emission.
+          if isNullInit && vd.symbol.flags.is(Flags.Mutable)
+              && !declared.endsWith("?") && declared != "dynamic" then
+            line(s"late $declared ${vd.name};")
+          else
+            val tpe = if isNullInit && !declared.endsWith("?") && declared != "dynamic" then declared + "?" else declared
+            line(s"${if vd.symbol.flags.is(Flags.Mutable) then "" else "final "}$tpe ${vd.name}$init;")
       case Assign(lhs, rhs) =>
         line(s"${emitExpr(lhs)} = ${emitExpr(rhs)};")
       case tryTree: Try =>
@@ -1737,10 +1745,14 @@ class DartEmitter(
 
       // `await(f)` → `(await f)` — the enclosing emitted function is
       // marked `async` by containsAwait detection in emitMethod/emitClosure.
+      // A ternary operand needs its own parens: `await cond ? a : b` parses
+      // as `(await cond) ? a : b`.
       case Apply(TypeApply(Select(q, "apply"), _), List(f)) if isSartRef(q, "sart.dart.await") =>
-        s"(await ${emitExpr(f)})"
+        val e = emitExpr(f)
+        if needsParensAsReceiver(f) then s"(await ($e))" else s"(await $e)"
       case Apply(Select(q, "apply"), List(f)) if isSartRef(q, "sart.dart.await") =>
-        s"(await ${emitExpr(f)})"
+        val e = emitExpr(f)
+        if needsParensAsReceiver(f) then s"(await ($e))" else s"(await $e)"
 
       // `async { body }` in expression position → immediately-invoked
       // async closure. (Whole-method `= async { … }` bodies are unwrapped
@@ -2591,7 +2603,9 @@ class DartEmitter(
       // ── Option (nullable receiver via the sart_option.dart shim) ───
       // `o.orElse(alt)` → `(o ?? alt)`; both are nullable types.
       StdlibRewrite(isNullableOptionReceiver, "orElse", isGetter = false,
-        c => s"(${c.qualExpr} ?? ${c.args})"),
+        // Extra parens on the alternative: a ternary default would rebind
+        // (`a ?? cond ? x : y` parses as `(a ?? cond) ? x : y`).
+        c => s"(${c.qualExpr} ?? (${c.args}))"),
       // `o.contains(x)` → `o == x` — works because Sart maps `Some(x)` to
       // a non-null value and `None` to `null`, so equality is exact.
       StdlibRewrite(isNullableOptionReceiver, "contains", isGetter = false,
@@ -2612,6 +2626,9 @@ class DartEmitter(
       StdlibRewrite(isFutureReceiver, "map",     isGetter = false,
         c => s"${c.prefix}then(${c.args})"),
       StdlibRewrite(isFutureReceiver, "flatMap", isGetter = false,
+        c => s"${c.prefix}then(${c.args})"),
+      // `.foreach` is fire-and-observe — same `.then` on the Dart side.
+      StdlibRewrite(isFutureReceiver, "foreach", isGetter = false,
         c => s"${c.prefix}then(${c.args})"),
 
       // ── Range construction (1 to 10 / 1 until 10) ──────────────────
@@ -3610,8 +3627,16 @@ class DartEmitter(
           // null-check promotion works on the local.
           s"final ${vd.name}$init;"
         else
-          val prefix = if vd.symbol.flags.is(Flags.Mutable) then "" else "final "
-          s"$prefix${emitTypeRef(vd.tpt.tpe)} ${vd.name}$init;"
+          val declared = emitTypeRef(vd.tpt.tpe)
+          // Null-initialised mutable local of a non-nullable type → Dart
+          // `late T x;` (same convention as emitStmt and field emission).
+          if isNullInit && vd.symbol.flags.is(Flags.Mutable)
+              && !declared.endsWith("?") && declared != "dynamic" then
+            s"late $declared ${vd.name};"
+          else
+            val prefix = if vd.symbol.flags.is(Flags.Mutable) then "" else "final "
+            val tpe = if isNullInit && !declared.endsWith("?") && declared != "dynamic" then declared + "?" else declared
+            s"$prefix$tpe ${vd.name}$init;"
       case Assign(lhs, rhs) => s"${emitExpr(lhs)} = ${emitExpr(rhs)};"
       // Statement-position `if` without a meaningful else — a real Dart
       // `if` statement, NOT a ternary (`cond ? voidCall() : null` is a
