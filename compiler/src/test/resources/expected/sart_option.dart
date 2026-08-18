@@ -3,14 +3,15 @@
 // on Dart nullable types.
 
 extension SartOption<T extends Object> on T? {
-  R? map<R extends Object>(R Function(T) f) =>
-    this == null ? null : f(this as T);
+  // `R` is deliberately unbounded: a lambda may itself return a
+  // nullable (Scala `Option`-returning) value, which collapses into
+  // the same `R?` in Dart's nullable lowering.
+  R? map<R>(R Function(T) f) => this == null ? null : f(this as T);
 
-  R? flatMap<R extends Object>(R? Function(T) f) =>
-    this == null ? null : f(this as T);
+  R? flatMap<R>(R? Function(T) f) => this == null ? null : f(this as T);
 
   R fold<R>(R ifEmpty, R Function(T) ifPresent) =>
-    this == null ? ifEmpty : ifPresent(this as T);
+      this == null ? ifEmpty : ifPresent(this as T);
 
   void foreach(void Function(T) f) {
     if (this != null) f(this as T);

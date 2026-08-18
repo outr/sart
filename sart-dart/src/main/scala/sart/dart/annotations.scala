@@ -131,6 +131,12 @@ final class JsonField(val name: String) extends StaticAnnotation
 object nn:
   def apply[T](value: T): T = value
 
+/** Dart's `as` cast: `cast[RenderBox](x)` emits `(x as RenderBox)`;
+ *  `cast[Option[RenderBox]](x)` emits `(x as RenderBox?)`.
+ */
+object cast:
+  def apply[T](value: Any): T = value.asInstanceOf[T]
+
 /** Dart `await`. Usable anywhere in a method or lambda body — the
  *  enclosing emitted function becomes `async`. Compile-only (a Sart app
  *  never runs on the JVM), so the "synchronous" return type is safe.
@@ -159,3 +165,14 @@ object Futures:
    *  `catch` of futures.
    */
   def onError[T](f: scala.concurrent.Future[T], handler: Any => T): scala.concurrent.Future[T] = f
+
+  /** `Futures.microtask(body)` → Dart `Future.microtask(body)`. */
+  def microtask(body: () => Unit): scala.concurrent.Future[Unit] =
+    scala.concurrent.Future.successful(body())
+
+  /** `Futures.delayed(d, body)` → Dart `Future.delayed(d, body)`.
+   *  `duration` is `Any` only because sart-dart can't depend on
+   *  sart-stdlib's Duration facade — pass a `sart.stdlib.Duration`.
+   */
+  def delayed(duration: Any, body: () => Unit): scala.concurrent.Future[Unit] =
+    scala.concurrent.Future.successful(body())

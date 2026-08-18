@@ -63,6 +63,10 @@ trait TickerProviderStateMixin extends DartObject
 
 @native
 @DartImport("package:flutter/material.dart")
+trait SingleTickerProviderStateMixin extends DartObject
+
+@native
+@DartImport("package:flutter/material.dart")
 trait AutomaticKeepAliveClientMixin extends DartObject:
   // Overriders write `override def wantKeepAlive: Boolean = true` — the
   // paren-less def emits as the Dart getter the mixin requires.
@@ -72,6 +76,7 @@ trait AutomaticKeepAliveClientMixin extends DartObject:
 @DartImport("package:flutter/material.dart")
 class BuildContext extends DartObject:
   def mounted: Boolean = native.value
+  def findRenderObject(): DartObject = native.value
 
 @native
 @DartImport("package:flutter/material.dart")
@@ -94,6 +99,7 @@ class MaterialPageRoute[T](
 class NavigatorState extends DartObject:
   def push[T](route: Route[T]): DartObject = native.value
   def pop(): Unit = native.value
+  def pop(result: Any): Unit = native.value
   def pushReplacement[T](route: Route[T]): DartObject = native.value
 
 @native
@@ -141,8 +147,11 @@ class AsyncSnapshot[T] extends DartObject:
 @DartImport("package:flutter/material.dart")
 class TextEditingController extends DartObject:
   var text: String = native.value
+  var selection: flutter.services.TextSelection = native.value
   def clear(): Unit = native.value
   def dispose(): Unit = native.value
+  def addListener(listener: () => Unit): Unit = native.value
+  def removeListener(listener: () => Unit): Unit = native.value
 
 // ─── Keys ──────────────────────────────────────────────────────────────────
 

@@ -51,10 +51,13 @@ class DartEmitter(
       |// on Dart nullable types.
       |
       |extension SartOption<T extends Object> on T? {
-      |  R? map<R extends Object>(R Function(T) f) =>
+      |  // `R` is deliberately unbounded: a lambda may itself return a
+      |  // nullable (Scala `Option`-returning) value, which collapses into
+      |  // the same `R?` in Dart's nullable lowering.
+      |  R? map<R>(R Function(T) f) =>
       |    this == null ? null : f(this as T);
       |
-      |  R? flatMap<R extends Object>(R? Function(T) f) =>
+      |  R? flatMap<R>(R? Function(T) f) =>
       |    this == null ? null : f(this as T);
       |
       |  R fold<R>(R ifEmpty, R Function(T) ifPresent) =>
@@ -249,6 +252,8 @@ class DartEmitter(
         |  errors:
         |    unnecessary_non_null_assertion: ignore
         |    dead_null_aware_expression: ignore
+        |    unnecessary_cast: ignore
+        |    invalid_use_of_protected_member: ignore
         |""".stripMargin, StandardCharsets.UTF_8)
 
   /** Lower-bound Dart SDK version the emitter targets. Single source of
@@ -1410,6 +1415,10 @@ class DartEmitter(
       // void-operand ternary is invalid Dart.
       case ifTerm @ If(_, _, _) if isUnitTyped(ifTerm) =>
         emitStmt(ifTerm)
+      // A Unit-typed trailing `match` stays a statement — a Dart switch
+      // *expression* with void arms is invalid.
+      case m @ Match(_, _) if isUnitTyped(m) =>
+        emitStmt(m)
       case term: Term =>
         if returnLast then line(s"return ${emitExpr(term)};")
         else line(s"${emitExpr(term)};")
@@ -1445,6 +1454,41 @@ class DartEmitter(
         line(s"while (${emitExpr(cond)}) {")
         indent += 1
         emitBodyAsStatements(body, returnLast = false)
+        indent -= 1
+        line("}")
+      // Unit-typed `if` at statement position — a real Dart `if`
+      // statement; a ternary with void operands is invalid Dart.
+      case ifTerm @ If(cond, thenp, elsep) if isUnitTyped(ifTerm) =>
+        line(s"if (${emitExpr(cond)}) {")
+        indent += 1
+        emitBodyAsStatements(thenp, returnLast = false)
+        indent -= 1
+        if isUnitLiteral(elsep) then line("}")
+        else
+          line("} else {")
+          indent += 1
+          emitBodyAsStatements(elsep, returnLast = false)
+          indent -= 1
+          line("}")
+      // Unit-typed `match` at statement position — a Dart switch
+      // *statement* with `case pattern:` labels (Dart 3 has no implicit
+      // fall-through; an empty arm gets an explicit `break` so it doesn't
+      // merge with the next label).
+      case m @ Match(scrutinee, cases) if isUnitTyped(m) =>
+        line(s"switch (${emitExpr(scrutinee)}) {")
+        indent += 1
+        cases.foreach { c =>
+          val usageScope: Tree = c.guard match
+            case Some(g) => Block(List(g), c.rhs)
+            case None    => c.rhs
+          val pat   = emitPattern(c.pattern, usageScope)
+          val guard = c.guard.map(g => s" when ${emitExpr(g)}").getOrElse("")
+          line(s"case $pat$guard:")
+          indent += 1
+          if isUnitLiteral(c.rhs) then line("break;")
+          else emitBodyAsStatements(c.rhs, returnLast = false)
+          indent -= 1
+        }
         indent -= 1
         line("}")
       case term: Term =>
@@ -1570,6 +1614,20 @@ class DartEmitter(
       case Apply(Select(q, "apply"), List(arg)) if isSartRef(q, "sart.dart.nn") =>
         s"${emitExpr(arg)}!"
 
+      // `cast[T](x)` → `(x as T)`.
+      case Apply(TypeApply(Select(q, "apply"), List(t)), List(arg)) if isSartRef(q, "sart.dart.cast") =>
+        s"(${emitExpr(arg)} as ${emitTypeRef(t.tpe)})"
+
+      // `x.isInstanceOf[T]` → `x is T`; `x.asInstanceOf[T]` → `(x as T)`.
+      case TypeApply(Select(recv, "isInstanceOf"), List(t)) =>
+        s"${emitExpr(recv)} is ${emitTypeRef(t.tpe)}"
+      case TypeApply(Select(recv, "asInstanceOf"), List(t)) =>
+        s"(${emitExpr(recv)} as ${emitTypeRef(t.tpe)})"
+      case Apply(TypeApply(Select(recv, "isInstanceOf"), List(t)), Nil) =>
+        s"${emitExpr(recv)} is ${emitTypeRef(t.tpe)}"
+      case Apply(TypeApply(Select(recv, "asInstanceOf"), List(t)), Nil) =>
+        s"(${emitExpr(recv)} as ${emitTypeRef(t.tpe)})"
+
       // `Futures.ensure(f, action)` → `f.whenComplete(action)` — the
       // try/finally of futures.
       case Apply(TypeApply(Select(q, "ensure"), _), List(f, action)) if isSartRef(q, "sart.dart.Futures") =>
@@ -1580,6 +1638,10 @@ class DartEmitter(
         s"${emitExpr(f)}.catchError(${emitExpr(handler)})"
       case Apply(Select(q, "onError"), List(f, handler)) if isSartRef(q, "sart.dart.Futures") =>
         s"${emitExpr(f)}.catchError(${emitExpr(handler)})"
+      case Apply(Select(q, "delayed"), List(d, body)) if isSartRef(q, "sart.dart.Futures") =>
+        s"Future.delayed(${emitExpr(d)}, ${emitExpr(body)})"
+      case Apply(Select(q, "microtask"), List(body)) if isSartRef(q, "sart.dart.Futures") =>
+        s"Future.microtask(${emitExpr(body)})"
 
       // `await(f)` → `(await f)` — the enclosing emitted function is
       // marked `async` by containsAwait detection in emitMethod/emitClosure.
@@ -2131,8 +2193,10 @@ class DartEmitter(
 
       // Generic Scala-getter → Dart-method paren-fix for names whose
       // Dart counterpart is a method on most receivers (e.g.
-      // `int.toDouble()`, `iter.toList()`).
-      if dartMethodNamesNeedingParens(name) then
+      // `int.toDouble()`, `iter.toList()`). Never applies to members of
+      // native facade *objects* (`Icons.clear` is an IconData getter, not
+      // a call) — facades declare real methods with explicit parens.
+      if dartMethodNamesNeedingParens(name) && !isNativeSingleton(qual) then
         return s"${selectPrefix(qual)}$name()"
 
       s"${selectPrefix(qual)}$name"
@@ -2489,6 +2553,15 @@ class DartEmitter(
         c => s"int.parse(${c.qualExpr})"),
       StdlibRewrite(isStringReceiver, "toDouble", isGetter = true,
         c => s"double.parse(${c.qualExpr})"),
+      // Java's `String.replace` (all occurrences, literal match) is
+      // Dart's `replaceAll`.
+      StdlibRewrite(isStringReceiver, "replace", isGetter = false,
+        c => s"${c.qualExpr}.replaceAll(${c.argList(0)}, ${c.argList(1)})"),
+      // tryParse returns null on failure — exactly Option's Dart shape.
+      StdlibRewrite(isStringReceiver, "toIntOption", isGetter = true,
+        c => s"int.tryParse(${c.qualExpr})"),
+      StdlibRewrite(isStringReceiver, "toDoubleOption", isGetter = true,
+        c => s"double.tryParse(${c.qualExpr})"),
       // Scala's `stripMargin` strips leading whitespace + `|` per line.
       // Mirror with a Dart regex: every match of `^\s*\|` becomes ''.
       StdlibRewrite(isStringReceiver, "stripMargin", isGetter = true,
@@ -2636,7 +2709,9 @@ class DartEmitter(
       Set("+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">=", "&&", "||").contains(op)
 
     private def isStringType(tpe: TypeRepr): Boolean =
-      val fq = tpe.typeSymbol.fullName
+      // `widen` first: a bare parameter/val receiver types as a TermRef
+      // singleton, whose `typeSymbol` is NOT the underlying class.
+      val fq = tpe.widen.dealias.typeSymbol.fullName
       fq == "java.lang.String" || fq == "scala.Predef.String" ||
       // `s.toInt` etc. flow through Predef's `augmentString` implicit
       // wrapper, which gives the receiver type `StringOps` even though
@@ -3138,6 +3213,35 @@ class DartEmitter(
         s"if (${emitExpr(cond)}) { ${stmtInline(thenp)} }"
       case If(cond, thenp, elsep) =>
         s"if (${emitExpr(cond)}) { ${stmtInline(thenp)} } else { ${stmtInline(elsep)} }"
+      // A lambda-shaped block is a single expression — don't tear it apart.
+      case b @ Block(List(_: DefDef), _: Closure) =>
+        s"${emitExpr(b)};"
+      // Statement-position block (e.g. a multi-statement `if` branch) —
+      // splice the statements instead of wrapping them in an IIFE, so
+      // statement-only constructs (`while`, statement `if`) stay legal.
+      case Block(stats, expr) =>
+        val sb = new StringBuilder
+        stats.foreach { s => sb.append(stmtInline(s)).append(' ') }
+        expr match
+          case Literal(c) if c.value == () => ()
+          case term: Term                  => sb.append(stmtInline(term))
+          case _                           => ()
+        sb.toString.trim
+      case While(cond, body) =>
+        s"while (${emitExpr(cond)}) { ${stmtInline(body)} }"
+      // Unit-typed `match` inline — a Dart switch *statement* (see the
+      // block-form twin in `emitStmt`).
+      case m @ Match(scrutinee, cases) if isUnitTyped(m) =>
+        val arms = cases.map { c =>
+          val usageScope: Tree = c.guard match
+            case Some(g) => Block(List(g), c.rhs)
+            case None    => c.rhs
+          val pat   = emitPattern(c.pattern, usageScope)
+          val guard = c.guard.map(g => s" when ${emitExpr(g)}").getOrElse("")
+          val body  = if isUnitLiteral(c.rhs) then "break;" else stmtInline(c.rhs)
+          s"case $pat$guard: $body"
+        }.mkString(" ")
+        s"switch (${emitExpr(scrutinee)}) { $arms }"
       case term: Term       => s"${emitExpr(term)};"
       case _                => s"/* TODO stmt-inline */"
 
