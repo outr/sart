@@ -212,6 +212,12 @@ object foundation:
   def debugPrint(message: String): Unit = native.value
   def kIsWeb: Boolean = native.value
 
+/** flutter/services' top-level `rootBundle` asset accessor. */
+@native
+@DartImport("package:flutter/services.dart")
+object rootBundle:
+  def loadString(key: String): scala.concurrent.Future[String] = native.value
+
 // ─── Canvas / painting (curated: dart:ui types with cascade-style
 // mutation and subclassable CustomPainter) ─────────────────────────────────
 
