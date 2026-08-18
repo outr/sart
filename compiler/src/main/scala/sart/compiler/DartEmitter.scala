@@ -259,6 +259,7 @@ class DartEmitter(
         |    invalid_use_of_protected_member: ignore
         |    deprecated_member_use: ignore
         |    must_be_immutable: ignore
+        |    unnecessary_import: ignore
         |""".stripMargin, StandardCharsets.UTF_8)
 
   /** Lower-bound Dart SDK version the emitter targets. Single source of
@@ -2335,7 +2336,9 @@ class DartEmitter(
 
       // Option's identity unwrap can arrive via the generic TypeApply
       // fallback (`(if a then x else y).orNull`) — always the receiver.
-      if name == "orNull" && isOptionReceiver(qual) then
+      // Name-based: `orNull` only exists on Option (scala's and ours) and
+      // union-typed receivers can defeat the type check.
+      if name == "orNull" then
         return emitExpr(qual)
 
       // Receiver-aware rewrites win first — they may translate to a
@@ -3668,6 +3671,10 @@ class DartEmitter(
         // The dynamic bridge: Sart's face of Dart `dynamic`.
         case "sart.dart.Dyn" =>
           return "dynamic"
+        // `None.type` — appears as the result type of synthesised default
+        // getters whose default is `None`. The value is always `null`.
+        case "sart.stdlib.None" | "scala.None" | "sart.stdlib.None$" | "scala.None$" =>
+          return "Null"
         case "sart.stdlib.Option" | "scala.Option" =>
           // Both the hand-ported `sart.stdlib.Option` and Scala's built-in
           // `scala.Option` map to Dart's `T?` nullable. Flag the shim AND
