@@ -403,3 +403,8 @@ class WidgetsBindingInstance extends DartObject:
 @DartImport("package:flutter/material.dart")
 object WidgetsBinding:
   def instance: WidgetsBindingInstance = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+object WidgetsFlutterBinding:
+  def ensureInitialized(): WidgetsBindingInstance = native.value

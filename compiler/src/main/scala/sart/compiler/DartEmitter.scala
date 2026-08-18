@@ -1577,6 +1577,11 @@ class DartEmitter(
       // `Select` fallbacks or those would swallow the reference.
       case t if isSartRef(t, "sart.stdlib.None") => "null"
       case t if isSartRef(t, "scala.None") => "null"
+      // `nullValue[T]` — typed null for primitive-typed facade params.
+      case TypeApply(fn, _) if fn.symbol.exists && fn.symbol.name == "nullValue"
+          && fn.symbol.fullName.startsWith("sart.dart") => "null"
+      case t if t.symbol.exists && t.symbol.name == "nullValue"
+          && t.symbol.fullName.startsWith("sart.dart") => "null"
       // `Double.PositiveInfinity` → `double.infinity` (`width: double.infinity`
       // is the Flutter fill-the-parent idiom).
       case Select(Ident("Double"), "PositiveInfinity") => "double.infinity"
@@ -2437,6 +2442,11 @@ class DartEmitter(
         case other                 => emitExpr(other)
       }
       val argStr = argList.mkString(", ")
+
+      // `String.fromEnvironment` / `bool.fromEnvironment` are const
+      // constructors — Dart requires the invocation itself to be const.
+      if name == "fromEnvironment" then
+        return s"const ${selectPrefix(qual, name)}$name($argStr)"
 
       stdlibRewrite(qual, name, isGetter = false, argList, argStr) match
         case Some(rendered) => rendered

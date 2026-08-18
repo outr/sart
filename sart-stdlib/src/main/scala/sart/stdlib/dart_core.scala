@@ -10,11 +10,19 @@ import sart.dart.*
 @DartName("String")
 object DartString:
   def fromCharCodes(charCodes: Uint8List): String = native.value
+  /** Compile-time define — the emitter prefixes `const`. */
+  def fromEnvironment(name: String, defaultValue: String = native.value): String = native.value
 
 @native
 @DartName("int")
 object DartInt:
   def parse(source: String, radix: Int = native.value): Int = native.value
+
+@native
+@DartName("bool")
+object DartBool:
+  /** Compile-time define — the emitter prefixes `const`. */
+  def fromEnvironment(name: String, defaultValue: Boolean = native.value): Boolean = native.value
 
 /** dart:core FormatException — positional message ctor. */
 @native

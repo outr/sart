@@ -137,6 +137,12 @@ object nn:
 object cast:
   def apply[T](value: Any): T = value.asInstanceOf[T]
 
+/** A typed `null` literal — for facade params whose Dart type is nullable
+ *  but whose Scala facade type is a primitive Scala can't null
+ *  (`TextField(maxLines = nullValue, expands = true)`). Emits `null`.
+ */
+def nullValue[T]: T = throw new Error("sart.dart.nullValue evaluated at runtime — Sart apps only run as Dart")
+
 /** Dart `await`. Usable anywhere in a method or lambda body — the
  *  enclosing emitted function becomes `async`. Compile-only (a Sart app
  *  never runs on the JVM), so the "synchronous" return type is safe.
