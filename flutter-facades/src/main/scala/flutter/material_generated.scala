@@ -869,6 +869,19 @@ abstract class RenderBox extends DartObject:
   def debugPaintPointers(context: DartObject, offset: Offset): Unit = native.value
   def debugFillProperties(properties: DartObject): Unit = native.value
 
+// ─── proxy_box.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class HitTestBehavior extends DartObject
+
+@native
+@DartImport("package:flutter/material.dart")
+object HitTestBehavior:
+  val deferToChild: HitTestBehavior = native.value
+  val opaque: HitTestBehavior = native.value
+  val translucent: HitTestBehavior = native.value
+
 // ─── layer.dart ────────────────────────────────────────
 
 @native
@@ -892,6 +905,17 @@ object WrapAlignment:
   val spaceBetween: WrapAlignment = native.value
   val spaceAround: WrapAlignment = native.value
   val spaceEvenly: WrapAlignment = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+class WrapCrossAlignment extends DartObject
+
+@native
+@DartImport("package:flutter/material.dart")
+object WrapCrossAlignment:
+  val start: WrapCrossAlignment = native.value
+  val `end`: WrapCrossAlignment = native.value
+  val center: WrapCrossAlignment = native.value
 
 // ─── table.dart ────────────────────────────────────────
 
@@ -986,6 +1010,18 @@ object Text:
   def rich(textSpan: InlineSpan, key: Key = native.value, style: TextStyle = native.value, strutStyle: DartObject = native.value, textAlign: TextAlign = native.value, textDirection: DartObject = native.value, locale: DartObject = native.value, softWrap: Boolean = native.value, overflow: TextOverflow = native.value, textScaleFactor: Double = native.value, textScaler: DartObject = native.value, maxLines: Int = native.value, semanticsLabel: String = native.value, semanticsIdentifier: String = native.value, textWidthBasis: DartObject = native.value, textHeightBehavior: DartObject = native.value, selectionColor: Color = native.value): Text = native.value
 
 // ─── basic.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class CustomPaint(
+  val key: Key = native.value,
+  val painter: DartObject = native.value,
+  val foregroundPainter: DartObject = native.value,
+  val size: Size = native.value,
+  val isComplex: Boolean = native.value,
+  val willChange: Boolean = native.value,
+  val child: Widget = native.value
+) extends Widget
 
 @native
 @DartImport("package:flutter/material.dart")
@@ -1155,12 +1191,55 @@ class Wrap(
   val spacing: Double = native.value,
   val runAlignment: WrapAlignment = native.value,
   val runSpacing: Double = native.value,
-  val crossAxisAlignment: DartObject = native.value,
+  val crossAxisAlignment: WrapCrossAlignment = native.value,
   val textDirection: DartObject = native.value,
   val verticalDirection: DartObject = native.value,
   val clipBehavior: Clip = native.value,
   val children: List[Widget] = native.value
 ) extends Widget
+
+@native
+@DartImport("package:flutter/material.dart")
+class Listener(
+  val key: Key = native.value,
+  val onPointerDown: DartObject => Unit = native.value,
+  val onPointerMove: DartObject => Unit = native.value,
+  val onPointerUp: DartObject => Unit = native.value,
+  val onPointerHover: DartObject => Unit = native.value,
+  val onPointerCancel: DartObject => Unit = native.value,
+  val onPointerPanZoomStart: DartObject => Unit = native.value,
+  val onPointerPanZoomUpdate: DartObject => Unit = native.value,
+  val onPointerPanZoomEnd: DartObject => Unit = native.value,
+  val onPointerSignal: DartObject => Unit = native.value,
+  val behavior: HitTestBehavior = native.value,
+  val child: Widget = native.value
+) extends Widget
+
+@native
+@DartImport("package:flutter/material.dart")
+class MouseRegion(
+  val key: Key = native.value,
+  val onEnter: DartObject => Unit = native.value,
+  val onExit: DartObject => Unit = native.value,
+  val onHover: DartObject => Unit = native.value,
+  val cursor: DartObject = native.value,
+  val opaque: Boolean = native.value,
+  val hitTestBehavior: HitTestBehavior = native.value,
+  val child: Widget = native.value
+) extends Widget
+
+@native
+@DartImport("package:flutter/material.dart")
+class RepaintBoundary(
+  val key: Key = native.value,
+  val child: Widget = native.value
+) extends Widget
+
+@native
+@DartImport("package:flutter/material.dart")
+object RepaintBoundary:
+  def wrap(child: Widget, childIndex: Int): RepaintBoundary = native.value
+  def wrapAll(widgets: List[Widget]): List[RepaintBoundary] = native.value
 
 @native
 @DartImport("package:flutter/material.dart")
@@ -1177,6 +1256,15 @@ class Builder(
   val key: Key = native.value,
   val builder: BuildContext => Widget
 ) extends StatelessWidget
+
+@native
+@DartImport("package:flutter/material.dart")
+class ColoredBox(
+  val color: Color,
+  val isAntiAlias: Boolean = native.value,
+  val child: Widget = native.value,
+  val key: Key = native.value
+) extends Widget
 
 // ─── container.dart ────────────────────────────────────────
 
@@ -1260,16 +1348,16 @@ class ListView(
   val keyboardDismissBehavior: DartObject = native.value,
   val restorationId: String = native.value,
   val clipBehavior: Clip = native.value,
-  val hitTestBehavior: DartObject = native.value
+  val hitTestBehavior: HitTestBehavior = native.value
 ) extends StatelessWidget:
   def childrenDelegate: DartObject = native.value
 
 @native
 @DartImport("package:flutter/material.dart")
 object ListView:
-  def builder(key: Key = native.value, scrollDirection: Axis = native.value, reverse: Boolean = native.value, controller: ScrollController = native.value, primary: Boolean = native.value, physics: DartObject = native.value, shrinkWrap: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, itemExtent: Double = native.value, itemExtentBuilder: (Int, DartObject) => sart.stdlib.Option[Double] = native.value, prototypeItem: Widget = native.value, itemBuilder: (BuildContext, Int) => sart.stdlib.Option[Widget], findChildIndexCallback: Key => sart.stdlib.Option[Int] = native.value, itemCount: Int = native.value, addAutomaticKeepAlives: Boolean = native.value, addRepaintBoundaries: Boolean = native.value, addSemanticIndexes: Boolean = native.value, cacheExtent: Double = native.value, scrollCacheExtent: DartObject = native.value, semanticChildCount: Int = native.value, dragStartBehavior: DartObject = native.value, keyboardDismissBehavior: DartObject = native.value, restorationId: String = native.value, clipBehavior: Clip = native.value, hitTestBehavior: DartObject = native.value): ListView = native.value
-  def separated(key: Key = native.value, scrollDirection: Axis = native.value, reverse: Boolean = native.value, controller: ScrollController = native.value, primary: Boolean = native.value, physics: DartObject = native.value, shrinkWrap: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, itemBuilder: (BuildContext, Int) => sart.stdlib.Option[Widget], findChildIndexCallback: Key => sart.stdlib.Option[Int] = native.value, findItemIndexCallback: Key => sart.stdlib.Option[Int] = native.value, separatorBuilder: (BuildContext, Int) => Widget, itemCount: Int, addAutomaticKeepAlives: Boolean = native.value, addRepaintBoundaries: Boolean = native.value, addSemanticIndexes: Boolean = native.value, cacheExtent: Double = native.value, scrollCacheExtent: DartObject = native.value, dragStartBehavior: DartObject = native.value, keyboardDismissBehavior: DartObject = native.value, restorationId: String = native.value, clipBehavior: Clip = native.value, hitTestBehavior: DartObject = native.value): ListView = native.value
-  def custom(key: Key = native.value, scrollDirection: Axis = native.value, reverse: Boolean = native.value, controller: ScrollController = native.value, primary: Boolean = native.value, physics: DartObject = native.value, shrinkWrap: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, itemExtent: Double = native.value, prototypeItem: Widget = native.value, itemExtentBuilder: (Int, DartObject) => sart.stdlib.Option[Double] = native.value, childrenDelegate: DartObject, cacheExtent: Double = native.value, scrollCacheExtent: DartObject = native.value, semanticChildCount: Int = native.value, dragStartBehavior: DartObject = native.value, keyboardDismissBehavior: DartObject = native.value, restorationId: String = native.value, clipBehavior: Clip = native.value, hitTestBehavior: DartObject = native.value): ListView = native.value
+  def builder(key: Key = native.value, scrollDirection: Axis = native.value, reverse: Boolean = native.value, controller: ScrollController = native.value, primary: Boolean = native.value, physics: DartObject = native.value, shrinkWrap: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, itemExtent: Double = native.value, itemExtentBuilder: (Int, DartObject) => sart.stdlib.Option[Double] = native.value, prototypeItem: Widget = native.value, itemBuilder: (BuildContext, Int) => sart.stdlib.Option[Widget], findChildIndexCallback: Key => sart.stdlib.Option[Int] = native.value, itemCount: Int = native.value, addAutomaticKeepAlives: Boolean = native.value, addRepaintBoundaries: Boolean = native.value, addSemanticIndexes: Boolean = native.value, cacheExtent: Double = native.value, scrollCacheExtent: DartObject = native.value, semanticChildCount: Int = native.value, dragStartBehavior: DartObject = native.value, keyboardDismissBehavior: DartObject = native.value, restorationId: String = native.value, clipBehavior: Clip = native.value, hitTestBehavior: HitTestBehavior = native.value): ListView = native.value
+  def separated(key: Key = native.value, scrollDirection: Axis = native.value, reverse: Boolean = native.value, controller: ScrollController = native.value, primary: Boolean = native.value, physics: DartObject = native.value, shrinkWrap: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, itemBuilder: (BuildContext, Int) => sart.stdlib.Option[Widget], findChildIndexCallback: Key => sart.stdlib.Option[Int] = native.value, findItemIndexCallback: Key => sart.stdlib.Option[Int] = native.value, separatorBuilder: (BuildContext, Int) => Widget, itemCount: Int, addAutomaticKeepAlives: Boolean = native.value, addRepaintBoundaries: Boolean = native.value, addSemanticIndexes: Boolean = native.value, cacheExtent: Double = native.value, scrollCacheExtent: DartObject = native.value, dragStartBehavior: DartObject = native.value, keyboardDismissBehavior: DartObject = native.value, restorationId: String = native.value, clipBehavior: Clip = native.value, hitTestBehavior: HitTestBehavior = native.value): ListView = native.value
+  def custom(key: Key = native.value, scrollDirection: Axis = native.value, reverse: Boolean = native.value, controller: ScrollController = native.value, primary: Boolean = native.value, physics: DartObject = native.value, shrinkWrap: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, itemExtent: Double = native.value, prototypeItem: Widget = native.value, itemExtentBuilder: (Int, DartObject) => sart.stdlib.Option[Double] = native.value, childrenDelegate: DartObject, cacheExtent: Double = native.value, scrollCacheExtent: DartObject = native.value, semanticChildCount: Int = native.value, dragStartBehavior: DartObject = native.value, keyboardDismissBehavior: DartObject = native.value, restorationId: String = native.value, clipBehavior: Clip = native.value, hitTestBehavior: HitTestBehavior = native.value): ListView = native.value
 
 // ─── gesture_detector.dart ────────────────────────────────────────
 
@@ -1336,7 +1424,7 @@ class GestureDetector(
   val onScaleStart: DartObject => Unit = native.value,
   val onScaleUpdate: DartObject => Unit = native.value,
   val onScaleEnd: DartObject => Unit = native.value,
-  val behavior: DartObject = native.value,
+  val behavior: HitTestBehavior = native.value,
   val excludeFromSemantics: Boolean = native.value,
   val dragStartBehavior: DartObject = native.value,
   val trackpadScrollCausesScale: Boolean = native.value,
@@ -1489,7 +1577,7 @@ class SingleChildScrollView(
   val child: Widget = native.value,
   val dragStartBehavior: DartObject = native.value,
   val clipBehavior: Clip = native.value,
-  val hitTestBehavior: DartObject = native.value,
+  val hitTestBehavior: HitTestBehavior = native.value,
   val restorationId: String = native.value,
   val keyboardDismissBehavior: DartObject = native.value
 ) extends StatelessWidget
@@ -1644,6 +1732,57 @@ class TableCell(
   val verticalAlignment: TableCellVerticalAlignment = native.value,
   val child: Widget
 ) extends StatelessWidget
+
+// ─── layout_builder.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class LayoutBuilder(
+  val key: Key = native.value,
+  val builder: (BuildContext, BoxConstraints) => Widget
+) extends Widget
+
+// ─── interactive_viewer.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class InteractiveViewer(
+  val key: Key = native.value,
+  val clipBehavior: Clip = native.value,
+  val panAxis: DartObject = native.value,
+  val boundaryMargin: EdgeInsets = native.value,
+  val constrained: Boolean = native.value,
+  val maxScale: Double = native.value,
+  val minScale: Double = native.value,
+  val interactionEndFrictionCoefficient: Double = native.value,
+  val onInteractionEnd: DartObject => Unit = native.value,
+  val onInteractionStart: DartObject => Unit = native.value,
+  val onInteractionUpdate: DartObject => Unit = native.value,
+  val panEnabled: Boolean = native.value,
+  val scaleEnabled: Boolean = native.value,
+  val scaleFactor: Double = native.value,
+  val transformationController: TransformationController = native.value,
+  val alignment: Alignment = native.value,
+  val trackpadScrollCausesScale: Boolean = native.value,
+  val child: Widget
+) extends StatefulWidget:
+  def builder: (BuildContext, DartObject) => Widget = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+object InteractiveViewer:
+  def builder(key: Key = native.value, clipBehavior: Clip = native.value, panAxis: DartObject = native.value, boundaryMargin: EdgeInsets = native.value, maxScale: Double = native.value, minScale: Double = native.value, interactionEndFrictionCoefficient: Double = native.value, onInteractionEnd: DartObject => Unit = native.value, onInteractionStart: DartObject => Unit = native.value, onInteractionUpdate: DartObject => Unit = native.value, panEnabled: Boolean = native.value, scaleEnabled: Boolean = native.value, scaleFactor: Double = native.value, transformationController: TransformationController = native.value, alignment: Alignment = native.value, trackpadScrollCausesScale: Boolean = native.value, builder: (BuildContext, DartObject) => Widget): InteractiveViewer = native.value
+  def getNearestPointOnLine(point: DartObject, l1: DartObject, l2: DartObject): DartObject = native.value
+  def getAxisAlignedBoundingBox(quad: DartObject): DartObject = native.value
+  def pointIsInside(point: DartObject, quad: DartObject): Boolean = native.value
+  def getNearestPointInside(point: DartObject, quad: DartObject): DartObject = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+class TransformationController(
+  val value: DartObject = native.value
+) extends ChangeNotifier:
+  def toScene(viewportPoint: Offset): Offset = native.value
 
 // ─── media_query.dart ────────────────────────────────────────
 
@@ -11250,7 +11389,7 @@ class SnackBar(
   val padding: EdgeInsetsGeometry = native.value,
   val width: Double = native.value,
   val shape: DartObject = native.value,
-  val hitTestBehavior: DartObject = native.value,
+  val hitTestBehavior: HitTestBehavior = native.value,
   val behavior: DartObject = native.value,
   val action: StatefulWidget = native.value,
   val actionOverflowThreshold: Double = native.value,
@@ -11468,6 +11607,18 @@ class Divider(
 @DartImport("package:flutter/material.dart")
 object Divider:
   def createBorderSide(context: BuildContext, color: Color = native.value, width: Double = native.value): BorderSide = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+class VerticalDivider(
+  val key: Key = native.value,
+  val width: Double = native.value,
+  val thickness: Double = native.value,
+  val indent: Double = native.value,
+  val endIndent: Double = native.value,
+  val color: Color = native.value,
+  val radius: BorderRadiusGeometry = native.value
+) extends StatelessWidget
 
 // ─── elevated_button.dart ────────────────────────────────────────
 

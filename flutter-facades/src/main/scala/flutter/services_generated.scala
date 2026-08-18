@@ -84,6 +84,33 @@ object AutofillHints:
 
 @native
 @DartImport("package:flutter/services.dart")
+class TextInputType extends DartObject:
+  def index: Int = native.value
+  def signed: Boolean = native.value
+  def decimal: Boolean = native.value
+  def toJson(): Map[String, Any] = native.value
+
+@native
+@DartImport("package:flutter/services.dart")
+object TextInputType:
+  def text: TextInputType = native.value
+  def multiline: TextInputType = native.value
+  def number: TextInputType = native.value
+  def phone: TextInputType = native.value
+  def datetime: TextInputType = native.value
+  def emailAddress: TextInputType = native.value
+  def url: TextInputType = native.value
+  def visiblePassword: TextInputType = native.value
+  def name: TextInputType = native.value
+  def streetAddress: TextInputType = native.value
+  def none: TextInputType = native.value
+  def webSearch: TextInputType = native.value
+  def twitter: TextInputType = native.value
+  def values: List[TextInputType] = native.value
+  def numberWithOptions(signed: Boolean = native.value, decimal: Boolean = native.value): TextInputType = native.value
+
+@native
+@DartImport("package:flutter/services.dart")
 class TextInput extends DartObject:
   def scribbleInProgress: Boolean = native.value
 

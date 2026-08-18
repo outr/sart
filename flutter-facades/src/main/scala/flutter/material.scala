@@ -169,7 +169,10 @@ class Semantics(
   val container: Boolean = native.value,
   val label: String = native.value,
   val tooltip: String = native.value,
-  val enabled: Boolean = native.value
+  val enabled: Boolean = native.value,
+  val button: Boolean = native.value,
+  val selected: Boolean = native.value,
+  val textField: Boolean = native.value
 ) extends StatelessWidget
 
 // Curated: RichText's real parent chain (MultiChildRenderObjectWidget)
@@ -193,6 +196,92 @@ class StatefulBuilder(
   val builder: (BuildContext, (() => Unit) => Unit) => Widget,
   val key: Key = native.value
 ) extends StatefulWidget
+
+// ─── Canvas / painting (curated: dart:ui types with cascade-style
+// mutation and subclassable CustomPainter) ─────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class Paint() extends DartObject:
+  var color: Color = native.value
+  var strokeWidth: Double = native.value
+  var style: PaintingStyle = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+class PaintingStyle extends DartObject
+
+@native
+@DartImport("package:flutter/material.dart")
+object PaintingStyle:
+  val fill: PaintingStyle = native.value
+  val stroke: PaintingStyle = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+class Path() extends DartObject:
+  def moveTo(x: Double, y: Double): Unit = native.value
+  def lineTo(x: Double, y: Double): Unit = native.value
+  def close(): Unit = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+class Canvas extends DartObject:
+  def drawLine(p1: Offset, p2: Offset, paint: Paint): Unit = native.value
+  def drawPath(path: Path, paint: Paint): Unit = native.value
+  def drawCircle(c: Offset, radius: Double, paint: Paint): Unit = native.value
+  def drawRect(rect: DartObject, paint: Paint): Unit = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+abstract class CustomPainter extends DartObject:
+  def paint(canvas: Canvas, size: Size): Unit = native.value
+  def shouldRepaint(oldDelegate: CustomPainter): Boolean = native.value
+
+// vector_math_64's Matrix4 (re-exported through flutter/widgets).
+@native
+@DartImport("package:flutter/material.dart")
+class Matrix4 extends DartObject:
+  def translateByDouble(x: Double, y: Double, z: Double, w: Double): Unit = native.value
+  def scaleByDouble(x: Double, y: Double, z: Double, w: Double): Unit = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+object Matrix4:
+  def identity(): Matrix4 = native.value
+
+// Animation driver — curated so `vsync = this` (a TickerProvider mixin
+// receiver) types without the mixin surface.
+@native
+@DartImport("package:flutter/material.dart")
+class AnimationController(
+  val vsync: Any,
+  val duration: sart.stdlib.Duration = native.value
+) extends DartObject:
+  def addListener(listener: () => Unit): Unit = native.value
+  def removeListener(listener: () => Unit): Unit = native.value
+  def repeat(): DartObject = native.value
+  def stop(): Unit = native.value
+  def dispose(): Unit = native.value
+
+// Pointer/gesture payloads reach facades as DartObject — cast to these.
+@native
+@DartImport("package:flutter/material.dart")
+class PointerEvent extends DartObject:
+  def buttons: Int = native.value
+  def localPosition: Offset = native.value
+  def position: Offset = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+class TapUpDetails extends DartObject:
+  def localPosition: Offset = native.value
+
+@native
+@DartImport("package:flutter/gestures.dart")
+@DartTopLevel
+object gestures:
+  def kPrimaryButton: Int = native.value
 
 // ─── Material colors ───────────────────────────────────────────────────────
 
