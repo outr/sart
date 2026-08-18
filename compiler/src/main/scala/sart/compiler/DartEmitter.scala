@@ -1024,10 +1024,12 @@ class DartEmitter(
             .getOrElse(src)
         case "scala.collection.immutable.Map" =>
           arg1 match
-            case Some(v) if v.dealias.typeSymbol.fullName == "java.lang.String" =>
-              s"($src as Map<String, dynamic>).map((k, v) => MapEntry(k, v as String))"
-            case Some(v) if isJsonObjectLike(v) =>
-              s"($src as Map<String, dynamic>).map((k, v) => MapEntry(k, ${v.typeSymbol.name}.fromJson(v as Map<String, dynamic>)))"
+            // Dyn-valued maps stay raw; every other value type decodes
+            // element-wise through this same dispatcher.
+            case Some(vt) if vt.dealias.typeSymbol.fullName == "sart.dart.Dyn" =>
+              s"($src as Map<String, dynamic>)"
+            case Some(vt) =>
+              s"($src as Map<String, dynamic>).map((k, v) => MapEntry(k, ${jsonDecodeExpr(vt, "v")}))"
             case _ => s"($src as Map<String, dynamic>)"
         case _ if sym.flags.is(Flags.Case) || (sym.flags.is(Flags.Sealed) && hasJsonModel(sym)) =>
           s"${sym.name}.fromJson($src as Map<String, dynamic>)"
@@ -1379,7 +1381,9 @@ class DartEmitter(
       // hoisting into a single call. Without this, method bodies that
       // construct a widget tree with a mix of named+default args emit with
       // an ugly prelude of intermediate vals.
-      case block @ Block(stats, _: Term) if stats.nonEmpty && stats.forall { case _: ValDef => true; case _ => false } =>
+      case block @ Block(stats, expr: Term)
+        if stats.nonEmpty && stats.forall { case _: ValDef => true; case _ => false }
+           && !isStatementOnlyTerm(expr) =>
         emitTerminal(block, returnLast)
       case Block(stats, expr) =>
         stats.foreach(emitStmt)
@@ -1438,6 +1442,10 @@ class DartEmitter(
           line("}")
 
     private def emitTerminal(t: Tree, returnLast: Boolean): Unit = t match
+      // Wrappers are transparent — unwrap so statement-only constructs
+      // (Unit `if`, `try`, `match`) are recognized beneath them.
+      case Typed(inner: Term, _)      => emitTerminal(inner, returnLast)
+      case Inlined(_, _, inner: Term) => emitTerminal(inner, returnLast)
       case Literal(c) if c.value == () =>
         () // nothing to emit; a Unit-valued body trails off
       case w: While =>
@@ -1450,6 +1458,9 @@ class DartEmitter(
       // *expression* with void arms is invalid.
       case m @ Match(_, _) if isUnitTyped(m) =>
         emitStmt(m)
+      // A trailing try/catch renders as the statement form.
+      case tryTree: Try =>
+        emitTryStatement(tryTree, returnLast)
       case term: Term =>
         if returnLast then line(s"return ${emitExpr(term)};")
         else line(s"${emitExpr(term)};")
@@ -1475,7 +1486,7 @@ class DartEmitter(
           line(s"final ${vd.name}$init;")
         else
           val declared = emitTypeRef(vd.tpt.tpe)
-          val tpe = if isNullInit && !declared.endsWith("?") then declared + "?" else declared
+          val tpe = if isNullInit && !declared.endsWith("?") && declared != "dynamic" then declared + "?" else declared
           line(s"${if vd.symbol.flags.is(Flags.Mutable) then "" else "final "}$tpe ${vd.name}$init;")
       case Assign(lhs, rhs) =>
         line(s"${emitExpr(lhs)} = ${emitExpr(rhs)};")
@@ -2639,6 +2650,20 @@ class DartEmitter(
 
     private def isUnitTyped(t: Term): Boolean =
       t.tpe.typeSymbol.fullName == "scala.Unit"
+
+    /** Trees that only have a statement rendering in Dart — a trailing
+     *  one must NOT be routed through the expression/temp-val-inline
+     *  path (a Unit `if` becomes a void ternary; a `try`/`while` has no
+     *  expression form at all).
+     */
+    private def isStatementOnlyTerm(t: Term): Boolean = t match
+      case Typed(e, _)      => isStatementOnlyTerm(e)
+      case Inlined(_, _, e) => isStatementOnlyTerm(e)
+      case i @ If(_, _, _)  => isUnitTyped(i)
+      case m @ Match(_, _)  => isUnitTyped(m)
+      case _: Try           => isUnitTyped(t)
+      case _: While         => true
+      case _                => false
 
     /** Record the annotations of a bare Ident's owning facade object (and
      *  its companions) — no-op for non-facade owners.
