@@ -845,12 +845,26 @@ class DartEmitter(
       // shadowing field would leave Widget.key null and silently break
       // GlobalKey addressing.
       def isSuperKeyParam(p: ValDef): Boolean =
-        p.name == "key" && emitTypeRef(p.tpt.tpe) == "Key" && !sym.flags.is(Flags.Case)
+        // Only meaningful when the parent chain actually reaches the
+        // framework's Widget (a plain data class named `key` must keep
+        // its own field — there is no `super.key` to forward to).
+        p.name == "key" && emitTypeRef(p.tpt.tpe) == "Key" && !sym.flags.is(Flags.Case) &&
+          parents.extendsTpt.exists { t =>
+            val p = t.tpe.typeSymbol
+            p.exists && p.fullName != "java.lang.Object" && p.fullName != "scala.AnyRef"
+          }
       def isFieldParam(p: ValDef): Boolean =
         !isSuperKeyParam(p) &&
           (sym.flags.is(Flags.Case) || publicAccessors.contains(p.name) || usedInMembers(p.name))
+      // A ctor param defaulted to `null` needs a nullable field type —
+      // `final Key key;` with `{this.key = null}` is an invalid_assignment.
+      val nullDefaultedParams: Set[String] =
+        dartParamShape(ctor.symbol, ctorParams).named
+          .collect { case (p, "null") => p.name }.toSet
       for p <- ctorParams if isFieldParam(p) do
-        line(s"final ${emitTypeRef(p.tpt.tpe)} ${p.name};")
+        val t  = emitTypeRef(p.tpt.tpe)
+        val tn = if nullDefaultedParams.contains(p.name) && !t.endsWith("?") && t != "dynamic" then s"$t?" else t
+        line(s"final $tn ${p.name};")
 
       // User-class primary constructors: params without defaults stay
       // positional (matching how Scala call sites invoke them); params
@@ -941,12 +955,15 @@ class DartEmitter(
       indent -= 1
       blank()
 
-      // hashCode
+      // hashCode — `Object.hash` takes at most 20 positional values; wide
+      // records switch to `Object.hashAll`.
       line("@override")
       if names.size == 1 then
         line(s"int get hashCode => ${names.head}.hashCode;")
-      else
+      else if names.size <= 20 then
         line(s"int get hashCode => Object.hash(${names.mkString(", ")});")
+      else
+        line(s"int get hashCode => Object.hashAll([${names.mkString(", ")}]);")
       blank()
 
       // toString — each `$$name` in Scala source becomes `$name` in the
@@ -1508,6 +1525,10 @@ class DartEmitter(
       // `Select` fallbacks or those would swallow the reference.
       case t if isSartRef(t, "sart.stdlib.None") => "null"
       case t if isSartRef(t, "scala.None") => "null"
+      // `Double.PositiveInfinity` → `double.infinity` (`width: double.infinity`
+      // is the Flutter fill-the-parent idiom).
+      case Select(Ident("Double"), "PositiveInfinity") => "double.infinity"
+      case Select(Ident("Double"), "NegativeInfinity") => "double.negativeInfinity"
       case Ident(name) => dartSafeName(name)
       case This(_) => "this"
       case _: Super => "super"
@@ -1782,9 +1803,19 @@ class DartEmitter(
       // so we wrap non-string operands in `.toString()` on the way through.
       // Match both sides to catch `"x" + n` and `n + "x"`.
       case Apply(Select(lhs, "+"), List(rhs)) if isStringType(lhs.tpe) || isStringType(rhs.tpe) =>
-        val l = if isStringType(lhs.tpe) then emitExpr(lhs) else s"${emitExpr(lhs)}.toString()"
-        val r = if isStringType(rhs.tpe) then emitExpr(rhs) else s"${emitExpr(rhs)}.toString()"
-        s"$l + $r"
+        // Operands binding looser than `+` (ternaries from if-expressions)
+        // need parens; nested `+` chains don't.
+        def loose(t: Term): Boolean = t match
+          case If(_, _, _) | Match(_, _) | Assign(_, _) => true
+          case Typed(e, _)                              => loose(e)
+          case Inlined(_, _, e)                         => loose(e)
+          case Block(Nil, e: Term)                      => loose(e)
+          case _                                        => false
+        def side(t: Term): String =
+          val e = emitExpr(t)
+          val wrapped = if loose(t) then s"($e)" else e
+          if isStringType(t.tpe) then wrapped else s"$wrapped.toString()"
+        s"${side(lhs)} + ${side(rhs)}"
 
       // List append `xs :+ x` → Dart spread `[...xs, x]`. Dart lacks a
       // native append operator but the spread literal is idiomatic.
@@ -2152,6 +2183,11 @@ class DartEmitter(
       case If(_, _, _)                                     => true
       case Match(_, _)                                     => true
       case Assign(_, _)                                    => true
+      // Wrappers are transparent in emission — look through them so a
+      // wrapped ternary/binary still gets its parens.
+      case Typed(e, _)                                     => needsParensAsReceiver(e)
+      case Inlined(_, _, e)                                => needsParensAsReceiver(e)
+      case Block(Nil, e: Term)                             => needsParensAsReceiver(e)
       case _                                               => false
 
     /** No-argument member access (`Select(qual, name)`). Consults the
@@ -2181,6 +2217,7 @@ class DartEmitter(
           case "toInt"  => return s"(${emitExpr(qual)} as int)"
           case "toBool" => return s"(${emitExpr(qual)} as bool)"
           case "isNull" => return s"(${emitExpr(qual)} == null)"
+          case "toList" => return s"(${emitExpr(qual)} as List<dynamic>)"
           case _        => ()
 
       // Receiver-aware rewrites win first — they may translate to a
@@ -2226,7 +2263,7 @@ class DartEmitter(
       if isDynReceiver(qual) then
         name match
           case "apply" => return s"${emitExpr(qual)}[${emitArgs(args)}]"
-          case "str" | "toInt" | "toBool" | "isNull" if args.isEmpty =>
+          case "str" | "toInt" | "toBool" | "isNull" | "toList" if args.isEmpty =>
             return emitMemberAccess(qual, name)
           case _ => ()
 
@@ -3078,6 +3115,10 @@ class DartEmitter(
             // statement, never a void-operand ternary.
             case ifTerm @ If(_, _, _) if isUnitTyped(ifTerm) =>
               s"($paramStr)$asyncMark { ${stmtInline(ifTerm)} }"
+            // A statless Block wrapping a try/catch — statement-only in
+            // Dart, so block form.
+            case Block(Nil, tryTree: Try) =>
+              s"($paramStr)$asyncMark { ${stmtInline(tryTree)} }"
             // A statless Block is just a wrapper — unwrap to the arrow form.
             case Block(Nil, expr: Term) =>
               s"($paramStr)$asyncMark => ${emitExpr(expr)}"
@@ -3120,6 +3161,9 @@ class DartEmitter(
               sb.toString
             case Assign(lhs, rhs) =>
               s"($paramStr)$asyncMark { ${emitExpr(lhs)} = ${emitExpr(rhs)}; }"
+            // A try/catch body is statement-only in Dart — block form.
+            case tryTree: Try =>
+              s"($paramStr)$asyncMark { ${stmtInline(tryTree)} }"
             case term: Term =>
               s"($paramStr)$asyncMark => ${emitExpr(term)}"
         case None => s"($paramStr) => null"
@@ -3165,11 +3209,86 @@ class DartEmitter(
       // computation (e.g. re-running a jsonDecode or an http call).
       // Process in reverse declaration order so a later val's inlined
       // RHS still gets earlier vals substituted into it.
+      // A substituted RHS that isn't a single atom (identifier, literal,
+      // one balanced call/list/paren group) gets parenthesised — dropping
+      // a bare ternary or binary chain into `<name>.member` would rebind
+      // by precedence (`a ? b : c.member`).
+      def atomicRendered(s: String): Boolean =
+        // Scanner for a postfix chain: Prim (('.'|'?.') ident | (…) | […] |
+        // <…> | '…' | '!')* — anything that binds tighter than every infix
+        // operator. Closures ((params) => e / (params) { … }) also count:
+        // they only ever appear in argument position.
+        var i = 0
+        val n = s.length
+        def scanGroup(open: Char, close: Char): Boolean =
+          var depth = 0
+          var inStr = false
+          while i < n do
+            val c = s(i)
+            if inStr then
+              if c == '\\' then i += 1
+              else if c == '\'' then inStr = false
+            else if c == '\'' then inStr = true
+            else if c == open then depth += 1
+            else if c == close then
+              depth -= 1
+              if depth == 0 then
+                i += 1
+                return true
+            i += 1
+          false
+        def scanString(): Boolean =
+          i += 1
+          while i < n do
+            val c = s(i)
+            if c == '\\' then i += 1
+            else if c == '\'' then
+              i += 1
+              return true
+            i += 1
+          false
+        def scanIdent(): Boolean =
+          val start = i
+          while i < n && (s(i).isLetterOrDigit || s(i) == '_' || s(i) == '$') do i += 1
+          i > start
+        // Prim
+        val primOk = s.nonEmpty && (s(0) match
+          case '('            => scanGroup('(', ')')
+          case '['            => scanGroup('[', ']')
+          case '<'            => scanGroup('<', '>') && i < n && s(i) == '[' && scanGroup('[', ']')
+          case '\''           => scanString()
+          case c if c.isLetterOrDigit || c == '_' || c == '$' => scanIdent()
+          case _              => false)
+        if !primOk then false
+        else if i >= n then true
+        // Closure body following a parameter group.
+        else if s.startsWith(" => ", i) || s.startsWith(" {", i) || s.startsWith(" async", i) then true
+        else
+          // Postfix chain
+          var ok = true
+          while ok && i < n do
+            if s(i) == '.' then
+              i += 1
+              ok = scanIdent()
+            else if s.startsWith("?.", i) then
+              i += 2
+              ok = scanIdent()
+            else if s(i) == '!' then i += 1
+            else if s(i) == '(' then ok = scanGroup('(', ')')
+            else if s(i) == '[' then ok = scanGroup('[', ']')
+            else if s(i) == '<' then ok = scanGroup('<', '>')
+            else if s(i) == '\'' then ok = scanString()
+            else ok = false
+          ok && i >= n
+
       val preSubstituted = out
       var dup = false
       for vd <- realVals.reverse if !dup do
         if occurrences(out, vd.name) > 1 then dup = true
-        else out = substitute(out, vd.name, vd.rhs.map(emitExpr).getOrElse(""))
+        else
+          val rendered = vd.rhs.map(emitExpr).getOrElse("")
+          val wrapped  = if atomicRendered(rendered) then rendered else s"($rendered)"
+          out = substitute(out, vd.name, wrapped)
 
       if !dup then out
       else
@@ -3229,6 +3348,8 @@ class DartEmitter(
         sb.toString.trim
       case While(cond, body) =>
         s"while (${emitExpr(cond)}) { ${stmtInline(body)} }"
+      case t: Try =>
+        stmtInlineTry(t)
       // Unit-typed `match` inline — a Dart switch *statement* (see the
       // block-form twin in `emitStmt`).
       case m @ Match(scrutinee, cases) if isUnitTyped(m) =>
@@ -3244,6 +3365,30 @@ class DartEmitter(
         s"switch (${emitExpr(scrutinee)}) { $arms }"
       case term: Term       => s"${emitExpr(term)};"
       case _                => s"/* TODO stmt-inline */"
+
+    /** Single-line `try { … } on E catch (e) { … } finally { … }` — the
+     *  inline twin of `emitTryStatement`, for closure/branch bodies that
+     *  render on one line.
+     */
+    private def stmtInlineTry(t: Try): String =
+      val sb = new StringBuilder("try { ")
+      sb.append(stmtInline(t.body)).append(" }")
+      for c <- t.cases do
+        val header = c.pattern match
+          case Typed(Ident("_"), tpt) =>
+            s" on ${emitTypeRef(tpt.tpe)} {"
+          case Bind(name, Typed(Ident("_"), tpt)) =>
+            val tn = emitTypeRef(tpt.tpe)
+            if bodyUsesIdent(c.rhs, name) then s" on $tn catch ($name) {" else s" on $tn {"
+          case Bind(name, Ident("_")) =>
+            if bodyUsesIdent(c.rhs, name) then s" catch ($name) {" else s" catch (_) {"
+          case Ident("_") =>
+            s" catch (_) {"
+          case _ =>
+            s" catch (_) { /* TODO complex catch pattern */"
+        sb.append(header).append(' ').append(stmtInline(c.rhs)).append(" }")
+      t.finalizer.foreach(f => sb.append(" finally { ").append(stmtInline(f)).append(" }"))
+      sb.toString
 
     // ── Type references ──────────────────────────────────────────────────
 
@@ -3269,7 +3414,11 @@ class DartEmitter(
           shimsNeeded += optionShim
           imports     += optionShim.fileName
           return tpe match
-            case AppliedType(_, List(arg: TypeRepr)) => s"${emitTypeRef(arg)}?"
+            case AppliedType(_, List(arg: TypeRepr)) =>
+              val inner = emitTypeRef(arg)
+              // `dynamic?` is redundant (dynamic already admits null) and
+              // trips Dart's unnecessary_question_mark lint.
+              if inner == "dynamic" || inner.endsWith("?") then inner else s"$inner?"
             case _                                   => "Object?"
         // scala.Function0..FunctionN → Dart `R Function(T1, …, Tn)`.
         case fqn if fqn.matches("scala\\.Function\\d+") =>

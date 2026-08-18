@@ -151,6 +151,18 @@ object TextDecoration:
 
 @native
 @DartImport("package:flutter/material.dart")
+class Clip extends DartObject
+
+@native
+@DartImport("package:flutter/material.dart")
+object Clip:
+  val none: Clip = native.value
+  val hardEdge: Clip = native.value
+  val antiAlias: Clip = native.value
+  val antiAliasWithSaveLayer: Clip = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
 class FontStyle extends DartObject
 
 @native
@@ -929,7 +941,7 @@ class ClipRRect(
   val key: Key = native.value,
   val borderRadius: BorderRadiusGeometry = native.value,
   val clipper: DartObject = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val child: Widget = native.value
 ) extends Widget
 
@@ -1012,7 +1024,7 @@ class Stack(
   val alignment: AlignmentGeometry = native.value,
   val textDirection: DartObject = native.value,
   val fit: DartObject = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val children: List[Widget] = native.value
 ) extends Widget
 
@@ -1094,7 +1106,7 @@ class Wrap(
   val crossAxisAlignment: DartObject = native.value,
   val textDirection: DartObject = native.value,
   val verticalDirection: DartObject = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val children: List[Widget] = native.value
 ) extends Widget
 
@@ -1133,7 +1145,7 @@ class Container(
   val transform: DartObject = native.value,
   val transformAlignment: AlignmentGeometry = native.value,
   val child: Widget = native.value,
-  val clipBehavior: DartObject = native.value
+  val clipBehavior: Clip = native.value
 ) extends StatelessWidget
 
 // ─── icon.dart ────────────────────────────────────────
@@ -1195,7 +1207,7 @@ class ListView(
   val dragStartBehavior: DartObject = native.value,
   val keyboardDismissBehavior: DartObject = native.value,
   val restorationId: String = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val hitTestBehavior: DartObject = native.value
 ) extends StatelessWidget:
   def childrenDelegate: DartObject = native.value
@@ -1203,9 +1215,9 @@ class ListView(
 @native
 @DartImport("package:flutter/material.dart")
 object ListView:
-  def builder(key: Key = native.value, scrollDirection: Axis = native.value, reverse: Boolean = native.value, controller: ScrollController = native.value, primary: Boolean = native.value, physics: DartObject = native.value, shrinkWrap: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, itemExtent: Double = native.value, itemExtentBuilder: (Int, DartObject) => sart.stdlib.Option[Double] = native.value, prototypeItem: Widget = native.value, itemBuilder: (BuildContext, Int) => sart.stdlib.Option[Widget], findChildIndexCallback: Key => sart.stdlib.Option[Int] = native.value, itemCount: Int = native.value, addAutomaticKeepAlives: Boolean = native.value, addRepaintBoundaries: Boolean = native.value, addSemanticIndexes: Boolean = native.value, cacheExtent: Double = native.value, scrollCacheExtent: DartObject = native.value, semanticChildCount: Int = native.value, dragStartBehavior: DartObject = native.value, keyboardDismissBehavior: DartObject = native.value, restorationId: String = native.value, clipBehavior: DartObject = native.value, hitTestBehavior: DartObject = native.value): ListView = native.value
-  def separated(key: Key = native.value, scrollDirection: Axis = native.value, reverse: Boolean = native.value, controller: ScrollController = native.value, primary: Boolean = native.value, physics: DartObject = native.value, shrinkWrap: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, itemBuilder: (BuildContext, Int) => sart.stdlib.Option[Widget], findChildIndexCallback: Key => sart.stdlib.Option[Int] = native.value, findItemIndexCallback: Key => sart.stdlib.Option[Int] = native.value, separatorBuilder: (BuildContext, Int) => Widget, itemCount: Int, addAutomaticKeepAlives: Boolean = native.value, addRepaintBoundaries: Boolean = native.value, addSemanticIndexes: Boolean = native.value, cacheExtent: Double = native.value, scrollCacheExtent: DartObject = native.value, dragStartBehavior: DartObject = native.value, keyboardDismissBehavior: DartObject = native.value, restorationId: String = native.value, clipBehavior: DartObject = native.value, hitTestBehavior: DartObject = native.value): ListView = native.value
-  def custom(key: Key = native.value, scrollDirection: Axis = native.value, reverse: Boolean = native.value, controller: ScrollController = native.value, primary: Boolean = native.value, physics: DartObject = native.value, shrinkWrap: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, itemExtent: Double = native.value, prototypeItem: Widget = native.value, itemExtentBuilder: (Int, DartObject) => sart.stdlib.Option[Double] = native.value, childrenDelegate: DartObject, cacheExtent: Double = native.value, scrollCacheExtent: DartObject = native.value, semanticChildCount: Int = native.value, dragStartBehavior: DartObject = native.value, keyboardDismissBehavior: DartObject = native.value, restorationId: String = native.value, clipBehavior: DartObject = native.value, hitTestBehavior: DartObject = native.value): ListView = native.value
+  def builder(key: Key = native.value, scrollDirection: Axis = native.value, reverse: Boolean = native.value, controller: ScrollController = native.value, primary: Boolean = native.value, physics: DartObject = native.value, shrinkWrap: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, itemExtent: Double = native.value, itemExtentBuilder: (Int, DartObject) => sart.stdlib.Option[Double] = native.value, prototypeItem: Widget = native.value, itemBuilder: (BuildContext, Int) => sart.stdlib.Option[Widget], findChildIndexCallback: Key => sart.stdlib.Option[Int] = native.value, itemCount: Int = native.value, addAutomaticKeepAlives: Boolean = native.value, addRepaintBoundaries: Boolean = native.value, addSemanticIndexes: Boolean = native.value, cacheExtent: Double = native.value, scrollCacheExtent: DartObject = native.value, semanticChildCount: Int = native.value, dragStartBehavior: DartObject = native.value, keyboardDismissBehavior: DartObject = native.value, restorationId: String = native.value, clipBehavior: Clip = native.value, hitTestBehavior: DartObject = native.value): ListView = native.value
+  def separated(key: Key = native.value, scrollDirection: Axis = native.value, reverse: Boolean = native.value, controller: ScrollController = native.value, primary: Boolean = native.value, physics: DartObject = native.value, shrinkWrap: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, itemBuilder: (BuildContext, Int) => sart.stdlib.Option[Widget], findChildIndexCallback: Key => sart.stdlib.Option[Int] = native.value, findItemIndexCallback: Key => sart.stdlib.Option[Int] = native.value, separatorBuilder: (BuildContext, Int) => Widget, itemCount: Int, addAutomaticKeepAlives: Boolean = native.value, addRepaintBoundaries: Boolean = native.value, addSemanticIndexes: Boolean = native.value, cacheExtent: Double = native.value, scrollCacheExtent: DartObject = native.value, dragStartBehavior: DartObject = native.value, keyboardDismissBehavior: DartObject = native.value, restorationId: String = native.value, clipBehavior: Clip = native.value, hitTestBehavior: DartObject = native.value): ListView = native.value
+  def custom(key: Key = native.value, scrollDirection: Axis = native.value, reverse: Boolean = native.value, controller: ScrollController = native.value, primary: Boolean = native.value, physics: DartObject = native.value, shrinkWrap: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, itemExtent: Double = native.value, prototypeItem: Widget = native.value, itemExtentBuilder: (Int, DartObject) => sart.stdlib.Option[Double] = native.value, childrenDelegate: DartObject, cacheExtent: Double = native.value, scrollCacheExtent: DartObject = native.value, semanticChildCount: Int = native.value, dragStartBehavior: DartObject = native.value, keyboardDismissBehavior: DartObject = native.value, restorationId: String = native.value, clipBehavior: Clip = native.value, hitTestBehavior: DartObject = native.value): ListView = native.value
 
 // ─── gesture_detector.dart ────────────────────────────────────────
 
@@ -1412,7 +1424,7 @@ class SingleChildScrollView(
   val controller: ScrollController = native.value,
   val child: Widget = native.value,
   val dragStartBehavior: DartObject = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val hitTestBehavior: DartObject = native.value,
   val restorationId: String = native.value,
   val keyboardDismissBehavior: DartObject = native.value
@@ -1462,14 +1474,14 @@ class OverlayEntry(
 class Overlay(
   val key: Key = native.value,
   val initialEntries: List[OverlayEntry] = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val alwaysSizeToContent: Boolean = native.value
 ) extends StatefulWidget
 
 @native
 @DartImport("package:flutter/material.dart")
 object Overlay:
-  def wrap(key: Key = native.value, clipBehavior: DartObject = native.value, alwaysSizeToContent: Boolean = native.value, child: Widget): Widget = native.value
+  def wrap(key: Key = native.value, clipBehavior: Clip = native.value, alwaysSizeToContent: Boolean = native.value, child: Widget): Widget = native.value
   def of(context: BuildContext, rootOverlay: Boolean = native.value, debugRequiredFor: Widget = native.value): OverlayState = native.value
   def maybeOf(context: BuildContext, rootOverlay: Boolean = native.value): OverlayState = native.value
 
@@ -1768,7 +1780,7 @@ class AnimatedSize(
   val curve: DartObject = native.value,
   val duration: sart.stdlib.Duration,
   val reverseDuration: sart.stdlib.Duration = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val onEnd: () => Unit = native.value
 ) extends StatefulWidget
 
@@ -1892,7 +1904,7 @@ class ThemeData(
   val cupertinoOverrideTheme: DartObject = native.value,
   val extensions: List[DartObject] = native.value,
   val inputDecorationTheme: Any = native.value,
-  val materialTapTargetSize: DartObject = native.value,
+  val materialTapTargetSize: MaterialTapTargetSize = native.value,
   val pageTransitionsTheme: DartObject = native.value,
   val platform: DartObject = native.value,
   val scrollbarTheme: ScrollbarThemeData = native.value,
@@ -1914,7 +1926,7 @@ class ThemeData(
   val primaryColor: Color = native.value,
   val primaryColorDark: Color = native.value,
   val primaryColorLight: Color = native.value,
-  val primarySwatch: Color = native.value,
+  val primarySwatch: MaterialColor = native.value,
   val scaffoldBackgroundColor: Color = native.value,
   val secondaryHeaderColor: Color = native.value,
   val shadowColor: Color = native.value,
@@ -1981,13 +1993,13 @@ class ThemeData(
   def adaptationMap: Map[DartObject, DartObject] = native.value
   def getAdaptation[T](): DartObject = native.value
   def extension[T](): T = native.value
-  def copyWith(adaptations: List[DartObject] = native.value, applyElevationOverlayColor: Boolean = native.value, cupertinoOverrideTheme: DartObject = native.value, extensions: List[DartObject] = native.value, inputDecorationTheme: Any = native.value, materialTapTargetSize: DartObject = native.value, pageTransitionsTheme: DartObject = native.value, platform: DartObject = native.value, scrollbarTheme: ScrollbarThemeData = native.value, splashFactory: DartObject = native.value, visualDensity: VisualDensity = native.value, colorScheme: ColorScheme = native.value, brightness: Brightness = native.value, canvasColor: Color = native.value, cardColor: Color = native.value, disabledColor: Color = native.value, dividerColor: Color = native.value, focusColor: Color = native.value, highlightColor: Color = native.value, hintColor: Color = native.value, hoverColor: Color = native.value, primaryColor: Color = native.value, primaryColorDark: Color = native.value, primaryColorLight: Color = native.value, scaffoldBackgroundColor: Color = native.value, secondaryHeaderColor: Color = native.value, shadowColor: Color = native.value, splashColor: Color = native.value, unselectedWidgetColor: Color = native.value, iconTheme: DartObject = native.value, primaryIconTheme: DartObject = native.value, primaryTextTheme: TextTheme = native.value, textTheme: TextTheme = native.value, typography: DartObject = native.value, actionIconTheme: DartObject = native.value, appBarTheme: Any = native.value, badgeTheme: DartObject = native.value, bannerTheme: DartObject = native.value, bottomAppBarTheme: DartObject = native.value, bottomNavigationBarTheme: DartObject = native.value, bottomSheetTheme: DartObject = native.value, buttonTheme: DartObject = native.value, cardTheme: DartObject = native.value, carouselViewTheme: DartObject = native.value, checkboxTheme: CheckboxThemeData = native.value, chipTheme: DartObject = native.value, dataTableTheme: DartObject = native.value, datePickerTheme: DartObject = native.value, dialogTheme: DartObject = native.value, dividerTheme: DartObject = native.value, drawerTheme: DartObject = native.value, dropdownMenuTheme: DartObject = native.value, elevatedButtonTheme: DartObject = native.value, expansionTileTheme: DartObject = native.value, filledButtonTheme: DartObject = native.value, floatingActionButtonTheme: DartObject = native.value, iconButtonTheme: DartObject = native.value, listTileTheme: DartObject = native.value, menuBarTheme: DartObject = native.value, menuButtonTheme: DartObject = native.value, menuTheme: DartObject = native.value, navigationBarTheme: DartObject = native.value, navigationDrawerTheme: DartObject = native.value, navigationRailTheme: DartObject = native.value, outlinedButtonTheme: DartObject = native.value, popupMenuTheme: DartObject = native.value, progressIndicatorTheme: DartObject = native.value, radioTheme: DartObject = native.value, searchBarTheme: DartObject = native.value, searchViewTheme: DartObject = native.value, segmentedButtonTheme: DartObject = native.value, sliderTheme: DartObject = native.value, snackBarTheme: DartObject = native.value, switchTheme: DartObject = native.value, tabBarTheme: DartObject = native.value, textButtonTheme: DartObject = native.value, textSelectionTheme: DartObject = native.value, timePickerTheme: DartObject = native.value, toggleButtonsTheme: DartObject = native.value, tooltipTheme: DartObject = native.value, useMaterial3: Boolean = native.value, buttonBarTheme: DartObject = native.value, dialogBackgroundColor: Color = native.value, indicatorColor: Color = native.value): ThemeData = native.value
+  def copyWith(adaptations: List[DartObject] = native.value, applyElevationOverlayColor: Boolean = native.value, cupertinoOverrideTheme: DartObject = native.value, extensions: List[DartObject] = native.value, inputDecorationTheme: Any = native.value, materialTapTargetSize: MaterialTapTargetSize = native.value, pageTransitionsTheme: DartObject = native.value, platform: DartObject = native.value, scrollbarTheme: ScrollbarThemeData = native.value, splashFactory: DartObject = native.value, visualDensity: VisualDensity = native.value, colorScheme: ColorScheme = native.value, brightness: Brightness = native.value, canvasColor: Color = native.value, cardColor: Color = native.value, disabledColor: Color = native.value, dividerColor: Color = native.value, focusColor: Color = native.value, highlightColor: Color = native.value, hintColor: Color = native.value, hoverColor: Color = native.value, primaryColor: Color = native.value, primaryColorDark: Color = native.value, primaryColorLight: Color = native.value, scaffoldBackgroundColor: Color = native.value, secondaryHeaderColor: Color = native.value, shadowColor: Color = native.value, splashColor: Color = native.value, unselectedWidgetColor: Color = native.value, iconTheme: DartObject = native.value, primaryIconTheme: DartObject = native.value, primaryTextTheme: TextTheme = native.value, textTheme: TextTheme = native.value, typography: DartObject = native.value, actionIconTheme: DartObject = native.value, appBarTheme: Any = native.value, badgeTheme: DartObject = native.value, bannerTheme: DartObject = native.value, bottomAppBarTheme: DartObject = native.value, bottomNavigationBarTheme: DartObject = native.value, bottomSheetTheme: DartObject = native.value, buttonTheme: DartObject = native.value, cardTheme: DartObject = native.value, carouselViewTheme: DartObject = native.value, checkboxTheme: CheckboxThemeData = native.value, chipTheme: DartObject = native.value, dataTableTheme: DartObject = native.value, datePickerTheme: DartObject = native.value, dialogTheme: DartObject = native.value, dividerTheme: DartObject = native.value, drawerTheme: DartObject = native.value, dropdownMenuTheme: DartObject = native.value, elevatedButtonTheme: DartObject = native.value, expansionTileTheme: DartObject = native.value, filledButtonTheme: DartObject = native.value, floatingActionButtonTheme: DartObject = native.value, iconButtonTheme: DartObject = native.value, listTileTheme: DartObject = native.value, menuBarTheme: DartObject = native.value, menuButtonTheme: DartObject = native.value, menuTheme: DartObject = native.value, navigationBarTheme: DartObject = native.value, navigationDrawerTheme: DartObject = native.value, navigationRailTheme: DartObject = native.value, outlinedButtonTheme: DartObject = native.value, popupMenuTheme: DartObject = native.value, progressIndicatorTheme: DartObject = native.value, radioTheme: DartObject = native.value, searchBarTheme: DartObject = native.value, searchViewTheme: DartObject = native.value, segmentedButtonTheme: DartObject = native.value, sliderTheme: DartObject = native.value, snackBarTheme: DartObject = native.value, switchTheme: DartObject = native.value, tabBarTheme: DartObject = native.value, textButtonTheme: DartObject = native.value, textSelectionTheme: DartObject = native.value, timePickerTheme: DartObject = native.value, toggleButtonsTheme: DartObject = native.value, tooltipTheme: DartObject = native.value, useMaterial3: Boolean = native.value, buttonBarTheme: DartObject = native.value, dialogBackgroundColor: Color = native.value, indicatorColor: Color = native.value): ThemeData = native.value
   def debugFillProperties(properties: DartObject): Unit = native.value
 
 @native
 @DartImport("package:flutter/material.dart")
 object ThemeData:
-  def raw(adaptationMap: Map[DartObject, DartObject], applyElevationOverlayColor: Boolean, cupertinoOverrideTheme: DartObject, extensions: Map[Any, DartObject], inputDecorationTheme: DartObject, materialTapTargetSize: DartObject, pageTransitionsTheme: DartObject, platform: DartObject, scrollbarTheme: ScrollbarThemeData, splashFactory: DartObject, useMaterial3: Boolean, visualDensity: VisualDensity, colorScheme: ColorScheme, canvasColor: Color, cardColor: Color, disabledColor: Color, dividerColor: Color, focusColor: Color, highlightColor: Color, hintColor: Color, hoverColor: Color, primaryColor: Color, primaryColorDark: Color, primaryColorLight: Color, scaffoldBackgroundColor: Color, secondaryHeaderColor: Color, shadowColor: Color, splashColor: Color, unselectedWidgetColor: Color, iconTheme: DartObject, primaryIconTheme: DartObject, primaryTextTheme: TextTheme, textTheme: TextTheme, typography: DartObject, actionIconTheme: DartObject, appBarTheme: DartObject, badgeTheme: DartObject, bannerTheme: DartObject, bottomAppBarTheme: DartObject, bottomNavigationBarTheme: DartObject, bottomSheetTheme: DartObject, buttonTheme: DartObject, cardTheme: DartObject, carouselViewTheme: DartObject, checkboxTheme: CheckboxThemeData, chipTheme: DartObject, dataTableTheme: DartObject, datePickerTheme: DartObject, dialogTheme: DartObject, dividerTheme: DartObject, drawerTheme: DartObject, dropdownMenuTheme: DartObject, elevatedButtonTheme: DartObject, expansionTileTheme: DartObject, filledButtonTheme: DartObject, floatingActionButtonTheme: DartObject, iconButtonTheme: DartObject, listTileTheme: DartObject, menuBarTheme: DartObject, menuButtonTheme: DartObject, menuTheme: DartObject, navigationBarTheme: DartObject, navigationDrawerTheme: DartObject, navigationRailTheme: DartObject, outlinedButtonTheme: DartObject, popupMenuTheme: DartObject, progressIndicatorTheme: DartObject, radioTheme: DartObject, searchBarTheme: DartObject, searchViewTheme: DartObject, segmentedButtonTheme: DartObject, sliderTheme: DartObject, snackBarTheme: DartObject, switchTheme: DartObject, tabBarTheme: DartObject, textButtonTheme: DartObject, textSelectionTheme: DartObject, timePickerTheme: DartObject, toggleButtonsTheme: DartObject, tooltipTheme: DartObject, buttonBarTheme: DartObject = native.value, dialogBackgroundColor: Color, indicatorColor: Color): ThemeData = native.value
+  def raw(adaptationMap: Map[DartObject, DartObject], applyElevationOverlayColor: Boolean, cupertinoOverrideTheme: DartObject, extensions: Map[Any, DartObject], inputDecorationTheme: DartObject, materialTapTargetSize: MaterialTapTargetSize, pageTransitionsTheme: DartObject, platform: DartObject, scrollbarTheme: ScrollbarThemeData, splashFactory: DartObject, useMaterial3: Boolean, visualDensity: VisualDensity, colorScheme: ColorScheme, canvasColor: Color, cardColor: Color, disabledColor: Color, dividerColor: Color, focusColor: Color, highlightColor: Color, hintColor: Color, hoverColor: Color, primaryColor: Color, primaryColorDark: Color, primaryColorLight: Color, scaffoldBackgroundColor: Color, secondaryHeaderColor: Color, shadowColor: Color, splashColor: Color, unselectedWidgetColor: Color, iconTheme: DartObject, primaryIconTheme: DartObject, primaryTextTheme: TextTheme, textTheme: TextTheme, typography: DartObject, actionIconTheme: DartObject, appBarTheme: DartObject, badgeTheme: DartObject, bannerTheme: DartObject, bottomAppBarTheme: DartObject, bottomNavigationBarTheme: DartObject, bottomSheetTheme: DartObject, buttonTheme: DartObject, cardTheme: DartObject, carouselViewTheme: DartObject, checkboxTheme: CheckboxThemeData, chipTheme: DartObject, dataTableTheme: DartObject, datePickerTheme: DartObject, dialogTheme: DartObject, dividerTheme: DartObject, drawerTheme: DartObject, dropdownMenuTheme: DartObject, elevatedButtonTheme: DartObject, expansionTileTheme: DartObject, filledButtonTheme: DartObject, floatingActionButtonTheme: DartObject, iconButtonTheme: DartObject, listTileTheme: DartObject, menuBarTheme: DartObject, menuButtonTheme: DartObject, menuTheme: DartObject, navigationBarTheme: DartObject, navigationDrawerTheme: DartObject, navigationRailTheme: DartObject, outlinedButtonTheme: DartObject, popupMenuTheme: DartObject, progressIndicatorTheme: DartObject, radioTheme: DartObject, searchBarTheme: DartObject, searchViewTheme: DartObject, segmentedButtonTheme: DartObject, sliderTheme: DartObject, snackBarTheme: DartObject, switchTheme: DartObject, tabBarTheme: DartObject, textButtonTheme: DartObject, textSelectionTheme: DartObject, timePickerTheme: DartObject, toggleButtonsTheme: DartObject, tooltipTheme: DartObject, buttonBarTheme: DartObject = native.value, dialogBackgroundColor: Color, indicatorColor: Color): ThemeData = native.value
   def from(colorScheme: ColorScheme, textTheme: TextTheme = native.value, useMaterial3: Boolean = native.value): ThemeData = native.value
   def light(useMaterial3: Boolean = native.value): ThemeData = native.value
   def dark(useMaterial3: Boolean = native.value): ThemeData = native.value
@@ -2019,6 +2031,16 @@ object VisualDensity:
   def adaptivePlatformDensity: VisualDensity = native.value
   def defaultDensityForPlatform(platform: DartObject): VisualDensity = native.value
   def lerp(a: VisualDensity, b: VisualDensity, t: Double): VisualDensity = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+class MaterialTapTargetSize extends DartObject
+
+@native
+@DartImport("package:flutter/material.dart")
+object MaterialTapTargetSize:
+  val padded: MaterialTapTargetSize = native.value
+  val shrinkWrap: MaterialTapTargetSize = native.value
 
 // ─── theme.dart ────────────────────────────────────────
 
@@ -2104,7 +2126,7 @@ object ColorScheme:
   def dark(brightness: Brightness = native.value, primary: Color = native.value, onPrimary: Color = native.value, primaryContainer: Color = native.value, onPrimaryContainer: Color = native.value, primaryFixed: Color = native.value, primaryFixedDim: Color = native.value, onPrimaryFixed: Color = native.value, onPrimaryFixedVariant: Color = native.value, secondary: Color = native.value, onSecondary: Color = native.value, secondaryContainer: Color = native.value, onSecondaryContainer: Color = native.value, secondaryFixed: Color = native.value, secondaryFixedDim: Color = native.value, onSecondaryFixed: Color = native.value, onSecondaryFixedVariant: Color = native.value, tertiary: Color = native.value, onTertiary: Color = native.value, tertiaryContainer: Color = native.value, onTertiaryContainer: Color = native.value, tertiaryFixed: Color = native.value, tertiaryFixedDim: Color = native.value, onTertiaryFixed: Color = native.value, onTertiaryFixedVariant: Color = native.value, error: Color = native.value, onError: Color = native.value, errorContainer: Color = native.value, onErrorContainer: Color = native.value, surface: Color = native.value, onSurface: Color = native.value, surfaceDim: Color = native.value, surfaceBright: Color = native.value, surfaceContainerLowest: Color = native.value, surfaceContainerLow: Color = native.value, surfaceContainer: Color = native.value, surfaceContainerHigh: Color = native.value, surfaceContainerHighest: Color = native.value, onSurfaceVariant: Color = native.value, outline: Color = native.value, outlineVariant: Color = native.value, shadow: Color = native.value, scrim: Color = native.value, inverseSurface: Color = native.value, onInverseSurface: Color = native.value, inversePrimary: Color = native.value, surfaceTint: Color = native.value, background: Color = native.value, onBackground: Color = native.value, surfaceVariant: Color = native.value): ColorScheme = native.value
   def highContrastLight(brightness: Brightness = native.value, primary: Color = native.value, onPrimary: Color = native.value, primaryContainer: Color = native.value, onPrimaryContainer: Color = native.value, primaryFixed: Color = native.value, primaryFixedDim: Color = native.value, onPrimaryFixed: Color = native.value, onPrimaryFixedVariant: Color = native.value, secondary: Color = native.value, onSecondary: Color = native.value, secondaryContainer: Color = native.value, onSecondaryContainer: Color = native.value, secondaryFixed: Color = native.value, secondaryFixedDim: Color = native.value, onSecondaryFixed: Color = native.value, onSecondaryFixedVariant: Color = native.value, tertiary: Color = native.value, onTertiary: Color = native.value, tertiaryContainer: Color = native.value, onTertiaryContainer: Color = native.value, tertiaryFixed: Color = native.value, tertiaryFixedDim: Color = native.value, onTertiaryFixed: Color = native.value, onTertiaryFixedVariant: Color = native.value, error: Color = native.value, onError: Color = native.value, errorContainer: Color = native.value, onErrorContainer: Color = native.value, surface: Color = native.value, onSurface: Color = native.value, surfaceDim: Color = native.value, surfaceBright: Color = native.value, surfaceContainerLowest: Color = native.value, surfaceContainerLow: Color = native.value, surfaceContainer: Color = native.value, surfaceContainerHigh: Color = native.value, surfaceContainerHighest: Color = native.value, onSurfaceVariant: Color = native.value, outline: Color = native.value, outlineVariant: Color = native.value, shadow: Color = native.value, scrim: Color = native.value, inverseSurface: Color = native.value, onInverseSurface: Color = native.value, inversePrimary: Color = native.value, surfaceTint: Color = native.value, background: Color = native.value, onBackground: Color = native.value, surfaceVariant: Color = native.value): ColorScheme = native.value
   def highContrastDark(brightness: Brightness = native.value, primary: Color = native.value, onPrimary: Color = native.value, primaryContainer: Color = native.value, onPrimaryContainer: Color = native.value, primaryFixed: Color = native.value, primaryFixedDim: Color = native.value, onPrimaryFixed: Color = native.value, onPrimaryFixedVariant: Color = native.value, secondary: Color = native.value, onSecondary: Color = native.value, secondaryContainer: Color = native.value, onSecondaryContainer: Color = native.value, secondaryFixed: Color = native.value, secondaryFixedDim: Color = native.value, onSecondaryFixed: Color = native.value, onSecondaryFixedVariant: Color = native.value, tertiary: Color = native.value, onTertiary: Color = native.value, tertiaryContainer: Color = native.value, onTertiaryContainer: Color = native.value, tertiaryFixed: Color = native.value, tertiaryFixedDim: Color = native.value, onTertiaryFixed: Color = native.value, onTertiaryFixedVariant: Color = native.value, error: Color = native.value, onError: Color = native.value, errorContainer: Color = native.value, onErrorContainer: Color = native.value, surface: Color = native.value, onSurface: Color = native.value, surfaceDim: Color = native.value, surfaceBright: Color = native.value, surfaceContainerLowest: Color = native.value, surfaceContainerLow: Color = native.value, surfaceContainer: Color = native.value, surfaceContainerHigh: Color = native.value, surfaceContainerHighest: Color = native.value, onSurfaceVariant: Color = native.value, outline: Color = native.value, outlineVariant: Color = native.value, shadow: Color = native.value, scrim: Color = native.value, inverseSurface: Color = native.value, onInverseSurface: Color = native.value, inversePrimary: Color = native.value, surfaceTint: Color = native.value, background: Color = native.value, onBackground: Color = native.value, surfaceVariant: Color = native.value): ColorScheme = native.value
-  def fromSwatch(primarySwatch: Color = native.value, accentColor: Color = native.value, cardColor: Color = native.value, backgroundColor: Color = native.value, errorColor: Color = native.value, brightness: Brightness = native.value): ColorScheme = native.value
+  def fromSwatch(primarySwatch: MaterialColor = native.value, accentColor: Color = native.value, cardColor: Color = native.value, backgroundColor: Color = native.value, errorColor: Color = native.value, brightness: Brightness = native.value): ColorScheme = native.value
   def lerp(a: ColorScheme, b: ColorScheme, t: Double): ColorScheme = native.value
   def fromImageProvider(provider: ImageProvider, brightness: Brightness = native.value, dynamicSchemeVariant: DartObject = native.value, contrastLevel: Double = native.value, primary: Color = native.value, onPrimary: Color = native.value, primaryContainer: Color = native.value, onPrimaryContainer: Color = native.value, primaryFixed: Color = native.value, primaryFixedDim: Color = native.value, onPrimaryFixed: Color = native.value, onPrimaryFixedVariant: Color = native.value, secondary: Color = native.value, onSecondary: Color = native.value, secondaryContainer: Color = native.value, onSecondaryContainer: Color = native.value, secondaryFixed: Color = native.value, secondaryFixedDim: Color = native.value, onSecondaryFixed: Color = native.value, onSecondaryFixedVariant: Color = native.value, tertiary: Color = native.value, onTertiary: Color = native.value, tertiaryContainer: Color = native.value, onTertiaryContainer: Color = native.value, tertiaryFixed: Color = native.value, tertiaryFixedDim: Color = native.value, onTertiaryFixed: Color = native.value, onTertiaryFixedVariant: Color = native.value, error: Color = native.value, onError: Color = native.value, errorContainer: Color = native.value, onErrorContainer: Color = native.value, outline: Color = native.value, outlineVariant: Color = native.value, surface: Color = native.value, onSurface: Color = native.value, surfaceDim: Color = native.value, surfaceBright: Color = native.value, surfaceContainerLowest: Color = native.value, surfaceContainerLow: Color = native.value, surfaceContainer: Color = native.value, surfaceContainerHigh: Color = native.value, surfaceContainerHighest: Color = native.value, onSurfaceVariant: Color = native.value, inverseSurface: Color = native.value, onInverseSurface: Color = native.value, inversePrimary: Color = native.value, shadow: Color = native.value, scrim: Color = native.value, surfaceTint: Color = native.value, background: Color = native.value, onBackground: Color = native.value, surfaceVariant: Color = native.value): scala.concurrent.Future[ColorScheme] = native.value
   def of(context: BuildContext): ColorScheme = native.value
@@ -2168,42 +2190,42 @@ object Colors:
   def white24: Color = native.value
   def white12: Color = native.value
   def white10: Color = native.value
-  def red: Color = native.value
+  def red: MaterialColor = native.value
   def redAccent: Color = native.value
-  def pink: Color = native.value
+  def pink: MaterialColor = native.value
   def pinkAccent: Color = native.value
-  def purple: Color = native.value
+  def purple: MaterialColor = native.value
   def purpleAccent: Color = native.value
-  def deepPurple: Color = native.value
+  def deepPurple: MaterialColor = native.value
   def deepPurpleAccent: Color = native.value
-  def indigo: Color = native.value
+  def indigo: MaterialColor = native.value
   def indigoAccent: Color = native.value
-  def blue: Color = native.value
+  def blue: MaterialColor = native.value
   def blueAccent: Color = native.value
-  def lightBlue: Color = native.value
+  def lightBlue: MaterialColor = native.value
   def lightBlueAccent: Color = native.value
-  def cyan: Color = native.value
+  def cyan: MaterialColor = native.value
   def cyanAccent: Color = native.value
-  def teal: Color = native.value
+  def teal: MaterialColor = native.value
   def tealAccent: Color = native.value
-  def green: Color = native.value
+  def green: MaterialColor = native.value
   def greenAccent: Color = native.value
-  def lightGreen: Color = native.value
+  def lightGreen: MaterialColor = native.value
   def lightGreenAccent: Color = native.value
-  def lime: Color = native.value
+  def lime: MaterialColor = native.value
   def limeAccent: Color = native.value
-  def yellow: Color = native.value
+  def yellow: MaterialColor = native.value
   def yellowAccent: Color = native.value
-  def amber: Color = native.value
+  def amber: MaterialColor = native.value
   def amberAccent: Color = native.value
-  def orange: Color = native.value
+  def orange: MaterialColor = native.value
   def orangeAccent: Color = native.value
-  def deepOrange: Color = native.value
+  def deepOrange: MaterialColor = native.value
   def deepOrangeAccent: Color = native.value
-  def brown: Color = native.value
-  def grey: Color = native.value
-  def blueGrey: Color = native.value
-  def primaries: List[Color] = native.value
+  def brown: MaterialColor = native.value
+  def grey: MaterialColor = native.value
+  def blueGrey: MaterialColor = native.value
+  def primaries: List[MaterialColor] = native.value
   def accents: List[Color] = native.value
 
 // ─── icons.dart ────────────────────────────────────────
@@ -11137,7 +11159,7 @@ class SnackBar(
   val animation: DartObject = native.value,
   val onVisible: () => Unit = native.value,
   val dismissDirection: DartObject = native.value,
-  val clipBehavior: DartObject = native.value
+  val clipBehavior: Clip = native.value
 ) extends StatefulWidget:
   def withAnimation(newAnimation: DartObject, fallbackKey: Key = native.value): SnackBar = native.value
 
@@ -11213,7 +11235,7 @@ class AppBar(
   val systemOverlayStyle: DartObject = native.value,
   val forceMaterialTransparency: Boolean = native.value,
   val useDefaultSemanticsOrder: Boolean = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val actionsPadding: EdgeInsetsGeometry = native.value,
   val animateColor: Boolean = native.value
 ) extends StatefulWidget
@@ -11246,10 +11268,10 @@ class FloatingActionButton(
   val mouseCursor: DartObject = native.value,
   val mini: Boolean = native.value,
   val shape: DartObject = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val focusNode: FocusNode = native.value,
   val autofocus: Boolean = native.value,
-  val materialTapTargetSize: DartObject = native.value,
+  val materialTapTargetSize: MaterialTapTargetSize = native.value,
   val isExtended: Boolean = native.value,
   val enableFeedback: Boolean = native.value
 ) extends StatelessWidget:
@@ -11260,9 +11282,9 @@ class FloatingActionButton(
 @native
 @DartImport("package:flutter/material.dart")
 object FloatingActionButton:
-  def small(key: Key = native.value, child: Widget = native.value, tooltip: String = native.value, foregroundColor: Color = native.value, backgroundColor: Color = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, splashColor: Color = native.value, heroTag: Any = native.value, elevation: Double = native.value, focusElevation: Double = native.value, hoverElevation: Double = native.value, highlightElevation: Double = native.value, disabledElevation: Double = native.value, onPressed: () => Unit, mouseCursor: DartObject = native.value, shape: DartObject = native.value, clipBehavior: DartObject = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, materialTapTargetSize: DartObject = native.value, enableFeedback: Boolean = native.value): FloatingActionButton = native.value
-  def large(key: Key = native.value, child: Widget = native.value, tooltip: String = native.value, foregroundColor: Color = native.value, backgroundColor: Color = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, splashColor: Color = native.value, heroTag: Any = native.value, elevation: Double = native.value, focusElevation: Double = native.value, hoverElevation: Double = native.value, highlightElevation: Double = native.value, disabledElevation: Double = native.value, onPressed: () => Unit, mouseCursor: DartObject = native.value, shape: DartObject = native.value, clipBehavior: DartObject = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, materialTapTargetSize: DartObject = native.value, enableFeedback: Boolean = native.value): FloatingActionButton = native.value
-  def extended(key: Key = native.value, tooltip: String = native.value, foregroundColor: Color = native.value, backgroundColor: Color = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, heroTag: Any = native.value, elevation: Double = native.value, focusElevation: Double = native.value, hoverElevation: Double = native.value, splashColor: Color = native.value, highlightElevation: Double = native.value, disabledElevation: Double = native.value, onPressed: () => Unit, mouseCursor: DartObject = native.value, shape: DartObject = native.value, isExtended: Boolean = native.value, materialTapTargetSize: DartObject = native.value, clipBehavior: DartObject = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, extendedIconLabelSpacing: Double = native.value, extendedPadding: EdgeInsetsGeometry = native.value, extendedTextStyle: TextStyle = native.value, icon: Widget = native.value, label: Widget, enableFeedback: Boolean = native.value): FloatingActionButton = native.value
+  def small(key: Key = native.value, child: Widget = native.value, tooltip: String = native.value, foregroundColor: Color = native.value, backgroundColor: Color = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, splashColor: Color = native.value, heroTag: Any = native.value, elevation: Double = native.value, focusElevation: Double = native.value, hoverElevation: Double = native.value, highlightElevation: Double = native.value, disabledElevation: Double = native.value, onPressed: () => Unit, mouseCursor: DartObject = native.value, shape: DartObject = native.value, clipBehavior: Clip = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, materialTapTargetSize: MaterialTapTargetSize = native.value, enableFeedback: Boolean = native.value): FloatingActionButton = native.value
+  def large(key: Key = native.value, child: Widget = native.value, tooltip: String = native.value, foregroundColor: Color = native.value, backgroundColor: Color = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, splashColor: Color = native.value, heroTag: Any = native.value, elevation: Double = native.value, focusElevation: Double = native.value, hoverElevation: Double = native.value, highlightElevation: Double = native.value, disabledElevation: Double = native.value, onPressed: () => Unit, mouseCursor: DartObject = native.value, shape: DartObject = native.value, clipBehavior: Clip = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, materialTapTargetSize: MaterialTapTargetSize = native.value, enableFeedback: Boolean = native.value): FloatingActionButton = native.value
+  def extended(key: Key = native.value, tooltip: String = native.value, foregroundColor: Color = native.value, backgroundColor: Color = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, heroTag: Any = native.value, elevation: Double = native.value, focusElevation: Double = native.value, hoverElevation: Double = native.value, splashColor: Color = native.value, highlightElevation: Double = native.value, disabledElevation: Double = native.value, onPressed: () => Unit, mouseCursor: DartObject = native.value, shape: DartObject = native.value, isExtended: Boolean = native.value, materialTapTargetSize: MaterialTapTargetSize = native.value, clipBehavior: Clip = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, extendedIconLabelSpacing: Double = native.value, extendedPadding: EdgeInsetsGeometry = native.value, extendedTextStyle: TextStyle = native.value, icon: Widget = native.value, label: Widget, enableFeedback: Boolean = native.value): FloatingActionButton = native.value
 
 // ─── card.dart ────────────────────────────────────────
 
@@ -11277,7 +11299,7 @@ class Card(
   val shape: DartObject = native.value,
   val borderOnForeground: Boolean = native.value,
   val margin: EdgeInsetsGeometry = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val child: Widget = native.value,
   val semanticContainer: Boolean = native.value
 ) extends StatelessWidget
@@ -11285,8 +11307,8 @@ class Card(
 @native
 @DartImport("package:flutter/material.dart")
 object Card:
-  def filled(key: Key = native.value, color: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, elevation: Double = native.value, shape: DartObject = native.value, borderOnForeground: Boolean = native.value, margin: EdgeInsetsGeometry = native.value, clipBehavior: DartObject = native.value, child: Widget = native.value, semanticContainer: Boolean = native.value): Card = native.value
-  def outlined(key: Key = native.value, color: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, elevation: Double = native.value, shape: DartObject = native.value, borderOnForeground: Boolean = native.value, margin: EdgeInsetsGeometry = native.value, clipBehavior: DartObject = native.value, child: Widget = native.value, semanticContainer: Boolean = native.value): Card = native.value
+  def filled(key: Key = native.value, color: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, elevation: Double = native.value, shape: DartObject = native.value, borderOnForeground: Boolean = native.value, margin: EdgeInsetsGeometry = native.value, clipBehavior: Clip = native.value, child: Widget = native.value, semanticContainer: Boolean = native.value): Card = native.value
+  def outlined(key: Key = native.value, color: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, elevation: Double = native.value, shape: DartObject = native.value, borderOnForeground: Boolean = native.value, margin: EdgeInsetsGeometry = native.value, clipBehavior: Clip = native.value, child: Widget = native.value, semanticContainer: Boolean = native.value): Card = native.value
 
 // ─── divider.dart ────────────────────────────────────────
 
@@ -11320,7 +11342,7 @@ class ElevatedButton(
   val style: ButtonStyle = native.value,
   val focusNode: FocusNode = native.value,
   val autofocus: Boolean = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val statesController: ValueNotifier[?] = native.value,
   val child: Widget
 ) extends StatefulWidget
@@ -11328,8 +11350,8 @@ class ElevatedButton(
 @native
 @DartImport("package:flutter/material.dart")
 object ElevatedButton:
-  def icon(key: Key = native.value, onPressed: () => Unit, onLongPress: () => Unit = native.value, onHover: Boolean => Unit = native.value, onFocusChange: Boolean => Unit = native.value, style: ButtonStyle = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, clipBehavior: DartObject = native.value, statesController: ValueNotifier[?] = native.value, icon: Widget = native.value, label: Widget, iconAlignment: DartObject = native.value): ElevatedButton = native.value
-  def styleFrom(foregroundColor: Color = native.value, backgroundColor: Color = native.value, disabledForegroundColor: Color = native.value, disabledBackgroundColor: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, iconColor: Color = native.value, iconSize: Double = native.value, iconAlignment: DartObject = native.value, disabledIconColor: Color = native.value, overlayColor: Color = native.value, elevation: Double = native.value, textStyle: TextStyle = native.value, padding: EdgeInsetsGeometry = native.value, minimumSize: Size = native.value, fixedSize: Size = native.value, maximumSize: Size = native.value, side: BorderSide = native.value, shape: DartObject = native.value, enabledMouseCursor: DartObject = native.value, disabledMouseCursor: DartObject = native.value, visualDensity: VisualDensity = native.value, tapTargetSize: DartObject = native.value, animationDuration: sart.stdlib.Duration = native.value, enableFeedback: Boolean = native.value, alignment: AlignmentGeometry = native.value, splashFactory: DartObject = native.value, backgroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value, foregroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value): ButtonStyle = native.value
+  def icon(key: Key = native.value, onPressed: () => Unit, onLongPress: () => Unit = native.value, onHover: Boolean => Unit = native.value, onFocusChange: Boolean => Unit = native.value, style: ButtonStyle = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, clipBehavior: Clip = native.value, statesController: ValueNotifier[?] = native.value, icon: Widget = native.value, label: Widget, iconAlignment: DartObject = native.value): ElevatedButton = native.value
+  def styleFrom(foregroundColor: Color = native.value, backgroundColor: Color = native.value, disabledForegroundColor: Color = native.value, disabledBackgroundColor: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, iconColor: Color = native.value, iconSize: Double = native.value, iconAlignment: DartObject = native.value, disabledIconColor: Color = native.value, overlayColor: Color = native.value, elevation: Double = native.value, textStyle: TextStyle = native.value, padding: EdgeInsetsGeometry = native.value, minimumSize: Size = native.value, fixedSize: Size = native.value, maximumSize: Size = native.value, side: BorderSide = native.value, shape: DartObject = native.value, enabledMouseCursor: DartObject = native.value, disabledMouseCursor: DartObject = native.value, visualDensity: VisualDensity = native.value, tapTargetSize: MaterialTapTargetSize = native.value, animationDuration: sart.stdlib.Duration = native.value, enableFeedback: Boolean = native.value, alignment: AlignmentGeometry = native.value, splashFactory: DartObject = native.value, backgroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value, foregroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value): ButtonStyle = native.value
 
 // ─── text_button.dart ────────────────────────────────────────
 
@@ -11344,7 +11366,7 @@ class TextButton(
   val style: ButtonStyle = native.value,
   val focusNode: FocusNode = native.value,
   val autofocus: Boolean = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val statesController: ValueNotifier[?] = native.value,
   val isSemanticButton: Boolean = native.value,
   val child: Widget
@@ -11353,8 +11375,8 @@ class TextButton(
 @native
 @DartImport("package:flutter/material.dart")
 object TextButton:
-  def icon(key: Key = native.value, onPressed: () => Unit, onLongPress: () => Unit = native.value, onHover: Boolean => Unit = native.value, onFocusChange: Boolean => Unit = native.value, style: ButtonStyle = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, clipBehavior: DartObject = native.value, statesController: ValueNotifier[?] = native.value, icon: Widget = native.value, label: Widget, iconAlignment: DartObject = native.value): TextButton = native.value
-  def styleFrom(foregroundColor: Color = native.value, backgroundColor: Color = native.value, disabledForegroundColor: Color = native.value, disabledBackgroundColor: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, iconColor: Color = native.value, iconSize: Double = native.value, iconAlignment: DartObject = native.value, disabledIconColor: Color = native.value, overlayColor: Color = native.value, elevation: Double = native.value, textStyle: TextStyle = native.value, padding: EdgeInsetsGeometry = native.value, minimumSize: Size = native.value, fixedSize: Size = native.value, maximumSize: Size = native.value, side: BorderSide = native.value, shape: DartObject = native.value, enabledMouseCursor: DartObject = native.value, disabledMouseCursor: DartObject = native.value, visualDensity: VisualDensity = native.value, tapTargetSize: DartObject = native.value, animationDuration: sart.stdlib.Duration = native.value, enableFeedback: Boolean = native.value, alignment: AlignmentGeometry = native.value, splashFactory: DartObject = native.value, backgroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value, foregroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value): ButtonStyle = native.value
+  def icon(key: Key = native.value, onPressed: () => Unit, onLongPress: () => Unit = native.value, onHover: Boolean => Unit = native.value, onFocusChange: Boolean => Unit = native.value, style: ButtonStyle = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, clipBehavior: Clip = native.value, statesController: ValueNotifier[?] = native.value, icon: Widget = native.value, label: Widget, iconAlignment: DartObject = native.value): TextButton = native.value
+  def styleFrom(foregroundColor: Color = native.value, backgroundColor: Color = native.value, disabledForegroundColor: Color = native.value, disabledBackgroundColor: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, iconColor: Color = native.value, iconSize: Double = native.value, iconAlignment: DartObject = native.value, disabledIconColor: Color = native.value, overlayColor: Color = native.value, elevation: Double = native.value, textStyle: TextStyle = native.value, padding: EdgeInsetsGeometry = native.value, minimumSize: Size = native.value, fixedSize: Size = native.value, maximumSize: Size = native.value, side: BorderSide = native.value, shape: DartObject = native.value, enabledMouseCursor: DartObject = native.value, disabledMouseCursor: DartObject = native.value, visualDensity: VisualDensity = native.value, tapTargetSize: MaterialTapTargetSize = native.value, animationDuration: sart.stdlib.Duration = native.value, enableFeedback: Boolean = native.value, alignment: AlignmentGeometry = native.value, splashFactory: DartObject = native.value, backgroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value, foregroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value): ButtonStyle = native.value
 
 // ─── icon_button.dart ────────────────────────────────────────
 
@@ -11395,7 +11417,7 @@ object IconButton:
   def filled(key: Key = native.value, iconSize: Double = native.value, visualDensity: VisualDensity = native.value, padding: EdgeInsetsGeometry = native.value, alignment: AlignmentGeometry = native.value, splashRadius: Double = native.value, color: Color = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, highlightColor: Color = native.value, splashColor: Color = native.value, disabledColor: Color = native.value, onPressed: () => Unit, onHover: Boolean => Unit = native.value, onLongPress: () => Unit = native.value, mouseCursor: DartObject = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, tooltip: String = native.value, enableFeedback: Boolean = native.value, constraints: BoxConstraints = native.value, style: ButtonStyle = native.value, isSelected: Boolean = native.value, selectedIcon: Widget = native.value, statesController: ValueNotifier[?] = native.value, icon: Widget): IconButton = native.value
   def filledTonal(key: Key = native.value, iconSize: Double = native.value, visualDensity: VisualDensity = native.value, padding: EdgeInsetsGeometry = native.value, alignment: AlignmentGeometry = native.value, splashRadius: Double = native.value, color: Color = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, highlightColor: Color = native.value, splashColor: Color = native.value, disabledColor: Color = native.value, onPressed: () => Unit, onHover: Boolean => Unit = native.value, onLongPress: () => Unit = native.value, mouseCursor: DartObject = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, tooltip: String = native.value, enableFeedback: Boolean = native.value, constraints: BoxConstraints = native.value, style: ButtonStyle = native.value, isSelected: Boolean = native.value, selectedIcon: Widget = native.value, statesController: ValueNotifier[?] = native.value, icon: Widget): IconButton = native.value
   def outlined(key: Key = native.value, iconSize: Double = native.value, visualDensity: VisualDensity = native.value, padding: EdgeInsetsGeometry = native.value, alignment: AlignmentGeometry = native.value, splashRadius: Double = native.value, color: Color = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, highlightColor: Color = native.value, splashColor: Color = native.value, disabledColor: Color = native.value, onPressed: () => Unit, onHover: Boolean => Unit = native.value, onLongPress: () => Unit = native.value, mouseCursor: DartObject = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, tooltip: String = native.value, enableFeedback: Boolean = native.value, constraints: BoxConstraints = native.value, style: ButtonStyle = native.value, isSelected: Boolean = native.value, selectedIcon: Widget = native.value, statesController: ValueNotifier[?] = native.value, icon: Widget): IconButton = native.value
-  def styleFrom(foregroundColor: Color = native.value, backgroundColor: Color = native.value, disabledForegroundColor: Color = native.value, disabledBackgroundColor: Color = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, highlightColor: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, overlayColor: Color = native.value, elevation: Double = native.value, minimumSize: Size = native.value, fixedSize: Size = native.value, maximumSize: Size = native.value, iconSize: Double = native.value, side: BorderSide = native.value, shape: DartObject = native.value, padding: EdgeInsetsGeometry = native.value, enabledMouseCursor: DartObject = native.value, disabledMouseCursor: DartObject = native.value, visualDensity: VisualDensity = native.value, tapTargetSize: DartObject = native.value, animationDuration: sart.stdlib.Duration = native.value, enableFeedback: Boolean = native.value, alignment: AlignmentGeometry = native.value, splashFactory: DartObject = native.value): ButtonStyle = native.value
+  def styleFrom(foregroundColor: Color = native.value, backgroundColor: Color = native.value, disabledForegroundColor: Color = native.value, disabledBackgroundColor: Color = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, highlightColor: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, overlayColor: Color = native.value, elevation: Double = native.value, minimumSize: Size = native.value, fixedSize: Size = native.value, maximumSize: Size = native.value, iconSize: Double = native.value, side: BorderSide = native.value, shape: DartObject = native.value, padding: EdgeInsetsGeometry = native.value, enabledMouseCursor: DartObject = native.value, disabledMouseCursor: DartObject = native.value, visualDensity: VisualDensity = native.value, tapTargetSize: MaterialTapTargetSize = native.value, animationDuration: sart.stdlib.Duration = native.value, enableFeedback: Boolean = native.value, alignment: AlignmentGeometry = native.value, splashFactory: DartObject = native.value): ButtonStyle = native.value
 
 // ─── input_decorator.dart ────────────────────────────────────────
 
@@ -11678,7 +11700,7 @@ class TextField(
   val scrollPhysics: DartObject = native.value,
   val autofillHints: List[String] = native.value,
   val contentInsertionConfiguration: DartObject = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val restorationId: String = native.value,
   val scribbleEnabled: Boolean = native.value,
   val stylusHandwritingEnabled: Boolean = native.value,
@@ -11717,7 +11739,7 @@ class Checkbox(
   val hoverColor: Color = native.value,
   val overlayColor: WidgetStateProperty[Color] = native.value,
   val splashRadius: Double = native.value,
-  val materialTapTargetSize: DartObject = native.value,
+  val materialTapTargetSize: MaterialTapTargetSize = native.value,
   val visualDensity: VisualDensity = native.value,
   val focusNode: FocusNode = native.value,
   val autofocus: Boolean = native.value,
@@ -11731,7 +11753,7 @@ class Checkbox(
 @DartImport("package:flutter/material.dart")
 object Checkbox:
   def width: Double = native.value
-  def adaptive(key: Key = native.value, value: Boolean, tristate: Boolean = native.value, onChanged: sart.stdlib.Option[Boolean] => Unit, mouseCursor: DartObject = native.value, activeColor: Color = native.value, fillColor: WidgetStateProperty[Color] = native.value, checkColor: Color = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, overlayColor: WidgetStateProperty[Color] = native.value, splashRadius: Double = native.value, materialTapTargetSize: DartObject = native.value, visualDensity: VisualDensity = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, shape: DartObject = native.value, side: BorderSide = native.value, isError: Boolean = native.value, semanticLabel: String = native.value): Checkbox = native.value
+  def adaptive(key: Key = native.value, value: Boolean, tristate: Boolean = native.value, onChanged: sart.stdlib.Option[Boolean] => Unit, mouseCursor: DartObject = native.value, activeColor: Color = native.value, fillColor: WidgetStateProperty[Color] = native.value, checkColor: Color = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, overlayColor: WidgetStateProperty[Color] = native.value, splashRadius: Double = native.value, materialTapTargetSize: MaterialTapTargetSize = native.value, visualDensity: VisualDensity = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, shape: DartObject = native.value, side: BorderSide = native.value, isError: Boolean = native.value, semanticLabel: String = native.value): Checkbox = native.value
 
 // ─── switch.dart ────────────────────────────────────────
 
@@ -11755,7 +11777,7 @@ class Switch(
   val trackOutlineColor: WidgetStateProperty[Color] = native.value,
   val trackOutlineWidth: WidgetStateProperty[Double] = native.value,
   val thumbIcon: WidgetStateProperty[Icon] = native.value,
-  val materialTapTargetSize: DartObject = native.value,
+  val materialTapTargetSize: MaterialTapTargetSize = native.value,
   val dragStartBehavior: DartObject = native.value,
   val mouseCursor: DartObject = native.value,
   val focusColor: Color = native.value,
@@ -11772,7 +11794,7 @@ class Switch(
 @native
 @DartImport("package:flutter/material.dart")
 object Switch:
-  def adaptive(key: Key = native.value, value: Boolean, onChanged: Boolean => Unit, activeColor: Color = native.value, activeThumbColor: Color = native.value, activeTrackColor: Color = native.value, inactiveThumbColor: Color = native.value, inactiveTrackColor: Color = native.value, activeThumbImage: ImageProvider = native.value, onActiveThumbImageError: (Any, sart.stdlib.Option[DartObject]) => Unit = native.value, inactiveThumbImage: ImageProvider = native.value, onInactiveThumbImageError: (Any, sart.stdlib.Option[DartObject]) => Unit = native.value, materialTapTargetSize: DartObject = native.value, thumbColor: WidgetStateProperty[Color] = native.value, trackColor: WidgetStateProperty[Color] = native.value, trackOutlineColor: WidgetStateProperty[Color] = native.value, trackOutlineWidth: WidgetStateProperty[Double] = native.value, thumbIcon: WidgetStateProperty[Icon] = native.value, dragStartBehavior: DartObject = native.value, mouseCursor: DartObject = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, overlayColor: WidgetStateProperty[Color] = native.value, splashRadius: Double = native.value, focusNode: FocusNode = native.value, onFocusChange: Boolean => Unit = native.value, autofocus: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, applyCupertinoTheme: Boolean = native.value): Switch = native.value
+  def adaptive(key: Key = native.value, value: Boolean, onChanged: Boolean => Unit, activeColor: Color = native.value, activeThumbColor: Color = native.value, activeTrackColor: Color = native.value, inactiveThumbColor: Color = native.value, inactiveTrackColor: Color = native.value, activeThumbImage: ImageProvider = native.value, onActiveThumbImageError: (Any, sart.stdlib.Option[DartObject]) => Unit = native.value, inactiveThumbImage: ImageProvider = native.value, onInactiveThumbImageError: (Any, sart.stdlib.Option[DartObject]) => Unit = native.value, materialTapTargetSize: MaterialTapTargetSize = native.value, thumbColor: WidgetStateProperty[Color] = native.value, trackColor: WidgetStateProperty[Color] = native.value, trackOutlineColor: WidgetStateProperty[Color] = native.value, trackOutlineWidth: WidgetStateProperty[Double] = native.value, thumbIcon: WidgetStateProperty[Icon] = native.value, dragStartBehavior: DartObject = native.value, mouseCursor: DartObject = native.value, focusColor: Color = native.value, hoverColor: Color = native.value, overlayColor: WidgetStateProperty[Color] = native.value, splashRadius: Double = native.value, focusNode: FocusNode = native.value, onFocusChange: Boolean => Unit = native.value, autofocus: Boolean = native.value, padding: EdgeInsetsGeometry = native.value, applyCupertinoTheme: Boolean = native.value): Switch = native.value
 
 // ─── list_tile.dart ────────────────────────────────────────
 
@@ -11839,7 +11861,7 @@ class CheckboxListTile(
   val hoverColor: Color = native.value,
   val overlayColor: WidgetStateProperty[Color] = native.value,
   val splashRadius: Double = native.value,
-  val materialTapTargetSize: DartObject = native.value,
+  val materialTapTargetSize: MaterialTapTargetSize = native.value,
   val visualDensity: VisualDensity = native.value,
   val focusNode: FocusNode = native.value,
   val statesController: ValueNotifier[?] = native.value,
@@ -11875,9 +11897,33 @@ class CheckboxListTile(
 @native
 @DartImport("package:flutter/material.dart")
 object CheckboxListTile:
-  def adaptive(key: Key = native.value, value: Boolean, onChanged: sart.stdlib.Option[Boolean] => Unit, mouseCursor: DartObject = native.value, activeColor: Color = native.value, fillColor: WidgetStateProperty[Color] = native.value, checkColor: Color = native.value, hoverColor: Color = native.value, overlayColor: WidgetStateProperty[Color] = native.value, splashRadius: Double = native.value, materialTapTargetSize: DartObject = native.value, visualDensity: VisualDensity = native.value, focusNode: FocusNode = native.value, statesController: ValueNotifier[?] = native.value, autofocus: Boolean = native.value, shape: DartObject = native.value, side: BorderSide = native.value, isError: Boolean = native.value, enabled: Boolean = native.value, tileColor: Color = native.value, title: Widget = native.value, subtitle: Widget = native.value, isThreeLine: Boolean = native.value, dense: Boolean = native.value, secondary: Widget = native.value, selected: Boolean = native.value, controlAffinity: DartObject = native.value, contentPadding: EdgeInsetsGeometry = native.value, tristate: Boolean = native.value, checkboxShape: DartObject = native.value, selectedTileColor: Color = native.value, onFocusChange: Boolean => Unit = native.value, enableFeedback: Boolean = native.value, horizontalTitleGap: Double = native.value, minVerticalPadding: Double = native.value, minLeadingWidth: Double = native.value, minTileHeight: Double = native.value, checkboxSemanticLabel: String = native.value, checkboxScaleFactor: Double = native.value, titleAlignment: DartObject = native.value, internalAddSemanticForOnTap: Boolean = native.value): CheckboxListTile = native.value
+  def adaptive(key: Key = native.value, value: Boolean, onChanged: sart.stdlib.Option[Boolean] => Unit, mouseCursor: DartObject = native.value, activeColor: Color = native.value, fillColor: WidgetStateProperty[Color] = native.value, checkColor: Color = native.value, hoverColor: Color = native.value, overlayColor: WidgetStateProperty[Color] = native.value, splashRadius: Double = native.value, materialTapTargetSize: MaterialTapTargetSize = native.value, visualDensity: VisualDensity = native.value, focusNode: FocusNode = native.value, statesController: ValueNotifier[?] = native.value, autofocus: Boolean = native.value, shape: DartObject = native.value, side: BorderSide = native.value, isError: Boolean = native.value, enabled: Boolean = native.value, tileColor: Color = native.value, title: Widget = native.value, subtitle: Widget = native.value, isThreeLine: Boolean = native.value, dense: Boolean = native.value, secondary: Widget = native.value, selected: Boolean = native.value, controlAffinity: DartObject = native.value, contentPadding: EdgeInsetsGeometry = native.value, tristate: Boolean = native.value, checkboxShape: DartObject = native.value, selectedTileColor: Color = native.value, onFocusChange: Boolean => Unit = native.value, enableFeedback: Boolean = native.value, horizontalTitleGap: Double = native.value, minVerticalPadding: Double = native.value, minLeadingWidth: Double = native.value, minTileHeight: Double = native.value, checkboxSemanticLabel: String = native.value, checkboxScaleFactor: Double = native.value, titleAlignment: DartObject = native.value, internalAddSemanticForOnTap: Boolean = native.value): CheckboxListTile = native.value
 
 // ─── dialog.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class Dialog(
+  val key: Key = native.value,
+  val backgroundColor: Color = native.value,
+  val elevation: Double = native.value,
+  val shadowColor: Color = native.value,
+  val surfaceTintColor: Color = native.value,
+  val insetAnimationDuration: sart.stdlib.Duration = native.value,
+  val insetAnimationCurve: DartObject = native.value,
+  val insetPadding: EdgeInsets = native.value,
+  val clipBehavior: Clip = native.value,
+  val shape: DartObject = native.value,
+  val alignment: AlignmentGeometry = native.value,
+  val child: Widget = native.value,
+  val semanticsRole: DartObject = native.value,
+  val constraints: BoxConstraints = native.value
+) extends StatelessWidget
+
+@native
+@DartImport("package:flutter/material.dart")
+object Dialog:
+  def fullscreen(key: Key = native.value, backgroundColor: Color = native.value, insetAnimationDuration: sart.stdlib.Duration = native.value, insetAnimationCurve: DartObject = native.value, child: Widget = native.value, semanticsRole: DartObject = native.value): Dialog = native.value
 
 @native
 @DartImport("package:flutter/material.dart")
@@ -11905,7 +11951,7 @@ class AlertDialog(
   val surfaceTintColor: Color = native.value,
   val semanticLabel: String = native.value,
   val insetPadding: EdgeInsets = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val shape: DartObject = native.value,
   val alignment: AlignmentGeometry = native.value,
   val constraints: BoxConstraints = native.value,
@@ -11915,7 +11961,7 @@ class AlertDialog(
 @native
 @DartImport("package:flutter/material.dart")
 object AlertDialog:
-  def adaptive(key: Key = native.value, icon: Widget = native.value, iconPadding: EdgeInsetsGeometry = native.value, iconColor: Color = native.value, title: Widget = native.value, titlePadding: EdgeInsetsGeometry = native.value, titleTextStyle: TextStyle = native.value, content: Widget = native.value, contentPadding: EdgeInsetsGeometry = native.value, contentTextStyle: TextStyle = native.value, actions: List[Widget] = native.value, actionsPadding: EdgeInsetsGeometry = native.value, actionsAlignment: MainAxisAlignment = native.value, actionsOverflowAlignment: DartObject = native.value, actionsOverflowDirection: DartObject = native.value, actionsOverflowButtonSpacing: Double = native.value, buttonPadding: EdgeInsetsGeometry = native.value, backgroundColor: Color = native.value, elevation: Double = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, semanticLabel: String = native.value, insetPadding: EdgeInsets = native.value, clipBehavior: DartObject = native.value, shape: DartObject = native.value, alignment: AlignmentGeometry = native.value, constraints: BoxConstraints = native.value, scrollable: Boolean = native.value, scrollController: ScrollController = native.value, actionScrollController: ScrollController = native.value, insetAnimationDuration: sart.stdlib.Duration = native.value, insetAnimationCurve: DartObject = native.value): AlertDialog = native.value
+  def adaptive(key: Key = native.value, icon: Widget = native.value, iconPadding: EdgeInsetsGeometry = native.value, iconColor: Color = native.value, title: Widget = native.value, titlePadding: EdgeInsetsGeometry = native.value, titleTextStyle: TextStyle = native.value, content: Widget = native.value, contentPadding: EdgeInsetsGeometry = native.value, contentTextStyle: TextStyle = native.value, actions: List[Widget] = native.value, actionsPadding: EdgeInsetsGeometry = native.value, actionsAlignment: MainAxisAlignment = native.value, actionsOverflowAlignment: DartObject = native.value, actionsOverflowDirection: DartObject = native.value, actionsOverflowButtonSpacing: Double = native.value, buttonPadding: EdgeInsetsGeometry = native.value, backgroundColor: Color = native.value, elevation: Double = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, semanticLabel: String = native.value, insetPadding: EdgeInsets = native.value, clipBehavior: Clip = native.value, shape: DartObject = native.value, alignment: AlignmentGeometry = native.value, constraints: BoxConstraints = native.value, scrollable: Boolean = native.value, scrollController: ScrollController = native.value, actionScrollController: ScrollController = native.value, insetAnimationDuration: sart.stdlib.Duration = native.value, insetAnimationCurve: DartObject = native.value): AlertDialog = native.value
 
 @native
 @DartImport("package:flutter/material.dart")
@@ -11933,7 +11979,7 @@ class SimpleDialog(
   val surfaceTintColor: Color = native.value,
   val semanticLabel: String = native.value,
   val insetPadding: EdgeInsets = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val shape: DartObject = native.value,
   val alignment: AlignmentGeometry = native.value,
   val constraints: BoxConstraints = native.value
@@ -12014,7 +12060,7 @@ class DataTable(
   val rows: List[DataRow],
   val checkboxHorizontalMargin: Double = native.value,
   val border: TableBorder = native.value,
-  val clipBehavior: DartObject = native.value
+  val clipBehavior: Clip = native.value
 ) extends StatelessWidget
 
 // ─── tabs.dart ────────────────────────────────────────
@@ -12082,7 +12128,7 @@ class TabBarView(
   val physics: DartObject = native.value,
   val dragStartBehavior: DartObject = native.value,
   val viewportFraction: Double = native.value,
-  val clipBehavior: DartObject = native.value
+  val clipBehavior: Clip = native.value
 ) extends StatefulWidget
 
 // ─── tab_controller.dart ────────────────────────────────────────
@@ -12321,7 +12367,7 @@ class TextFormField(
   val dragStartBehavior: DartObject = native.value,
   val contentInsertionConfiguration: DartObject = native.value,
   val statesController: ValueNotifier[?] = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val scribbleEnabled: Boolean = native.value,
   val stylusHandwritingEnabled: Boolean = native.value,
   val canRequestFocus: Boolean = native.value,
@@ -12337,7 +12383,7 @@ class BottomAppBar(
   val color: Color = native.value,
   val elevation: Double = native.value,
   val shape: DartObject = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val notchMargin: Double = native.value,
   val child: Widget = native.value,
   val padding: EdgeInsetsGeometry = native.value,
@@ -12361,7 +12407,7 @@ class Material(
   val borderRadius: BorderRadiusGeometry = native.value,
   val shape: DartObject = native.value,
   val borderOnForeground: Boolean = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val animationDuration: sart.stdlib.Duration = native.value,
   val child: Widget = native.value,
   val animateColor: Boolean = native.value
@@ -12427,7 +12473,7 @@ class PopupMenuButton[T](
   val enableFeedback: Boolean = native.value,
   val constraints: BoxConstraints = native.value,
   val position: DartObject = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val useRootNavigator: Boolean = native.value,
   val popUpAnimationStyle: DartObject = native.value,
   val routeSettings: DartObject = native.value,
@@ -12458,7 +12504,7 @@ class ButtonStyle(
   val shape: WidgetStateProperty[DartObject] = native.value,
   val mouseCursor: WidgetStateProperty[DartObject] = native.value,
   val visualDensity: VisualDensity = native.value,
-  val tapTargetSize: DartObject = native.value,
+  val tapTargetSize: MaterialTapTargetSize = native.value,
   val animationDuration: sart.stdlib.Duration = native.value,
   val enableFeedback: Boolean = native.value,
   val alignment: AlignmentGeometry = native.value,
@@ -12466,7 +12512,7 @@ class ButtonStyle(
   val backgroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value,
   val foregroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value
 ) extends DartObject:
-  def copyWith(textStyle: WidgetStateProperty[TextStyle] = native.value, backgroundColor: WidgetStateProperty[Color] = native.value, foregroundColor: WidgetStateProperty[Color] = native.value, overlayColor: WidgetStateProperty[Color] = native.value, shadowColor: WidgetStateProperty[Color] = native.value, surfaceTintColor: WidgetStateProperty[Color] = native.value, elevation: WidgetStateProperty[Double] = native.value, padding: WidgetStateProperty[EdgeInsetsGeometry] = native.value, minimumSize: WidgetStateProperty[Size] = native.value, fixedSize: WidgetStateProperty[Size] = native.value, maximumSize: WidgetStateProperty[Size] = native.value, iconColor: WidgetStateProperty[Color] = native.value, iconSize: WidgetStateProperty[Double] = native.value, iconAlignment: DartObject = native.value, side: WidgetStateProperty[BorderSide] = native.value, shape: WidgetStateProperty[DartObject] = native.value, mouseCursor: WidgetStateProperty[DartObject] = native.value, visualDensity: VisualDensity = native.value, tapTargetSize: DartObject = native.value, animationDuration: sart.stdlib.Duration = native.value, enableFeedback: Boolean = native.value, alignment: AlignmentGeometry = native.value, splashFactory: DartObject = native.value, backgroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value, foregroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value): ButtonStyle = native.value
+  def copyWith(textStyle: WidgetStateProperty[TextStyle] = native.value, backgroundColor: WidgetStateProperty[Color] = native.value, foregroundColor: WidgetStateProperty[Color] = native.value, overlayColor: WidgetStateProperty[Color] = native.value, shadowColor: WidgetStateProperty[Color] = native.value, surfaceTintColor: WidgetStateProperty[Color] = native.value, elevation: WidgetStateProperty[Double] = native.value, padding: WidgetStateProperty[EdgeInsetsGeometry] = native.value, minimumSize: WidgetStateProperty[Size] = native.value, fixedSize: WidgetStateProperty[Size] = native.value, maximumSize: WidgetStateProperty[Size] = native.value, iconColor: WidgetStateProperty[Color] = native.value, iconSize: WidgetStateProperty[Double] = native.value, iconAlignment: DartObject = native.value, side: WidgetStateProperty[BorderSide] = native.value, shape: WidgetStateProperty[DartObject] = native.value, mouseCursor: WidgetStateProperty[DartObject] = native.value, visualDensity: VisualDensity = native.value, tapTargetSize: MaterialTapTargetSize = native.value, animationDuration: sart.stdlib.Duration = native.value, enableFeedback: Boolean = native.value, alignment: AlignmentGeometry = native.value, splashFactory: DartObject = native.value, backgroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value, foregroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value): ButtonStyle = native.value
   def merge(style: ButtonStyle): ButtonStyle = native.value
   def debugFillProperties(properties: DartObject): Unit = native.value
 
@@ -12485,12 +12531,12 @@ class CheckboxThemeData(
   val checkColor: WidgetStateProperty[Color] = native.value,
   val overlayColor: WidgetStateProperty[Color] = native.value,
   val splashRadius: Double = native.value,
-  val materialTapTargetSize: DartObject = native.value,
+  val materialTapTargetSize: MaterialTapTargetSize = native.value,
   val visualDensity: VisualDensity = native.value,
   val shape: DartObject = native.value,
   val side: BorderSide = native.value
 ) extends DartObject:
-  def copyWith(mouseCursor: WidgetStateProperty[DartObject] = native.value, fillColor: WidgetStateProperty[Color] = native.value, checkColor: WidgetStateProperty[Color] = native.value, overlayColor: WidgetStateProperty[Color] = native.value, splashRadius: Double = native.value, materialTapTargetSize: DartObject = native.value, visualDensity: VisualDensity = native.value, shape: DartObject = native.value, side: BorderSide = native.value): CheckboxThemeData = native.value
+  def copyWith(mouseCursor: WidgetStateProperty[DartObject] = native.value, fillColor: WidgetStateProperty[Color] = native.value, checkColor: WidgetStateProperty[Color] = native.value, overlayColor: WidgetStateProperty[Color] = native.value, splashRadius: Double = native.value, materialTapTargetSize: MaterialTapTargetSize = native.value, visualDensity: VisualDensity = native.value, shape: DartObject = native.value, side: BorderSide = native.value): CheckboxThemeData = native.value
   def debugFillProperties(properties: DartObject): Unit = native.value
 
 @native
@@ -12574,6 +12620,47 @@ class InkWell(
   val hoverDuration: sart.stdlib.Duration = native.value
 ) extends StatelessWidget
 
+// ─── expansion_tile.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class ExpansionTile(
+  val key: Key = native.value,
+  val leading: Widget = native.value,
+  val title: Widget,
+  val subtitle: Widget = native.value,
+  val onExpansionChanged: Boolean => Unit = native.value,
+  val children: List[Widget] = native.value,
+  val trailing: Widget = native.value,
+  val showTrailingIcon: Boolean = native.value,
+  val initiallyExpanded: Boolean = native.value,
+  val maintainState: Boolean = native.value,
+  val tilePadding: EdgeInsetsGeometry = native.value,
+  val expandedCrossAxisAlignment: CrossAxisAlignment = native.value,
+  val expandedAlignment: AlignmentGeometry = native.value,
+  val childrenPadding: EdgeInsetsGeometry = native.value,
+  val backgroundColor: Color = native.value,
+  val collapsedBackgroundColor: Color = native.value,
+  val textColor: Color = native.value,
+  val collapsedTextColor: Color = native.value,
+  val iconColor: Color = native.value,
+  val collapsedIconColor: Color = native.value,
+  val shape: DartObject = native.value,
+  val collapsedShape: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
+  val controlAffinity: DartObject = native.value,
+  val controller: ChangeNotifier = native.value,
+  val dense: Boolean = native.value,
+  val splashColor: Color = native.value,
+  val visualDensity: VisualDensity = native.value,
+  val minTileHeight: Double = native.value,
+  val enableFeedback: Boolean = native.value,
+  val enabled: Boolean = native.value,
+  val expansionAnimationStyle: DartObject = native.value,
+  val internalAddSemanticForOnTap: Boolean = native.value,
+  val statesController: ValueNotifier[?] = native.value
+) extends StatefulWidget
+
 // ─── badge.dart ────────────────────────────────────────
 
 @native
@@ -12636,7 +12723,7 @@ class OutlinedButton(
   val style: ButtonStyle = native.value,
   val focusNode: FocusNode = native.value,
   val autofocus: Boolean = native.value,
-  val clipBehavior: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
   val statesController: ValueNotifier[?] = native.value,
   val child: Widget
 ) extends StatefulWidget
@@ -12644,6 +12731,6 @@ class OutlinedButton(
 @native
 @DartImport("package:flutter/material.dart")
 object OutlinedButton:
-  def icon(key: Key = native.value, onPressed: () => Unit, onLongPress: () => Unit = native.value, onHover: Boolean => Unit = native.value, onFocusChange: Boolean => Unit = native.value, style: ButtonStyle = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, clipBehavior: DartObject = native.value, statesController: ValueNotifier[?] = native.value, icon: Widget = native.value, label: Widget, iconAlignment: DartObject = native.value): OutlinedButton = native.value
-  def styleFrom(foregroundColor: Color = native.value, backgroundColor: Color = native.value, disabledForegroundColor: Color = native.value, disabledBackgroundColor: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, iconColor: Color = native.value, iconSize: Double = native.value, iconAlignment: DartObject = native.value, disabledIconColor: Color = native.value, overlayColor: Color = native.value, elevation: Double = native.value, textStyle: TextStyle = native.value, padding: EdgeInsetsGeometry = native.value, minimumSize: Size = native.value, fixedSize: Size = native.value, maximumSize: Size = native.value, side: BorderSide = native.value, shape: DartObject = native.value, enabledMouseCursor: DartObject = native.value, disabledMouseCursor: DartObject = native.value, visualDensity: VisualDensity = native.value, tapTargetSize: DartObject = native.value, animationDuration: sart.stdlib.Duration = native.value, enableFeedback: Boolean = native.value, alignment: AlignmentGeometry = native.value, splashFactory: DartObject = native.value, backgroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value, foregroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value): ButtonStyle = native.value
+  def icon(key: Key = native.value, onPressed: () => Unit, onLongPress: () => Unit = native.value, onHover: Boolean => Unit = native.value, onFocusChange: Boolean => Unit = native.value, style: ButtonStyle = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, clipBehavior: Clip = native.value, statesController: ValueNotifier[?] = native.value, icon: Widget = native.value, label: Widget, iconAlignment: DartObject = native.value): OutlinedButton = native.value
+  def styleFrom(foregroundColor: Color = native.value, backgroundColor: Color = native.value, disabledForegroundColor: Color = native.value, disabledBackgroundColor: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, iconColor: Color = native.value, iconSize: Double = native.value, iconAlignment: DartObject = native.value, disabledIconColor: Color = native.value, overlayColor: Color = native.value, elevation: Double = native.value, textStyle: TextStyle = native.value, padding: EdgeInsetsGeometry = native.value, minimumSize: Size = native.value, fixedSize: Size = native.value, maximumSize: Size = native.value, side: BorderSide = native.value, shape: DartObject = native.value, enabledMouseCursor: DartObject = native.value, disabledMouseCursor: DartObject = native.value, visualDensity: VisualDensity = native.value, tapTargetSize: MaterialTapTargetSize = native.value, animationDuration: sart.stdlib.Duration = native.value, enableFeedback: Boolean = native.value, alignment: AlignmentGeometry = native.value, splashFactory: DartObject = native.value, backgroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value, foregroundBuilder: (BuildContext, Set[WidgetState], sart.stdlib.Option[Widget]) => Widget = native.value): ButtonStyle = native.value
 

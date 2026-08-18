@@ -721,11 +721,11 @@ class ShowcaseAppState extends State<ShowcaseApp> {
           ),
           SizedBox(height: 6.0),
           Text(
-            !emailTyped
+            (!emailTyped
                 ? '— type something —'
                 : emailValid
                 ? '✓ looks like an email'
-                : '✗ not a valid email',
+                : '✗ not a valid email'),
           ),
         ],
       ),

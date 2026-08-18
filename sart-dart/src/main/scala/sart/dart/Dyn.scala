@@ -11,6 +11,7 @@ package sart.dart
  *    - `d.toInt`  → `(d as int)`
  *    - `d.toBool` → `(d as bool)`
  *    - `d.isNull` → `(d == null)`
+ *    - `d.toList` → `(d as List<dynamic>)`
  */
 @native
 class Dyn extends DartObject:
@@ -20,3 +21,4 @@ class Dyn extends DartObject:
   def toInt: Int              = native.value
   def toBool: Boolean         = native.value
   def isNull: Boolean         = native.value
+  def toList: List[Dyn]       = native.value

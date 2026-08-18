@@ -153,6 +153,43 @@ class TextEditingController extends DartObject:
   def addListener(listener: () => Unit): Unit = native.value
   def removeListener(listener: () => Unit): Unit = native.value
 
+// ─── Keys / semantics (curated: generic parent chains the generator
+// can't bridge — ValueKey<T> → LocalKey → Key; Semantics extends a
+// private _SemanticsBase) ──────────────────────────────────────────────────
+@native
+@DartImport("package:flutter/material.dart")
+class ValueKey[T](val value: T) extends Key
+
+@native
+@DartImport("package:flutter/material.dart")
+class Semantics(
+  val key: Key = native.value,
+  val child: Widget = native.value,
+  val container: Boolean = native.value,
+  val label: String = native.value,
+  val tooltip: String = native.value,
+  val enabled: Boolean = native.value
+) extends StatelessWidget
+
+// ─── Material colors ───────────────────────────────────────────────────────
+
+// Curated: the real chain is MaterialColor → ColorSwatch<int> → Color; the
+// generator can't bridge the generic middle link, and `Colors.grey` et al.
+// must remain assignable wherever a Color is expected.
+@native
+@DartImport("package:flutter/material.dart")
+class MaterialColor extends Color(0):
+  def shade50: Color = native.value
+  def shade100: Color = native.value
+  def shade200: Color = native.value
+  def shade300: Color = native.value
+  def shade400: Color = native.value
+  def shade500: Color = native.value
+  def shade600: Color = native.value
+  def shade700: Color = native.value
+  def shade800: Color = native.value
+  def shade900: Color = native.value
+
 // ─── Keys ──────────────────────────────────────────────────────────────────
 
 // Curated: the real signature is `GlobalKey<T extends State<StatefulWidget>>`.
