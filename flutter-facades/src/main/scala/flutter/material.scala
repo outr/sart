@@ -250,6 +250,14 @@ class Matrix4 extends DartObject:
 object Matrix4:
   def identity(): Matrix4 = native.value
 
+// Curated: `value` is a settable property (the generator folds it into a
+// ctor val).
+@native
+@DartImport("package:flutter/material.dart")
+class TransformationController() extends DartObject:
+  var value: Matrix4 = native.value
+  def toScene(viewportPoint: Offset): Offset = native.value
+
 // Animation driver — curated so `vsync = this` (a TickerProvider mixin
 // receiver) types without the mixin surface.
 @native
