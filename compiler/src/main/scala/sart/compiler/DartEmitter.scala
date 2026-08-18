@@ -1021,6 +1021,8 @@ class DartEmitter(
           arg1 match
             case Some(v) if v.typeSymbol.fullName == "java.lang.String" =>
               s"($src as Map<String, dynamic>).map((k, v) => MapEntry(k, v as String))"
+            case Some(v) if isJsonObjectLike(v) =>
+              s"($src as Map<String, dynamic>).map((k, v) => MapEntry(k, ${v.typeSymbol.name}.fromJson(v as Map<String, dynamic>)))"
             case _ => s"($src as Map<String, dynamic>)"
         case _ if sym.flags.is(Flags.Case) || (sym.flags.is(Flags.Sealed) && hasJsonModel(sym)) =>
           s"${sym.name}.fromJson($src as Map<String, dynamic>)"
@@ -1045,6 +1047,11 @@ class DartEmitter(
           arg0 match
             case Some(a) if isJsonObjectLike(a) => s"$ref.map((e) => e.toJson()).toList()"
             case _                              => ref
+        case "scala.collection.immutable.Map" =>
+          tpe match
+            case AppliedType(_, List(_, v: TypeRepr)) if isJsonObjectLike(v) =>
+              s"$ref.map((k, v) => MapEntry(k, v.toJson()))"
+            case _ => ref
         case _ if isJsonObjectLike(tpe) => s"$ref.toJson()"
         case _ => ref
 
@@ -1078,11 +1085,13 @@ class DartEmitter(
       line(s"$className($ctorArgs);")
       indent -= 1
       blank()
-      // toJson
+      // toJson. A data field whose wire key collides with the sealed tag's
+      // 'type' key is dropped from the literal — the discriminator wins,
+      // mirroring json_serializable's `map['type'] = …` overwrite.
       if tag.isDefined then line("@override")
       line(s"Map<String, dynamic> toJson() => {")
       indent += 1
-      for p <- all do
+      for p <- all if !(tag.isDefined && jsonKeyOf(p) == "type") do
         line(s"'${jsonKeyOf(p)}': ${jsonEncodeExpr(p.tpt.tpe, p.name.toString)},")
       tag.foreach(t => line(s"'type': '$t',"))
       indent -= 1

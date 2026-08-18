@@ -633,6 +633,46 @@ class RoundedRectangleBorder(
   def paintInterior(canvas: DartObject, rect: DartObject, paint: DartObject, textDirection: DartObject = native.value): Unit = native.value
   def paint(canvas: DartObject, rect: DartObject, textDirection: DartObject = native.value): Unit = native.value
 
+// ─── stadium_border.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class StadiumBorder(
+  val side: BorderSide = native.value
+) extends DartObject:
+  def preferPaintInterior: Boolean = native.value
+  def scale(t: Double): DartObject = native.value
+  def lerpFrom(a: DartObject, t: Double): DartObject = native.value
+  def lerpTo(b: DartObject, t: Double): DartObject = native.value
+  def copyWith(side: BorderSide = native.value): StadiumBorder = native.value
+  def getInnerPath(rect: DartObject, textDirection: DartObject = native.value): DartObject = native.value
+  def getOuterPath(rect: DartObject, textDirection: DartObject = native.value): DartObject = native.value
+  def paintInterior(canvas: DartObject, rect: DartObject, paint: DartObject, textDirection: DartObject = native.value): Unit = native.value
+  def paint(canvas: DartObject, rect: DartObject, textDirection: DartObject = native.value): Unit = native.value
+
+// ─── gradient.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class LinearGradient(
+  val begin: AlignmentGeometry = native.value,
+  val `end`: AlignmentGeometry = native.value,
+  val colors: List[Color],
+  val stops: List[Double] = native.value,
+  val tileMode: DartObject = native.value,
+  val transform: DartObject = native.value
+) extends DartObject:
+  def createShader(rect: DartObject, textDirection: DartObject = native.value): DartObject = native.value
+  def scale(factor: Double): LinearGradient = native.value
+  def lerpFrom(a: DartObject, t: Double): DartObject = native.value
+  def lerpTo(b: DartObject, t: Double): DartObject = native.value
+  def withOpacity(opacity: Double): LinearGradient = native.value
+
+@native
+@DartImport("package:flutter/material.dart")
+object LinearGradient:
+  def lerp(a: LinearGradient, b: LinearGradient, t: Double): LinearGradient = native.value
+
 // ─── basic_types.dart ────────────────────────────────────────
 
 @native
@@ -11309,6 +11349,44 @@ class Card(
 object Card:
   def filled(key: Key = native.value, color: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, elevation: Double = native.value, shape: DartObject = native.value, borderOnForeground: Boolean = native.value, margin: EdgeInsetsGeometry = native.value, clipBehavior: Clip = native.value, child: Widget = native.value, semanticContainer: Boolean = native.value): Card = native.value
   def outlined(key: Key = native.value, color: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, elevation: Double = native.value, shape: DartObject = native.value, borderOnForeground: Boolean = native.value, margin: EdgeInsetsGeometry = native.value, clipBehavior: Clip = native.value, child: Widget = native.value, semanticContainer: Boolean = native.value): Card = native.value
+
+// ─── action_chip.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class ActionChip(
+  val key: Key = native.value,
+  val avatar: Widget = native.value,
+  val label: Widget,
+  val labelStyle: TextStyle = native.value,
+  val labelPadding: EdgeInsetsGeometry = native.value,
+  val onPressed: () => Unit = native.value,
+  val pressElevation: Double = native.value,
+  val tooltip: String = native.value,
+  val side: BorderSide = native.value,
+  val shape: DartObject = native.value,
+  val clipBehavior: Clip = native.value,
+  val focusNode: FocusNode = native.value,
+  val autofocus: Boolean = native.value,
+  val color: WidgetStateProperty[Color] = native.value,
+  val backgroundColor: Color = native.value,
+  val disabledColor: Color = native.value,
+  val padding: EdgeInsetsGeometry = native.value,
+  val visualDensity: VisualDensity = native.value,
+  val materialTapTargetSize: MaterialTapTargetSize = native.value,
+  val elevation: Double = native.value,
+  val shadowColor: Color = native.value,
+  val surfaceTintColor: Color = native.value,
+  val iconTheme: DartObject = native.value,
+  val avatarBoxConstraints: BoxConstraints = native.value,
+  val chipAnimationStyle: DartObject = native.value,
+  val mouseCursor: DartObject = native.value
+) extends StatelessWidget
+
+@native
+@DartImport("package:flutter/material.dart")
+object ActionChip:
+  def elevated(key: Key = native.value, avatar: Widget = native.value, label: Widget, labelStyle: TextStyle = native.value, labelPadding: EdgeInsetsGeometry = native.value, onPressed: () => Unit = native.value, pressElevation: Double = native.value, tooltip: String = native.value, side: BorderSide = native.value, shape: DartObject = native.value, clipBehavior: Clip = native.value, focusNode: FocusNode = native.value, autofocus: Boolean = native.value, color: WidgetStateProperty[Color] = native.value, backgroundColor: Color = native.value, disabledColor: Color = native.value, padding: EdgeInsetsGeometry = native.value, visualDensity: VisualDensity = native.value, materialTapTargetSize: MaterialTapTargetSize = native.value, elevation: Double = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, iconTheme: DartObject = native.value, avatarBoxConstraints: BoxConstraints = native.value, chipAnimationStyle: DartObject = native.value, mouseCursor: DartObject = native.value): ActionChip = native.value
 
 // ─── divider.dart ────────────────────────────────────────
 

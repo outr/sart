@@ -17,3 +17,12 @@ abstract class DartObject
  */
 @native
 abstract class DartFunction extends DartObject
+
+/** `dart:async` Completer — a hand-completed Future. */
+@native
+@DartImport("dart:async")
+class Completer[T]() extends DartObject:
+  def future: scala.concurrent.Future[T] = native.value
+  def complete(value: T): Unit = native.value
+  def completeError(error: Any): Unit = native.value
+  def isCompleted: Boolean = native.value
