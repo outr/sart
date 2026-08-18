@@ -257,6 +257,7 @@ object Matrix4:
 class TransformationController() extends DartObject:
   var value: Matrix4 = native.value
   def toScene(viewportPoint: Offset): Offset = native.value
+  def dispose(): Unit = native.value
 
 // Animation driver — curated so `vsync = this` (a TickerProvider mixin
 // receiver) types without the mixin surface.

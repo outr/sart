@@ -1761,7 +1761,7 @@ class InteractiveViewer(
   val panEnabled: Boolean = native.value,
   val scaleEnabled: Boolean = native.value,
   val scaleFactor: Double = native.value,
-  val transformationController: ValueNotifier[?] = native.value,
+  val transformationController: TransformationController = native.value,
   val alignment: Alignment = native.value,
   val trackpadScrollCausesScale: Boolean = native.value,
   val child: Widget
@@ -1771,7 +1771,7 @@ class InteractiveViewer(
 @native
 @DartImport("package:flutter/material.dart")
 object InteractiveViewer:
-  def builder(key: Key = native.value, clipBehavior: Clip = native.value, panAxis: DartObject = native.value, boundaryMargin: EdgeInsets = native.value, maxScale: Double = native.value, minScale: Double = native.value, interactionEndFrictionCoefficient: Double = native.value, onInteractionEnd: DartObject => Unit = native.value, onInteractionStart: DartObject => Unit = native.value, onInteractionUpdate: DartObject => Unit = native.value, panEnabled: Boolean = native.value, scaleEnabled: Boolean = native.value, scaleFactor: Double = native.value, transformationController: ValueNotifier[?] = native.value, alignment: Alignment = native.value, trackpadScrollCausesScale: Boolean = native.value, builder: (BuildContext, DartObject) => Widget): InteractiveViewer = native.value
+  def builder(key: Key = native.value, clipBehavior: Clip = native.value, panAxis: DartObject = native.value, boundaryMargin: EdgeInsets = native.value, maxScale: Double = native.value, minScale: Double = native.value, interactionEndFrictionCoefficient: Double = native.value, onInteractionEnd: DartObject => Unit = native.value, onInteractionStart: DartObject => Unit = native.value, onInteractionUpdate: DartObject => Unit = native.value, panEnabled: Boolean = native.value, scaleEnabled: Boolean = native.value, scaleFactor: Double = native.value, transformationController: TransformationController = native.value, alignment: Alignment = native.value, trackpadScrollCausesScale: Boolean = native.value, builder: (BuildContext, DartObject) => Widget): InteractiveViewer = native.value
   def getNearestPointOnLine(point: DartObject, l1: DartObject, l2: DartObject): DartObject = native.value
   def getAxisAlignedBoundingBox(quad: DartObject): DartObject = native.value
   def pointIsInside(point: DartObject, quad: DartObject): Boolean = native.value

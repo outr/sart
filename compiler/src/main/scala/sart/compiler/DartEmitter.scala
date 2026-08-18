@@ -1750,9 +1750,13 @@ class DartEmitter(
       // operator is the exact native equivalent. The default is
       // parenthesized: `a ?? cond ? x : y` would parse as `(a ?? cond) ? …`.
       case Apply(Select(recv, "getOrElse"), List(arg)) if isOptionReceiver(recv) =>
-        s"(${emitExpr(recv)} ?? (${emitExpr(arg)}))"
+        val r = emitExpr(recv)
+        val rp = if needsParensAsReceiver(recv) then s"($r)" else r
+        s"($rp ?? (${emitExpr(arg)}))"
       case Apply(TypeApply(Select(recv, "getOrElse"), _), List(arg)) if isOptionReceiver(recv) =>
-        s"(${emitExpr(recv)} ?? (${emitExpr(arg)}))"
+        val r = emitExpr(recv)
+        val rp = if needsParensAsReceiver(recv) then s"($r)" else r
+        s"($rp ?? (${emitExpr(arg)}))"
 
       // Presence checks → Dart null-comparison. Handles both getter-style
       // `Select` and zero-arg `Apply(Select(...), Nil)` tree shapes.
@@ -2209,6 +2213,9 @@ class DartEmitter(
       case If(_, _, _)                                     => true
       case Match(_, _)                                     => true
       case Assign(_, _)                                    => true
+      // `x is Y` / `x as Y` bind looser than prefix `!` and `.`.
+      case TypeApply(Select(_, "isInstanceOf"), _)         => true
+      case TypeApply(Select(_, "asInstanceOf"), _)         => true
       // Wrappers are transparent in emission — look through them so a
       // wrapped ternary/binary still gets its parens.
       case Typed(e, _)                                     => needsParensAsReceiver(e)
@@ -2352,9 +2359,12 @@ class DartEmitter(
       stdlibRewrites.find { e =>
         e.scalaName == name && e.isGetter == isGetter && e.receiver(qual)
       }.map { e =>
+        val q = emitExpr(qual)
         e.emit(RewriteCtx(
           prefix   = selectPrefix(qual),
-          qualExpr = emitExpr(qual),
+          // Parenthesize looser-binding receivers so templates that splice
+          // `qualExpr` into `??`/`.`-chains keep the intended grouping.
+          qualExpr = if needsParensAsReceiver(qual) then s"($q)" else q,
           args     = argStr,
           argList  = argList
         ))
@@ -2431,12 +2441,12 @@ class DartEmitter(
       listCall("foldLeft")  (c => s"${c.prefix}fold(${c.args})"),
       listCall("mkString")  (c => s"${c.prefix}join(${c.args})"),
       // Direct renames where Dart's name differs from Scala's.
-      listRename("drop",      "skip"),
+      listCall("drop")(c => s"${c.qualExpr}.skip(${c.args}).toList()"),
       listRename("dropWhile", "skipWhile"),
       listRename("exists",    "any"),
       listRename("forall",    "every"),
       // Same-name passthroughs that exist on Dart's Iterable.
-      listRename("take",      "take"),
+      listCall("take")(c => s"${c.qualExpr}.take(${c.args}).toList()"),
       listRename("takeWhile", "takeWhile"),
       listRename("contains",  "contains"),
       listRename("indexOf",   "indexOf"),
