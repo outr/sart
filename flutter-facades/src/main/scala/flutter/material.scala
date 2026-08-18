@@ -234,6 +234,7 @@ class StatefulBuilder(
 object foundation:
   def debugPrint(message: String): Unit = native.value
   def kIsWeb: Boolean = native.value
+  def kDebugMode: Boolean = native.value
 
 /** dart:ui Shadow (re-exported through material) — `TextStyle.shadows`.
  *  Curated: the generator only collects BoxShadow, its box-specific
