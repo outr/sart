@@ -574,8 +574,8 @@ object BoxShape:
 @DartImport("package:flutter/material.dart")
 class TextSpan(
   val text: String = native.value,
-  val children: List[DartObject] = native.value,
-  val style: TextStyle = native.value,
+  val children: List[InlineSpan] = native.value,
+  override val style: TextStyle = native.value,
   val recognizer: DartObject = native.value,
   val mouseCursor: DartObject = native.value,
   val onEnter: DartObject => Unit = native.value,
@@ -584,22 +584,34 @@ class TextSpan(
   val semanticsIdentifier: String = native.value,
   val locale: DartObject = native.value,
   val spellOut: Boolean = native.value
-) extends DartObject:
+) extends InlineSpan():
   def cursor: DartObject = native.value
   def validForMouseTracker: Boolean = native.value
   def handleEvent(event: DartObject, entry: DartObject): Unit = native.value
+  def toStringShort(): String = native.value
+  def debugDescribeChildren(): List[DartObject] = native.value
+
+// ─── inline_span.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+abstract class InlineSpan(
+  val style: TextStyle = native.value
+) extends DartObject:
   def build(builder: DartObject, textScaler: DartObject = native.value, dimensions: List[DartObject] = native.value): Unit = native.value
-  def visitChildren(visitor: DartObject => Boolean): Boolean = native.value
-  def visitDirectChildren(visitor: DartObject => Boolean): Boolean = native.value
-  def getSpanForPositionVisitor(position: DartObject, offset: DartObject): DartObject = native.value
+  def visitChildren(visitor: InlineSpan => Boolean): Boolean = native.value
+  def visitDirectChildren(visitor: InlineSpan => Boolean): Boolean = native.value
+  def getSpanForPosition(position: DartObject): InlineSpan = native.value
+  def getSpanForPositionVisitor(position: DartObject, offset: DartObject): InlineSpan = native.value
+  def toPlainText(includeSemanticsLabels: Boolean = native.value, includePlaceholders: Boolean = native.value): String = native.value
+  def getSemanticsInformation(): List[DartObject] = native.value
+  def computeSemanticsInformation(collector: List[DartObject]): Unit = native.value
   def computeToPlainText(buffer: DartObject, includeSemanticsLabels: Boolean = native.value, includePlaceholders: Boolean = native.value): Unit = native.value
-  def computeSemanticsInformation(collector: List[DartObject], inheritedLocale: DartObject = native.value, inheritedSpellOut: Boolean = native.value): Unit = native.value
+  def codeUnitAt(index: Int): Int = native.value
   def codeUnitAtVisitor(index: Int, offset: DartObject): Int = native.value
   def debugAssertIsValid(): Boolean = native.value
-  def compareTo(other: DartObject): DartObject = native.value
-  def toStringShort(): String = native.value
+  def compareTo(other: InlineSpan): DartObject = native.value
   def debugFillProperties(properties: DartObject): Unit = native.value
-  def debugDescribeChildren(): List[DartObject] = native.value
 
 // ─── text_painter.dart ────────────────────────────────────────
 
@@ -966,12 +978,12 @@ class Text(
   val textHeightBehavior: DartObject = native.value,
   val selectionColor: Color = native.value
 ) extends StatelessWidget:
-  def textSpan: DartObject = native.value
+  def textSpan: InlineSpan = native.value
 
 @native
 @DartImport("package:flutter/material.dart")
 object Text:
-  def rich(textSpan: DartObject, key: Key = native.value, style: TextStyle = native.value, strutStyle: DartObject = native.value, textAlign: TextAlign = native.value, textDirection: DartObject = native.value, locale: DartObject = native.value, softWrap: Boolean = native.value, overflow: TextOverflow = native.value, textScaleFactor: Double = native.value, textScaler: DartObject = native.value, maxLines: Int = native.value, semanticsLabel: String = native.value, semanticsIdentifier: String = native.value, textWidthBasis: DartObject = native.value, textHeightBehavior: DartObject = native.value, selectionColor: Color = native.value): Text = native.value
+  def rich(textSpan: InlineSpan, key: Key = native.value, style: TextStyle = native.value, strutStyle: DartObject = native.value, textAlign: TextAlign = native.value, textDirection: DartObject = native.value, locale: DartObject = native.value, softWrap: Boolean = native.value, overflow: TextOverflow = native.value, textScaleFactor: Double = native.value, textScaler: DartObject = native.value, maxLines: Int = native.value, semanticsLabel: String = native.value, semanticsIdentifier: String = native.value, textWidthBasis: DartObject = native.value, textHeightBehavior: DartObject = native.value, selectionColor: Color = native.value): Text = native.value
 
 // ─── basic.dart ────────────────────────────────────────
 
@@ -1392,6 +1404,18 @@ class FutureBuilder[T](
 object FutureBuilder:
   def debugRethrowError: Boolean = native.value
 
+@native
+@DartImport("package:flutter/material.dart")
+class ConnectionState extends DartObject
+
+@native
+@DartImport("package:flutter/material.dart")
+object ConnectionState:
+  val none: ConnectionState = native.value
+  val waiting: ConnectionState = native.value
+  val active: ConnectionState = native.value
+  val done: ConnectionState = native.value
+
 // ─── preferred_size.dart ────────────────────────────────────────
 
 @native
@@ -1582,22 +1606,13 @@ class WidgetSpan(
   val child: Widget,
   val alignment: PlaceholderAlignment = native.value,
   val baseline: TextBaseline = native.value,
-  val style: TextStyle = native.value
-) extends DartObject:
-  def build(builder: DartObject, textScaler: DartObject = native.value, dimensions: List[DartObject] = native.value): Unit = native.value
-  def visitChildren(visitor: DartObject => Boolean): Boolean = native.value
-  def visitDirectChildren(visitor: DartObject => Boolean): Boolean = native.value
-  def getSpanForPositionVisitor(position: DartObject, offset: DartObject): DartObject = native.value
-  def codeUnitAtVisitor(index: Int, offset: DartObject): Int = native.value
-  def compareTo(other: DartObject): DartObject = native.value
-  def getSpanForPosition(position: DartObject): DartObject = native.value
-  def debugAssertIsValid(): Boolean = native.value
-  def debugFillProperties(properties: DartObject): Unit = native.value
+  override val style: TextStyle = native.value
+) extends InlineSpan()
 
 @native
 @DartImport("package:flutter/material.dart")
 object WidgetSpan:
-  def extractFromInlineSpan(span: DartObject, textScaler: DartObject): List[Widget] = native.value
+  def extractFromInlineSpan(span: InlineSpan, textScaler: DartObject): List[Widget] = native.value
 
 // ─── table.dart ────────────────────────────────────────
 
@@ -2081,6 +2096,53 @@ class MaterialTapTargetSize extends DartObject
 object MaterialTapTargetSize:
   val padded: MaterialTapTargetSize = native.value
   val shrinkWrap: MaterialTapTargetSize = native.value
+
+// ─── selection_area.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class SelectionArea(
+  val key: Key = native.value,
+  val focusNode: FocusNode = native.value,
+  val selectionControls: DartObject = native.value,
+  val contextMenuBuilder: (BuildContext, State[?]) => Widget = native.value,
+  val magnifierConfiguration: DartObject = native.value,
+  val onSelectionChanged: sart.stdlib.Option[DartObject] => Unit = native.value,
+  val child: Widget
+) extends StatefulWidget
+
+// ─── segmented_button.dart ────────────────────────────────────────
+
+@native
+@DartImport("package:flutter/material.dart")
+class ButtonSegment[T](
+  val value: T,
+  val icon: Widget = native.value,
+  val label: Widget = native.value,
+  val tooltip: String = native.value,
+  val enabled: Boolean = native.value
+) extends DartObject
+
+@native
+@DartImport("package:flutter/material.dart")
+class SegmentedButton[T](
+  val key: Key = native.value,
+  val segments: List[ButtonSegment[T]],
+  val selected: Set[T],
+  val onSelectionChanged: Set[T] => Unit = native.value,
+  val multiSelectionEnabled: Boolean = native.value,
+  val emptySelectionAllowed: Boolean = native.value,
+  val expandedInsets: EdgeInsets = native.value,
+  val style: ButtonStyle = native.value,
+  val showSelectedIcon: Boolean = native.value,
+  val selectedIcon: Widget = native.value,
+  val direction: Axis = native.value
+) extends StatefulWidget
+
+@native
+@DartImport("package:flutter/material.dart")
+object SegmentedButton:
+  def styleFrom(foregroundColor: Color = native.value, backgroundColor: Color = native.value, selectedForegroundColor: Color = native.value, selectedBackgroundColor: Color = native.value, disabledForegroundColor: Color = native.value, disabledBackgroundColor: Color = native.value, shadowColor: Color = native.value, surfaceTintColor: Color = native.value, iconColor: Color = native.value, iconSize: Double = native.value, disabledIconColor: Color = native.value, overlayColor: Color = native.value, elevation: Double = native.value, textStyle: TextStyle = native.value, padding: EdgeInsetsGeometry = native.value, minimumSize: Size = native.value, fixedSize: Size = native.value, maximumSize: Size = native.value, side: BorderSide = native.value, shape: DartObject = native.value, enabledMouseCursor: DartObject = native.value, disabledMouseCursor: DartObject = native.value, visualDensity: VisualDensity = native.value, tapTargetSize: MaterialTapTargetSize = native.value, animationDuration: sart.stdlib.Duration = native.value, enableFeedback: Boolean = native.value, alignment: AlignmentGeometry = native.value, splashFactory: DartObject = native.value): ButtonStyle = native.value
 
 // ─── theme.dart ────────────────────────────────────────
 
@@ -12510,6 +12572,18 @@ abstract class PopupMenuEntry[T](
 
 @native
 @DartImport("package:flutter/material.dart")
+class PopupMenuDivider(
+  val key: Key = native.value,
+  val height: Double = native.value,
+  val thickness: Double = native.value,
+  val indent: Double = native.value,
+  val endIndent: Double = native.value,
+  val radius: BorderRadiusGeometry = native.value,
+  val color: Color = native.value
+) extends StatefulWidget
+
+@native
+@DartImport("package:flutter/material.dart")
 class PopupMenuItem[T](
   override val key: Key = native.value,
   val value: T = native.value,
@@ -12629,7 +12703,7 @@ object CheckboxThemeData:
 class Tooltip(
   val key: Key = native.value,
   val message: String = native.value,
-  val richMessage: DartObject = native.value,
+  val richMessage: InlineSpan = native.value,
   val height: Double = native.value,
   val constraints: BoxConstraints = native.value,
   val padding: EdgeInsetsGeometry = native.value,

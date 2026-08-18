@@ -137,6 +137,7 @@ class AsyncSnapshot[T] extends DartObject:
   def hasData: Boolean                      = native.value
   def hasError: Boolean                     = native.value
   def error: sart.stdlib.Option[Object]     = native.value
+  def connectionState: ConnectionState      = native.value
 
 // ─── Text editing ──────────────────────────────────────────────────────────
 
@@ -170,6 +171,28 @@ class Semantics(
   val tooltip: String = native.value,
   val enabled: Boolean = native.value
 ) extends StatelessWidget
+
+// Curated: RichText's real parent chain (MultiChildRenderObjectWidget)
+// defeats the generator.
+@native
+@DartImport("package:flutter/material.dart")
+class RichText(
+  val text: InlineSpan,
+  val overflow: TextOverflow = native.value,
+  val maxLines: Int = native.value,
+  val softWrap: Boolean = native.value,
+  val textAlign: TextAlign = native.value,
+  val key: Key = native.value
+) extends Widget
+
+// Curated: the generator renders StateSetter (`void Function(void
+// Function())`) with broken arrow associativity.
+@native
+@DartImport("package:flutter/material.dart")
+class StatefulBuilder(
+  val builder: (BuildContext, (() => Unit) => Unit) => Widget,
+  val key: Key = native.value
+) extends StatefulWidget
 
 // ─── Material colors ───────────────────────────────────────────────────────
 

@@ -864,7 +864,12 @@ class DartEmitter(
       for p <- ctorParams if isFieldParam(p) do
         val t  = emitTypeRef(p.tpt.tpe)
         val tn = if nullDefaultedParams.contains(p.name) && !t.endsWith("?") && t != "dynamic" then s"$t?" else t
-        line(s"final $tn ${p.name};")
+        // A `var` ctor param: the mutability lives on the ACCESSOR field,
+        // not the parameter symbol.
+        val accessor = sym.fieldMember(p.name)
+        val isVar = (accessor.exists && accessor.flags.is(Flags.Mutable)) || p.symbol.flags.is(Flags.Mutable)
+        val fin = if isVar then "" else "final "
+        line(s"$fin$tn ${p.name};")
 
       // User-class primary constructors: params without defaults stay
       // positional (matching how Scala call sites invoke them); params
@@ -1019,7 +1024,7 @@ class DartEmitter(
             .getOrElse(src)
         case "scala.collection.immutable.Map" =>
           arg1 match
-            case Some(v) if v.typeSymbol.fullName == "java.lang.String" =>
+            case Some(v) if v.dealias.typeSymbol.fullName == "java.lang.String" =>
               s"($src as Map<String, dynamic>).map((k, v) => MapEntry(k, v as String))"
             case Some(v) if isJsonObjectLike(v) =>
               s"($src as Map<String, dynamic>).map((k, v) => MapEntry(k, ${v.typeSymbol.name}.fromJson(v as Map<String, dynamic>)))"
@@ -1538,6 +1543,7 @@ class DartEmitter(
       // is the Flutter fill-the-parent idiom).
       case Select(Ident("Double"), "PositiveInfinity") => "double.infinity"
       case Select(Ident("Double"), "NegativeInfinity") => "double.negativeInfinity"
+      case Select(Ident("Double"), "NaN")              => "double.nan"
       case Ident(name) => dartSafeName(name)
       case This(_) => "this"
       case _: Super => "super"
@@ -2440,6 +2446,9 @@ class DartEmitter(
       StdlibRewrite(isMapReceiver, "get", isGetter = false,
         c => s"${c.qualExpr}[${c.args}]"),
       // `m.getOrElse(k, default)` becomes `m[k] ?? default`.
+      // `m ++ other` → Dart map-spread literal.
+      StdlibRewrite(isMapReceiver, "++", isGetter = false,
+        c => s"{...${c.qualExpr}, ...${c.argList(0)}}"),
       StdlibRewrite(isMapReceiver, "getOrElse", isGetter = false,
         c => s"(${c.qualExpr}[${c.argList(0)}] ?? ${c.argList(1)})"),
 
@@ -2608,6 +2617,9 @@ class DartEmitter(
         c => s"int.tryParse(${c.qualExpr})"),
       StdlibRewrite(isStringReceiver, "toDoubleOption", isGetter = true,
         c => s"double.tryParse(${c.qualExpr})"),
+      // Scala's `capitalize` — Dart has no equivalent; inline ternary.
+      StdlibRewrite(isStringReceiver, "capitalize", isGetter = true,
+        c => s"(${c.qualExpr}.isEmpty ? ${c.qualExpr} : ${c.qualExpr}[0].toUpperCase() + ${c.qualExpr}.substring(1))"),
       // Scala's `stripMargin` strips leading whitespace + `|` per line.
       // Mirror with a Dart regex: every match of `^\s*\|` becomes ''.
       StdlibRewrite(isStringReceiver, "stripMargin", isGetter = true,
