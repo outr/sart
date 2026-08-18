@@ -1756,13 +1756,13 @@ class DartEmitter(
       // call on the receiver.
       case Apply(Apply(fn, List(recv)), args) if isExtensionRef(fn) =>
         recordAnnotations(extensionSym(fn))
-        s"${emitExpr(recv)}.${extensionCallName(fn)}(${emitUserCallArgs(extensionSym(fn), args, dropParams = 1)})"
+        s"${selectPrefix(recv)}${extensionCallName(fn)}(${emitUserCallArgs(extensionSym(fn), args, dropParams = 1)})"
       case Apply(TypeApply(Apply(fn, List(recv)), _), args) if isExtensionRef(fn) =>
         recordAnnotations(extensionSym(fn))
-        s"${emitExpr(recv)}.${extensionCallName(fn)}(${emitUserCallArgs(extensionSym(fn), args, dropParams = 1)})"
+        s"${selectPrefix(recv)}${extensionCallName(fn)}(${emitUserCallArgs(extensionSym(fn), args, dropParams = 1)})"
       case Apply(Apply(TypeApply(fn, _), List(recv)), args) if isExtensionRef(fn) =>
         recordAnnotations(extensionSym(fn))
-        s"${emitExpr(recv)}.${extensionCallName(fn)}(${emitUserCallArgs(extensionSym(fn), args, dropParams = 1)})"
+        s"${selectPrefix(recv)}${extensionCallName(fn)}(${emitUserCallArgs(extensionSym(fn), args, dropParams = 1)})"
 
       // Parameterless extension defs (`s.codeUnits`) — the receiver clause
       // is the only argument list, and Dart-side these are getters.
@@ -2571,6 +2571,10 @@ class DartEmitter(
       StdlibRewrite(isMapReceiver, "keys",     isGetter = true,  c => s"${c.prefix}keys"),
       StdlibRewrite(isMapReceiver, "values",   isGetter = true,  c => s"${c.prefix}values"),
       // Methods.
+      // `m(k)` — Scala's throwing lookup; Dart `[]` is nullable, so the
+      // faithful form is the null-asserted index.
+      StdlibRewrite(isMapReceiver, "apply", isGetter = false,
+        c => s"${c.qualExpr}[${c.args}]!"),
       StdlibRewrite(isMapReceiver, "contains", isGetter = false,
         c => s"${c.prefix}containsKey(${c.args})"),
       // Scala's `m.get(k): Option[V]` matches Dart's `m[k]: V?` — Sart
@@ -3095,6 +3099,16 @@ class DartEmitter(
                 case t @ Select(_, _) if t.symbol.exists && t.symbol.owner.exists
                     && hasNative(t.symbol.owner) =>
                   Some(emitExpr(t))
+                // An eta-expanded facade-static method reference
+                // (`= RawAutocomplete.defaultStringForOption`) — the Dart
+                // tear-off is const, so it survives as a named default.
+                case Block(List(dd: DefDef), _: Closure) =>
+                  dd.rhs.map(unwrapT) match
+                    case Some(Apply(s @ Select(q, m), fwd))
+                        if s.symbol.exists && s.symbol.owner.exists && hasNative(s.symbol.owner)
+                           && fwd.forall { case _: Ident => true; case _ => false } =>
+                      Some(s"${emitExpr(q)}.$m")
+                    case _ => None
                 // Empty collections are Dart consts (`const []` / `const {}`),
                 // so `= List()` defaults stay named-with-default too.
                 case Apply(TypeApply(Select(Ident("List"), "apply"), _), List(arg)) if varargsItems(arg).isEmpty =>
