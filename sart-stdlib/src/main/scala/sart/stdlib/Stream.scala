@@ -15,6 +15,11 @@ class Stream[T] extends DartObject:
   def map[R](f: T => R): Stream[R]                      = native.value
   def where(test: T => Boolean): Stream[T]              = native.value
   def asBroadcastStream: Stream[T]                       = native.value
+  def expand[R](convert: T => List[R]): Stream[R]        = native.value
+  /** Dart's `await for (x in s) { body }` with a synchronous body —
+   *  `await(s.forEach(body))` is the direct equivalent.
+   */
+  def forEach(action: T => Unit): scala.concurrent.Future[Unit] = native.value
 
 @native
 @DartImport("dart:async")

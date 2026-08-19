@@ -1636,9 +1636,16 @@ class DartEmitter(
       // List(a, b, ...) → [a, b, ...]. An EMPTY `List()` keeps its element
       // type (`<Widget>[]`) — a bare `[]` is List<dynamic>, which poisons
       // `+`-concatenation chains feeding List<Widget> parameters.
+      // EXCEPT when covariance made scalac infer `Nothing` (`List()` with
+      // no useful expected type): `<Never>[]` upcasts fine but every WRITE
+      // through the upcast reference throws (Dart lists covariance-check
+      // writes) — SfDataGrid mutates `sortedColumns` in place, for one.
+      // A bare `[]` lets Dart infer the element type from context instead.
       case Apply(TypeApply(Select(Ident("List"), "apply"), List(tpt)), List(arg)) if isVarargs(arg) =>
         val items = varargsItems(arg)
-        if items.isEmpty then s"<${emitTypeRef(tpt.tpe)}>[]"
+        if items.isEmpty then
+          val elem = emitTypeRef(tpt.tpe)
+          if elem == "Never" then "[]" else s"<$elem>[]"
         else items.map(emitExpr).mkString("[", ", ", "]")
       case Apply(Select(Ident("List"), "apply"), List(arg)) if isVarargs(arg) =>
         varargsItems(arg).map(emitExpr).mkString("[", ", ", "]")
@@ -1656,7 +1663,12 @@ class DartEmitter(
       // keeps its inferred type arg (`<String>{}`) — a bare `{}` would be
       // a Map literal.
       case Apply(TypeApply(Select(Ident("Set"), "apply"), List(elem)), List(arg)) if varargsItems(arg).isEmpty =>
-        s"<${emitTypeRef(elem.tpe)}>{}"
+        // `Nothing` inference (see the List note above): `<Never>{}` breaks
+        // every method taking an element argument. A bare `{}` infers the
+        // set type from context (and is a loud analyzer error where the
+        // context is a Map — better than a silent runtime TypeError).
+        val e = emitTypeRef(elem.tpe)
+        if e == "Never" then "{}" else s"<$e>{}"
       case Apply(TypeApply(Select(Ident("Set"), "apply"), _), List(arg)) if varargsItems(arg).nonEmpty =>
         varargsItems(arg).map(emitExpr).mkString("{", ", ", "}")
       case Apply(Select(Ident("Set"), "apply"), List(arg)) if varargsItems(arg).nonEmpty =>
@@ -2573,6 +2585,9 @@ class DartEmitter(
       listRename("takeWhile", "takeWhile"),
       listRename("contains",  "contains"),
       listRename("indexOf",   "indexOf"),
+      // `xs.slice(from, until)` — Dart's sublist has the same [from, until)
+      // contract.
+      listCall("slice")(c => s"${c.qualExpr}.sublist(${c.args})"),
 
       // ── Map ────────────────────────────────────────────────────────
       // Getters: `m.size`/`nonEmpty` rename; `keys`/`values` exist in Dart
