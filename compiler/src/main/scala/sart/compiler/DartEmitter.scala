@@ -1635,17 +1635,16 @@ class DartEmitter(
 
       // List(a, b, ...) → [a, b, ...]. An EMPTY `List()` keeps its element
       // type (`<Widget>[]`) — a bare `[]` is List<dynamic>, which poisons
-      // `+`-concatenation chains feeding List<Widget> parameters.
-      // EXCEPT when covariance made scalac infer `Nothing` (`List()` with
-      // no useful expected type): `<Never>[]` upcasts fine but every WRITE
-      // through the upcast reference throws (Dart lists covariance-check
-      // writes) — SfDataGrid mutates `sortedColumns` in place, for one.
-      // A bare `[]` lets Dart infer the element type from context instead.
+      // `+`-concatenation chains feeding List<Widget> parameters (Dart's
+      // downward inference doesn't reach through the IIFEs Sart emits).
+      // TRAP: bare `List()` infers `Nothing` under covariance → `<Never>[]`.
+      // Reads/upcasts are fine, but any WRITE through the upcast reference
+      // throws at runtime (Dart covariance-checks writes) — facade-mutated
+      // lists (SfDataGrid's `sortedColumns`) must use an explicit element
+      // type in the Scala source (`List[SortColumnDetails]()`).
       case Apply(TypeApply(Select(Ident("List"), "apply"), List(tpt)), List(arg)) if isVarargs(arg) =>
         val items = varargsItems(arg)
-        if items.isEmpty then
-          val elem = emitTypeRef(tpt.tpe)
-          if elem == "Never" then "[]" else s"<$elem>[]"
+        if items.isEmpty then s"<${emitTypeRef(tpt.tpe)}>[]"
         else items.map(emitExpr).mkString("[", ", ", "]")
       case Apply(Select(Ident("List"), "apply"), List(arg)) if isVarargs(arg) =>
         varargsItems(arg).map(emitExpr).mkString("[", ", ", "]")
@@ -1662,13 +1661,11 @@ class DartEmitter(
       // Set(a, b, ...) → {a, b, ...}  (Dart set literal). Empty `Set()`
       // keeps its inferred type arg (`<String>{}`) — a bare `{}` would be
       // a Map literal.
+      // TRAP (same as List): bare `Set()` infers `Nothing` → `<Never>{}`,
+      // and every element-taking method through an upcast reference throws.
+      // Use an explicit element type in the Scala source (`Set[String]()`).
       case Apply(TypeApply(Select(Ident("Set"), "apply"), List(elem)), List(arg)) if varargsItems(arg).isEmpty =>
-        // `Nothing` inference (see the List note above): `<Never>{}` breaks
-        // every method taking an element argument. A bare `{}` infers the
-        // set type from context (and is a loud analyzer error where the
-        // context is a Map — better than a silent runtime TypeError).
-        val e = emitTypeRef(elem.tpe)
-        if e == "Never" then "{}" else s"<$e>{}"
+        s"<${emitTypeRef(elem.tpe)}>{}"
       case Apply(TypeApply(Select(Ident("Set"), "apply"), _), List(arg)) if varargsItems(arg).nonEmpty =>
         varargsItems(arg).map(emitExpr).mkString("{", ", ", "}")
       case Apply(Select(Ident("Set"), "apply"), List(arg)) if varargsItems(arg).nonEmpty =>
@@ -2236,6 +2233,12 @@ class DartEmitter(
           if found then true
           else t match
             case dd: DefDef => found // closure/def boundary — don't descend
+            // `async { … }` in expression/statement position emits its own
+            // async IIFE — awaits inside belong to IT, not the enclosing
+            // function (a fire-and-forget async block must not asyncify a
+            // sync callback like a GoRoute redirect).
+            case Apply(TypeApply(Select(q, "apply"), _), _) if isSartRef(q, "sart.dart.async") => found
+            case Apply(Select(q, "apply"), _) if isSartRef(q, "sart.dart.async") => found
             case Apply(TypeApply(Select(q, "apply"), _), _) if isSartRef(q, "sart.dart.await") => true
             case Apply(Select(q, "apply"), _) if isSartRef(q, "sart.dart.await") => true
             case _ => foldOverTree(found, t)(owner)
