@@ -179,6 +179,9 @@ source lines, idempotent Flutter project scaffolding, `sartAssets` for
 bundled assets, `@DartPubspec` YAML merging, and a generated
 `analysis_options.yaml` that silences only shim-noise diagnostics.
 
+**Published artifacts** (local Ivy): `sart-dart_3`, `sart-stdlib_3`,
+`flutter-facades_3`, `sart-compiler_3`, `sbt-sart` (all at `0.1.0-SNAPSHOT`).
+
 ## Reference app
 
 The 1.0 plan's first reference application, **LogicalNetwork** (a
@@ -197,9 +200,6 @@ dropdown_button2, flutter_multi_select_items, file_picker, file_saver,
 feedback, sentry_flutter, logger, overlay_support, flutter_markdown_plus,
 flutter_svg, shimmer, flutter_spinkit) are a mix of facadegen output and
 hand-curated `@native` facades in the app itself.
-
-**Published artifacts** (local Ivy): `sart-dart_3`, `sart-stdlib_3`,
-`flutter-facades_3`, `sart-compiler_3`, `sbt-sart` (all at `0.1.0-SNAPSHOT`).
 
 ## Platforms
 
