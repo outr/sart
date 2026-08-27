@@ -38,18 +38,28 @@ Why this is closer than the line counts suggest:
 shares its server-model pipeline with Sart's shared-core story. Port it
 first; nabo second.
 
-## Where we are (2026-08)
+## Where we are (2026-08-19)
 
 - Toolchain current: sbt 2.0.1 (root + plugin), Scala 3.8.4, Flutter
   3.44.8 / Dart 3.12. `sbt-sart` cross-builds for sbt 1.x and 2.x.
 - Emitter (`compiler/src/main/scala/sart/compiler/DartEmitter.scala`,
-  ~2.3k lines): classes, case classes, traits→abstract classes, simple
-  enums, switch expressions, try/catch, string interpolation, extensions,
-  a ~73-entry stdlib rewrite table (List/Map/Option/Set/Range/Tuple/
-  Future), Option→`T?`, Try/Either shims.
-- 40 emitter unit tests + golden-file gate + 6-platform CI matrix +
+  ~3.8k lines): everything in the README's "what works" list — classes,
+  case classes with codecs, traits → abstract mixin classes / `mixin on`,
+  enums, statement + expression forms, direct-style async/await,
+  named/default parameters incl. `$default$` getters, extension methods,
+  `late`/`lazy`, bitwise ops, `Dyn`, a ~40-entry stdlib rewrite table
+  (List/Map/Option/Set/Range/Tuple/Future/Stream) plus dedicated
+  lowerings, Option/Try/Either shims.
+- 61 emitter unit tests + golden-file gate + 6-platform CI matrix +
   plugin consumer smoke test (both sbt axes).
-- 72 Flutter facade declarations in `flutter-facades`.
+- ~360 Flutter facade declarations in `flutter-facades` (material,
+  services, gestures, dart:ui), ~320 of them generated from the SDK.
+- **The LogicalNetwork reference app is fully ported** (milestone 0.6's
+  code-side gate): 153 Scala files / 33k lines, zero hand-written Dart,
+  analyzer-clean, `flutter build web` green, every Dart file with a
+  line-by-line Scala twin, outr_flutter included. Verified by an
+  eight-way method-by-method review pass against the originals before
+  runtime testing.
 
 ## Workstream A — Language completeness (emitter)
 
@@ -180,12 +190,20 @@ it into `sbt-sart`** (the auto-facade plugin feature):
    way, replacing hand-maintained `material.scala` growth.
    **✅ Landed (2026-08):** facadegen v2 runs resolved analysis (super-
    params, named/factory ctors, required/default fidelity, type-collapse
-   via ancestor chains); `sbt sartFacadesRegen` +
-   `flutter-facades/facadegen.conf` derive the material facade set (~98
-   declarations incl. full Icons/Colors) from the real SDK, with the
-   curated core down to 15 declarations. Remaining from this workstream:
-   the `sartFacadePackages` pub-package resolver, subclassable facades,
-   and per-package generation runs (items 2–4).
+   via ancestor chains); `sbt sartFacadesRegen` + the
+   `flutter-facades/facadegen*.conf` manifests derive ~320 material/
+   services declarations (incl. full Icons/Colors) from the real SDK,
+   with the curated core at ~45. **Subclassable facades** landed too
+   (`context <appDir>` + `library <package:uri>` config resolves pub
+   packages through the app's analysis context; `flatten-inherited`
+   folds non-facaded ancestors' API in) — LN subclasses the generated
+   Syncfusion `DataGridSource` and the curated `CustomPainter`.
+   Per-package runs exist for syncfusion datagrid, dropdown_button2,
+   flex_color_scheme, intl, email_validator, shimmer, spinkit, svg.
+   Remaining: the `sartFacadePackages` pub-package resolver (today each
+   package is a hand-written `.conf` in the consuming app), and
+   generics — facadegen still can't emit `TreeNode<T>`-style classes, so
+   ~10 packages ride on hand-curated `@native` facades in app code.
 
 ## Workstream D — Shared core module (frontend + backend)
 
@@ -258,10 +276,10 @@ exactly once.
 | Version | Theme | Acceptance gate |
 |---|---|---|
 | 0.2 | Language completeness | Workstream A items 1–10; `--strict` green over a fixture corpus shaped like both apps (named/required/default params, super.key, const, mixins, getters, factory fromJson, while, overloads, late/lazy) |
-| 0.3 | Models + shared core | Workstream B + D: LN's `lib/model/**` + `service.dart` (916 files) replaced by direct Sart compilation of the shared Scala module; wire format byte-identical; `sartCoreVerify` in CI; `GenerateDart.scala` retired |
-| 0.4 | Facades at scale | Facadegen productized + `sartFacadePackages`; Flutter framework facades regenerated; Syncfusion datagrid + go_router facades working in a demo |
-| 0.5 | outr_flutter in Scala | The shared UI package ported and published as a Sart library; both apps' `Application`/`Screen`/`MessageService` layer runs from Scala |
-| **0.6** | **LogicalNetwork ships from Scala** | `flutter build web --wasm` from Sart output, zero hand-written Dart, deployed behind the Scala server — first full-app proof |
+| 0.3 | Models + shared core | Workstream B + D: LN's `lib/model/**` + `service.dart` (916 files) replaced by direct Sart compilation of the shared Scala module; wire format byte-identical; `sartCoreVerify` in CI; `GenerateDart.scala` retired. **Status: bypassed for LN** — the codecs (Workstream B) landed and the port consolidates all ~230 models + 114 endpoints by hand in `models.scala`/`service.scala` (wire-verified field-by-field); the shared module + `GenerateDart` retirement remain open |
+| 0.4 | Facades at scale | Facadegen productized + `sartFacadePackages`; Flutter framework facades regenerated; Syncfusion datagrid + go_router facades working in a demo. **Status: ✅ except `sartFacadePackages`** (per-package `.conf`s do the job today) |
+| 0.5 | outr_flutter in Scala | The shared UI package ported and published as a Sart library; both apps' `Application`/`Screen`/`MessageService` layer runs from Scala. **Status: ✅ ported** (lives in `app-sart`'s `outr` package for now, not yet published as a separate library) |
+| **0.6** | **LogicalNetwork ships from Scala** | `flutter build web --wasm` from Sart output, zero hand-written Dart, deployed behind the Scala server — first full-app proof. **Status: code-complete** — zero hand-written Dart, analyzer-clean, `flutter build web` green, every file ported line-by-line; open gates are runtime verification against the server, the `--wasm` build, and deployment |
 | 0.7 | nabo platform layer | Conditional exports, JS interop, platform channels, media_kit/webview facades; nabo's `lib/platform/` + models from Scala |
 | 0.8–0.9 | nabo migration | Port screens/ → widgets/ → games/; perf validation on TV hardware (const inference proves out) |
 | **1.0** | **Both apps ship from Scala** | LN (web) and NaboTV (web/Android/tvOS) build from Sart output with zero hand-written Dart; Maven Central artifacts; docs complete |
