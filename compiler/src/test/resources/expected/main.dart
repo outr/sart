@@ -178,6 +178,11 @@ class CircleK extends ShapeKind {
   String toString() => 'CircleK(radius: $radius)';
 
   CircleK copyWith({double? radius}) => CircleK(radius ?? this.radius);
+  static CircleK fromJson(Map<String, dynamic> json) =>
+      CircleK((json['radius'] as num).toDouble());
+
+  @override
+  Map<String, dynamic> toJson() => {'radius': radius, 'type': 'CircleK'};
 }
 
 /// Source: example/src/main/scala/example/apps/ClockApp.scala:11
@@ -265,6 +270,10 @@ class Contact {
 
   Contact copyWith({String? name, String? phone}) =>
       Contact(name ?? this.name, phone ?? this.phone);
+  static Contact fromJson(Map<String, dynamic> json) =>
+      Contact((json['name'] as String), (json['phone'] as String));
+
+  Map<String, dynamic> toJson() => {'name': name, 'phone': phone};
 }
 
 /// Source: example/src/main/scala/example/apps/TwoScreenApp.scala:26
@@ -427,6 +436,11 @@ class RectK extends ShapeKind {
   String toString() => 'RectK(w: $w, h: $h)';
 
   RectK copyWith({double? w, double? h}) => RectK(w ?? this.w, h ?? this.h);
+  static RectK fromJson(Map<String, dynamic> json) =>
+      RectK((json['w'] as num).toDouble(), (json['h'] as num).toDouble());
+
+  @override
+  Map<String, dynamic> toJson() => {'w': w, 'h': h, 'type': 'RectK'};
 }
 
 /// Source: example/src/main/scala/example/apps/DiceApp.scala:24
@@ -448,10 +462,24 @@ class Roll {
 
   Roll copyWith({int? face, int? index}) =>
       Roll(face ?? this.face, index ?? this.index);
+  static Roll fromJson(Map<String, dynamic> json) =>
+      Roll((json['face'] as num).toInt(), (json['index'] as num).toInt());
+
+  Map<String, dynamic> toJson() => {'face': face, 'index': index};
 }
 
 /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:17
-sealed class ShapeKind {}
+sealed class ShapeKind {
+  static ShapeKind fromJson(Map<String, dynamic> json) {
+    final String t = json['type'] as String;
+    if (t == 'CircleK') return CircleK.fromJson(json);
+    if (t == 'SquareK') return SquareK.fromJson(json);
+    if (t == 'RectK') return RectK.fromJson(json);
+    throw Exception('Unsupported type: ' + t);
+  }
+
+  Map<String, dynamic> toJson();
+}
 
 /// Source: example/src/main/scala/example/apps/ShowcaseApp.scala:24
 class ShowcaseApp extends StatefulWidget {
@@ -772,6 +800,11 @@ class SquareK extends ShapeKind {
   String toString() => 'SquareK(side: $side)';
 
   SquareK copyWith({double? side}) => SquareK(side ?? this.side);
+  static SquareK fromJson(Map<String, dynamic> json) =>
+      SquareK((json['side'] as num).toDouble());
+
+  @override
+  Map<String, dynamic> toJson() => {'side': side, 'type': 'SquareK'};
 }
 
 /// Source: example/src/main/scala/example/apps/TodoApp.scala:20
@@ -879,6 +912,10 @@ class TodoItem {
 
   TodoItem copyWith({String? text, bool? done}) =>
       TodoItem(text ?? this.text, done ?? this.done);
+  static TodoItem fromJson(Map<String, dynamic> json) =>
+      TodoItem((json['text'] as String), (json['done'] as bool));
+
+  Map<String, dynamic> toJson() => {'text': text, 'done': done};
 }
 
 /// Source: example/src/main/scala/example/features/AsyncBuilders.scala:9
@@ -965,6 +1002,11 @@ class Circle extends Shape {
   String toString() => 'Circle(radius: $radius)';
 
   Circle copyWith({double? radius}) => Circle(radius ?? this.radius);
+  static Circle fromJson(Map<String, dynamic> json) =>
+      Circle((json['radius'] as num).toDouble());
+
+  @override
+  Map<String, dynamic> toJson() => {'radius': radius, 'type': 'Circle'};
 }
 
 /// Source: example/src/main/scala/example/features/CtorPatterns.scala:11
@@ -1172,7 +1214,7 @@ class GivenExample {
 }
 
 /// Source: example/src/main/scala/example/features/GivenUsing.scala:10
-final Formatter<int> intFormatter = intFormatter$();
+final Formatter<int> intFormatter = intFormatter();
 
 /// Source: example/src/main/scala/example/features/GivenUsing.scala:10
 class intFormatter$ extends Formatter<int> {
@@ -1202,7 +1244,17 @@ int doubled(int x) {
 }
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:12
-sealed class Json {}
+sealed class Json {
+  static Json fromJson(Map<String, dynamic> json) {
+    final String t = json['type'] as String;
+    if (t == 'JsonString') return JsonString.fromJson(json);
+    if (t == 'JsonNumber') return JsonNumber.fromJson(json);
+    if (t == 'JsonBool') return JsonBool.fromJson(json);
+    throw Exception('Unsupported type: ' + t);
+  }
+
+  Map<String, dynamic> toJson();
+}
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:15
 class JsonBool extends Json {
@@ -1220,6 +1272,11 @@ class JsonBool extends Json {
   String toString() => 'JsonBool(value: $value)';
 
   JsonBool copyWith({bool? value}) => JsonBool(value ?? this.value);
+  static JsonBool fromJson(Map<String, dynamic> json) =>
+      JsonBool((json['value'] as bool));
+
+  @override
+  Map<String, dynamic> toJson() => {'value': value, 'type': 'JsonBool'};
 }
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:16
@@ -1241,6 +1298,11 @@ class JsonNumber extends Json {
   String toString() => 'JsonNumber(value: $value)';
 
   JsonNumber copyWith({double? value}) => JsonNumber(value ?? this.value);
+  static JsonNumber fromJson(Map<String, dynamic> json) =>
+      JsonNumber((json['value'] as num).toDouble());
+
+  @override
+  Map<String, dynamic> toJson() => {'value': value, 'type': 'JsonNumber'};
 }
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:13
@@ -1259,6 +1321,11 @@ class JsonString extends Json {
   String toString() => 'JsonString(value: $value)';
 
   JsonString copyWith({String? value}) => JsonString(value ?? this.value);
+  static JsonString fromJson(Map<String, dynamic> json) =>
+      JsonString((json['value'] as String));
+
+  @override
+  Map<String, dynamic> toJson() => {'value': value, 'type': 'JsonString'};
 }
 
 /// Source: example/src/main/scala/example/features/LayoutFacades.scala:8
@@ -1513,6 +1580,10 @@ class Point {
   String toString() => 'Point(x: $x, y: $y)';
 
   Point copyWith({int? x, int? y}) => Point(x ?? this.x, y ?? this.y);
+  static Point fromJson(Map<String, dynamic> json) =>
+      Point((json['x'] as num).toInt(), (json['y'] as num).toInt());
+
+  Map<String, dynamic> toJson() => {'x': x, 'y': y};
 }
 
 /// Source: example/src/main/scala/example/features/Enums.scala:11
@@ -1558,10 +1629,30 @@ class Rectangle extends Shape {
 
   Rectangle copyWith({double? width, double? height}) =>
       Rectangle(width ?? this.width, height ?? this.height);
+  static Rectangle fromJson(Map<String, dynamic> json) => Rectangle(
+    (json['width'] as num).toDouble(),
+    (json['height'] as num).toDouble(),
+  );
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'width': width,
+    'height': height,
+    'type': 'Rectangle',
+  };
 }
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:6
-sealed class Shape {}
+sealed class Shape {
+  static Shape fromJson(Map<String, dynamic> json) {
+    final String t = json['type'] as String;
+    if (t == 'Circle') return Circle.fromJson(json);
+    if (t == 'Rectangle') return Rectangle.fromJson(json);
+    throw Exception('Unsupported type: ' + t);
+  }
+
+  Map<String, dynamic> toJson();
+}
 
 /// Source: example/src/main/scala/example/features/Strings.scala:7
 class StringExample {
@@ -1624,6 +1715,13 @@ class Todo {
 
   Todo copyWith({int? id, String? text, bool? done}) =>
       Todo(id ?? this.id, text ?? this.text, done ?? this.done);
+  static Todo fromJson(Map<String, dynamic> json) => Todo(
+    (json['id'] as num).toInt(),
+    (json['text'] as String),
+    (json['done'] as bool),
+  );
+
+  Map<String, dynamic> toJson() => {'id': id, 'text': text, 'done': done};
 }
 
 /// Source: example/src/main/scala/example/features/TryCatch.scala:10
@@ -1755,6 +1853,13 @@ class User {
 
   User copyWith({String? name, String? email, int? age}) =>
       User(name ?? this.name, email ?? this.email, age ?? this.age);
+  static User fromJson(Map<String, dynamic> json) => User(
+    (json['name'] as String),
+    (json['email'] as String),
+    (json['age'] as num).toInt(),
+  );
+
+  Map<String, dynamic> toJson() => {'name': name, 'email': email, 'age': age};
 }
 
 /// Source: example/src/main/scala/example/features/CtorPatterns.scala:9
@@ -1774,6 +1879,10 @@ class Vec {
   String toString() => 'Vec(x: $x, y: $y)';
 
   Vec copyWith({int? x, int? y}) => Vec(x ?? this.x, y ?? this.y);
+  static Vec fromJson(Map<String, dynamic> json) =>
+      Vec((json['x'] as num).toInt(), (json['y'] as num).toInt());
+
+  Map<String, dynamic> toJson() => {'x': x, 'y': y};
 }
 
 /// Source: example/src/main/scala/example/features/Generics.scala:15

@@ -236,3 +236,34 @@ trait FxMixinOn extends FxCounter:
   def label(): String = "m"
 
 class FxWithMixinOn extends FxCounter with FxMixinOn
+
+
+// ── Annotation-free wire models (shared-module shape: no Sart references) ──
+
+case class FxPlainModel(id: String, count: Int, tags: List[String], note: Option[String])
+
+sealed trait FxGeom
+object FxGeom:
+  case class Circle(radius: Double) extends FxGeom
+  case class Box(w: Int, h: Int) extends FxGeom
+  // The JVM side's codec — no Dart form; must be skipped, loudly.
+  implicit val rw: fabric.rw.RW[Circle] = { import fabric.rw.*; RW.gen }
+
+class FxGeomUse:
+  def area(s: FxGeom): Double = s match
+    case FxGeom.Circle(r) => 3.0 * r * r
+    case FxGeom.Box(w, h) => (w * h).toDouble
+  def circle(r: Double): FxGeom = FxGeom.Circle(r)
+  def decode(d: Dyn): FxGeom = Json.decode[FxGeom](d)
+
+// A case class holding a widget-ish function field is NOT wire-shaped —
+// no codec must be synthesized for it.
+case class FxNotWire(label: String, onTap: () => Unit)
+
+// fabric's `Json` value type rides as `dynamic`; its builders lower to
+// Dart literals.
+case class FxApiRecord(id: String, extra: fabric.Json, tags: List[fabric.Json])
+object FxApiConsts:
+  val Private: fabric.Json = fabric.obj("type" -> fabric.str("SourceType.Private"))
+  val Empty: fabric.Json = fabric.obj()
+  val Nums: fabric.Json = fabric.arr(fabric.num(1), fabric.bool(true))

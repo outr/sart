@@ -104,23 +104,24 @@ final class DartTopLevel extends StaticAnnotation
 
 // ─── JSON codec synthesis ──────────────────────────────────────────────────
 
-/** Marks a case class — or a sealed trait of case classes — for JSON
- *  codec synthesis. Sart emits `fromJson` / `toJson` on the Dart class,
- *  matching the wire shape of json_serializable-generated models:
- *  string-keyed maps, nested `toJson` expansion, and (for members of a
- *  sealed hierarchy) a `type` discriminator with a factory dispatch on
- *  the sealed parent.
+/** Forces JSON codec synthesis (`fromJson`/`toJson`) for a case class
+ *  or sealed hierarchy. Rarely needed: every case class whose fields are
+ *  wire-shaped gets codecs WITHOUT this annotation, so shared model
+ *  modules need not reference Sart. Use it to force synthesis on a type
+ *  the heuristic would skip.
  */
 final class JsonModel extends StaticAnnotation
 
 /** Overrides the `type` discriminator a sealed-hierarchy member writes
- *  and matches in JSON. Defaults to the class's simple name.
+ *  and matches in JSON. Defaults to fabric's convention: the capitalised
+ *  tail of the fully-qualified name — `Outer.Inner` for a class nested in
+ *  an object, the bare name at top level.
  */
 final class JsonTag(val tag: String) extends StaticAnnotation
 
-/** Overrides the JSON key a `@JsonModel` field reads/writes — the
- *  counterpart of json_serializable's `@JsonKey(name: '...')`
- *  (e.g. LightDB's `_id`).
+/** Overrides the JSON key a model field reads/writes — the counterpart
+ *  of json_serializable's `@JsonKey(name: '...')`. Defaults to the field
+ *  name, so a field literally named `_id` needs nothing.
  */
 final class JsonField(val name: String) extends StaticAnnotation
 

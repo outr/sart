@@ -207,6 +207,17 @@ it into `sbt-sart`** (the auto-facade plugin feature):
 
 ## Workstream D — Shared core module (frontend + backend)
 
+**✅ Landed (2026-08-27): annotation-free models.** Plain case classes and
+sealed hierarchies get codecs with no Sart reference, defaulting to
+fabric's `RW.gen` conventions (field name = JSON key; tag =
+`Outer.Inner`); classes nested in objects flatten; JVM-only companion
+givens (`RW[T]`) are skipped loudly; fabric's `Json` rides as `dynamic`
+with its builders lowered to literals. LN's `logicalnetwork-api` module
+compiles through Sart as-is (verified: codecs for every request/response,
+every `RW.gen` skipped with a comment). Remaining: `case object` enumerations as
+Dart values with `RW.enumeration`-style string codecs, and switching the
+LN port from `models.scala` to the shared module.
+
 Goal: one cross-target Scala module holding models, protocol, validation,
 and operations logic, consumed by the JVM backend *and* compiled to Dart
 by Sart — the Scala.js `crossProject` story, but for Dart.

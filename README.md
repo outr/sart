@@ -144,11 +144,25 @@ boundary. `Future.map`/`flatMap`/`foreach` → `.then`, `Futures.ensure` →
 `whenComplete`, `onError` → `catchError`, `Completer`, `Timer`/
 `Timer.periodic`, `Stream` (`listen`/`map`/`expand`/`forEach`/`periodic`).
 
-**The wire boundary**: `@JsonModel` case classes get `fromJson`/`toJson`
-synthesised (nested models, `List`/`Map`/`Option` fields, `@JsonField`
-renames such as `"_id"`), sealed hierarchies dispatch on a `@JsonTag`
-`type` discriminator, and `Dyn` is the typed face of `dynamic`
-(`d("k")`, `d.str`/`toInt`/`toDouble`/`toBool`/`isNull`/`toList`,
+**The wire boundary — no annotations required**: every case class whose
+fields are wire-shaped (primitives, `String`, `Option`/`List`/`Set`/`Map`
+of wire-shaped, other models) gets `fromJson`/`toJson` synthesised, and
+every sealed hierarchy of such case classes dispatches on a `type`
+discriminator — so a model module shared with a JVM backend carries
+**no reference to Sart at all**. Defaults follow fabric's conventions
+(`RW.gen`): the JSON key is the field name (`_id` stays `_id`) and the
+tag is the capitalised tail of the fully-qualified name (`object
+QueryFilter { case class AddressFilter }` → `"QueryFilter.AddressFilter"`,
+a top-level class → its bare name). Classes nested in objects flatten to
+`QueryFilterAddressFilter` on the Dart side; call sites and patterns keep
+writing `QueryFilter.AddressFilter`. JVM-only `given`/`implicit` members
+in companions (a fabric `RW[Model]`, a lightdb codec) are skipped with a
+comment naming them, fabric's `Json` value type rides as `dynamic`, and
+its `obj`/`arr`/`str`/`num`/`bool` builders lower to Dart literals — LN's
+`logicalnetwork-api` module compiles through Sart untouched. `@JsonModel`
+(force synthesis), `@JsonTag`, and `@JsonField` remain as opt-in
+overrides. `Dyn` is the typed face of
+`dynamic` (`d("k")`, `d.str`/`toInt`/`toDouble`/`toBool`/`isNull`/`toList`,
 `d(k) = v`) for untyped payloads.
 
 **Stdlib mappings**: `Option[T]` ↔ `T?` (via native operators and a Dart
@@ -223,7 +237,11 @@ the matching host OS to actually run `flutter build`.
   platform channels — the platform-variant machinery the second
   reference app (NaboTV) needs.
 - A shared Scala "core" module compiled to both the JVM backend and the
-  Sart frontend (the LN port consolidates its models by hand instead).
+  Sart frontend — the codec side is done (annotation-free models, see
+  above); what remains is enumerations declared as `case object`s (fabric
+  `RW.enumeration` style) as first-class Dart values, and wiring LN's
+  `logicalnetwork-api` module through the port in place of the
+  hand-consolidated `models.scala`.
 - Maven Central releases (everything is `0.1.0-SNAPSHOT` in local Ivy).
 
 See [ROADMAP.md](ROADMAP.md) for the 1.0 plan: language completeness,

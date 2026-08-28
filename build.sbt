@@ -130,7 +130,10 @@ lazy val compiler = (project in file("compiler"))
     name := "sart-compiler",
     libraryDependencies ++= Seq(
       "org.scala-lang" %% "scala3-tasty-inspector" % scalaVersion.value,
-      "org.scalameta" %% "munit" % "1.3.5" % Test
+      "org.scalameta" %% "munit" % "1.3.5" % Test,
+      // Fixtures exercise the shared-model shape: plain case classes with
+      // fabric `RW` givens and `Json` fields, no Sart references.
+      "org.typelevel" %% "fabric-core" % "1.30.0" % Test
     ),
     // Test fixtures live under `src/test/scala/sart/compiler/fixtures/`.
     // Retain trees so the inspector can read their TASTy.

@@ -487,3 +487,47 @@ class EmitterSuite extends FunSuite:
     assert(emittedMain.contains("mixin FxMixinOn on FxCounter {"), emittedMain)
     assert(emittedMain.contains("class FxWithMixinOn extends FxCounter with FxMixinOn"), emittedMain)
   }
+
+  test("plain case classes get codecs without any annotation") {
+    val body = classBody("FxPlainModel")
+    assert(body.contains("static FxPlainModel fromJson(Map<String, dynamic> json) =>"), body)
+    assert(body.contains("(json['id'] as String)"), body)
+    assert(body.contains("Map<String, dynamic> toJson() => {"), body)
+    assert(body.contains("'note': note,"), body)
+  }
+
+  test("case classes with non-wire fields get no codec") {
+    val body = classBody("FxNotWire")
+    assert(!body.contains("fromJson"), body)
+    assert(!body.contains("toJson"), body)
+  }
+
+  test("classes nested in objects flatten, and sealed members default to fabric-style tags") {
+    val circle = classBody("FxGeomCircle")
+    assert(circle.contains("class FxGeomCircle extends FxGeom"), circle)
+    assert(circle.contains("'type': 'FxGeom.Circle',"), circle)
+    val parent = classBody("FxGeom")
+    assert(parent.contains("if (t == 'FxGeom.Box') return FxGeomBox.fromJson(json);"), parent)
+    val use = classBody("FxGeomUse")
+    assert(use.contains("FxGeomCircle(r)"), use)
+    assert(use.contains("FxGeom.fromJson(d as Map<String, dynamic>)"), use)
+  }
+
+  test("JVM-only givens in companions are skipped loudly") {
+    val parent = classBody("FxGeom")
+    assert(!parent.contains("randomUUID"), parent)
+    assert(parent.contains("`rw: fabric.rw.RW` is JVM-only"), parent)
+  }
+
+  test("fabric.Json rides as dynamic and its builders lower to literals") {
+    val rec = classBody("FxApiRecord")
+    assert(rec.contains("final dynamic extra;"), rec)
+    assert(rec.contains("final List<dynamic> tags;"), rec)
+    assert(rec.contains("static FxApiRecord fromJson"), rec)
+    assert(rec.contains("'extra': extra,"), rec)
+    val c = classBody("FxApiConsts")
+    assert(c.contains("{'type': 'SourceType.Private'}"), c)
+    assert(c.contains("<String, dynamic>{}"), c)
+    assert(c.contains("[1, true]"), c)
+  }
+
