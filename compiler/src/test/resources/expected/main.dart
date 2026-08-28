@@ -1263,6 +1263,7 @@ int doubled(int x) {
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:12
 sealed class Json {
+  const Json();
   static Json fromJson(Map<String, dynamic> json) {
     final String t = json['type'] as String;
     if (t == 'JsonString') return JsonString.fromJson(json);
@@ -1690,6 +1691,7 @@ class Rectangle extends Shape {
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:6
 sealed class Shape {
+  const Shape();
   static Shape fromJson(Map<String, dynamic> json) {
     final String t = json['type'] as String;
     if (t == 'Circle') return Circle.fromJson(json);

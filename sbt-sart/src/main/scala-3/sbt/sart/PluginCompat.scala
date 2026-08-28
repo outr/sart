@@ -15,4 +15,10 @@ private[sart] object PluginCompat {
     config: Configuration, jarTypes: Set[String], up: UpdateReport, conv: FileConverter
   ): Seq[File] =
     Classpaths.managedJars(config, jarTypes, up, conv).map(e => conv.toPath(e.data).toFile)
+
+  /** Every resolved (module, jar) pair in the compile configuration. */
+  def moduleJars(up: UpdateReport, conv: FileConverter): Seq[(ModuleID, File)] =
+    up.configuration(ConfigRef("compile")).toSeq
+      .flatMap(_.modules)
+      .flatMap(m => m.artifacts.map { case (_, f) => (m.module, f) })
 }

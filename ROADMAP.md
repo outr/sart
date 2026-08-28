@@ -214,6 +214,13 @@ it into `sbt-sart`** (the auto-facade plugin feature):
 
 ## Workstream D — Shared core module (frontend + backend)
 
+**✅ Landed (2026-08-28): dependency compile-through.** `dependsOn`
+projects and `sartLibraries` jars have their TASTy emitted with the app
+(`Main --library=…`, inspector `jars`), so a shared model module is a
+normal sbt dependency and Sart-aware libraries (reactify next) publish as
+ordinary Scala 3 jars. `sartStrict` fails the build at the Scala location
+of any untranslatable construct.
+
 **✅ Landed (2026-08-27): annotation-free models.** Plain case classes and
 sealed hierarchies get codecs with no Sart reference, defaulting to
 fabric's `RW.gen` conventions (field name = JSON key; tag =

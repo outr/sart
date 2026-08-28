@@ -17,7 +17,9 @@ import scala.jdk.CollectionConverters.*
 class EmitterSuite extends FunSuite:
 
   // Lazy + shared so the inspection cost (a few seconds) is paid once.
-  private lazy val emittedMain: String = {
+  private lazy val emittedMain: String = emitted._2
+  private lazy val emitter: DartEmitter = emitted._1
+  private lazy val emitted: (DartEmitter, String) = {
     // The build injects the real test-classes directory (sbt 2 presents
     // classpaths as hashed cache jars, so code-source lookup lands on a
     // jar without the fixtures' .tasty files). The code-source fallback
@@ -26,8 +28,22 @@ class EmitterSuite extends FunSuite:
       .map(Paths.get(_))
       .getOrElse(locateTestClassesDir(classOf[fixtures.FxPoint]))
     require(Files.isDirectory(tastyRoot), s"test classes dir not found: $tastyRoot")
+    emit(tastyRoot, gaps = false)
+  }
+
+  /** A second, separate emission over `fixtures.gaps` — constructs the
+   *  emitter deliberately does NOT translate, kept out of the main
+   *  fixture set so its strict-mode invariant stays meaningful. */
+  private lazy val gapEmitter: DartEmitter = {
+    val tastyRoot = sys.props.get("sart.test.classesDir")
+      .map(Paths.get(_))
+      .getOrElse(locateTestClassesDir(classOf[fixtures.FxPoint]))
+    emit(tastyRoot, gaps = true)._1
+  }
+
+  private def emit(tastyRoot: Path, gaps: Boolean): (DartEmitter, String) = {
     val outDir    = Files.createTempDirectory("sart-emitter-test")
-    val tastyFiles = findTastyFiles(tastyRoot)
+    val tastyFiles = findTastyFiles(tastyRoot, gaps)
     require(tastyFiles.nonEmpty, s"no fixture .tasty files under $tastyRoot")
     // Pare the inspector classpath down to the stdlib jars + the
     // fixtures' own classes dir. The full test classpath drags in
@@ -44,7 +60,7 @@ class EmitterSuite extends FunSuite:
     val ok = TastyInspector.inspectAllTastyFiles(tastyFiles, Nil, cp)(emitter)
     require(ok, "TASTy inspection failed")
     emitter.writeOutput()
-    new String(Files.readAllBytes(outDir.resolve("lib/main.dart")))
+    (emitter, new String(Files.readAllBytes(outDir.resolve("lib/main.dart"))))
   }
 
   private def locateTestClassesDir(cls: Class[?]): Path =
@@ -53,7 +69,7 @@ class EmitterSuite extends FunSuite:
   private def codeSourcePath(cls: Class[?]): String =
     Paths.get(cls.getProtectionDomain.getCodeSource.getLocation.toURI).toString
 
-  private def findTastyFiles(root: Path): List[String] =
+  private def findTastyFiles(root: Path, gaps: Boolean): List[String] =
     // Only inspect the fixtures package — the suite itself ends up in
     // the same classes directory, and pointing the inspector at e.g.
     // EmitterSuite.tasty fails because munit isn't on the inspector
@@ -61,9 +77,11 @@ class EmitterSuite extends FunSuite:
     val s = Files.walk(root)
     val sep = java.io.File.separator
     val needle = s"sart${sep}compiler${sep}fixtures${sep}"
+    val gapsNeedle = s"${needle}gaps${sep}"
     try s.iterator().asScala
       .filter(_.toString.endsWith(".tasty"))
       .filter(_.toString.contains(needle))
+      .filter(_.toString.contains(gapsNeedle) == gaps)
       .map(_.toString).toList.sorted
     finally s.close()
 
@@ -598,4 +616,25 @@ class EmitterSuite extends FunSuite:
     assert(!t.contains("FxTypesUserId UserId"), "plain nested object must not emit a pointer val: " + t)
     val inst = classBody("FxTypesboxFunctor$")
     assert(inst.contains("FxBox<B> fmap<A, B>(covariant FxBox<A> fa, B Function(A) f)"), inst)
+  }
+
+  test("sealed parents of case objects declare a const constructor") {
+    val parent = classBody("FxToken")
+    assert(parent.contains("const FxToken();"), parent)
+  }
+
+  test("a case object without a const-able parent chain becomes a singleton factory") {
+    val solo = classBody("FxSolo")
+    assert(solo.contains("factory FxSolo() => _instance;"), solo)
+    assert(solo.contains("static final FxSolo _instance = FxSolo._();"), solo)
+    assert(solo.contains("FxSolo._() : super(1);"), solo)
+    assert(!solo.contains("const FxSolo"), solo)
+    assert(!classBody("FxSoloBase").contains("const FxSoloBase"), classBody("FxSoloBase"))
+    assert(classBody("FxSoloUse").contains("return FxSolo();"), classBody("FxSoloUse"))
+  }
+
+  test("unsupported constructs are collected with their Scala source location") {
+    val gaps = gapEmitter.unsupported.toList
+    assert(gaps.exists(_.matches(".*Gaps\\.scala:\\d+: nested def")), gaps.mkString("\n"))
+    assert(emitter.unsupported.isEmpty, emitter.unsupported.mkString("\n"))
   }

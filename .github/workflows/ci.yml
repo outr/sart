@@ -26,7 +26,7 @@ jobs:
           flutter-version: '3.44.8'
           channel: stable
       # sbt 2's `test` is incremental — `testFull` forces the whole suite.
-      - run: sbt -Dsbt.color=false "compiler/testFull" sartGoldenVerify
+      - run: sbt -Dsbt.color=false "compiler/testFull; sartGoldenVerify"
 
   # Per-platform build matrix. Each job is the full chain
   #   compile → emit → scaffold → flutter build

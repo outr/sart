@@ -112,7 +112,25 @@ enablePlugins(SartPlugin)
 
 After `sbt sartRun`, your Scala 3 code emits to `out/lib/main.dart` and
 builds into a Linux native binary. See [`sbt-sart/README.md`](sbt-sart/README.md)
-for plugin-specific settings.
+for plugin-specific settings. Two worth knowing from day one:
+
+```scala
+// build.sbt
+sartStrict    := true   // any Scala the emitter can't translate fails the
+                        // build at its Scala source location — a compile
+                        // error, not a Dart analyzer surprise later
+sartLibraries := Seq("com.outr" %% "reactify" % "4.1.0")   // also
+                        // compile these dependencies' TASTy through to
+                        // Dart (matched by organisation + name)
+```
+
+Projects reached through `dependsOn` compile through automatically, so a
+model module shared with a JVM backend (plain case classes, no Sart
+reference) is just a normal sbt dependency of the Flutter project.
+`sartLibraries` extends that to published jars: every Scala 3 jar ships
+its TASTy, and anything written inside the supported subset emits like
+your own code (JVM-only members such as fabric `RW` givens are skipped
+with a comment).
 
 **First-time bootstrap**: run `sbt sartPublishLocalAll` from this repo to
 publish all Sart core artifacts (`sart-dart`, `sart-stdlib`,
@@ -212,6 +230,23 @@ bundled assets, `@DartPubspec` YAML merging, and a generated
 
 **Published artifacts** (local Ivy): `sart-dart_3`, `sart-stdlib_3`,
 `flutter-facades_3`, `sart-compiler_3`, `sbt-sart` (all at `0.1.0-SNAPSHOT`).
+
+## Compile-time cost
+
+Sart is not a macro: nothing runs inside scalac, and the emit is a
+separate pass over the TASTy scalac already wrote. Measured on the
+reference app (153 Scala files / 33k lines → 65k lines of Dart; sbt 2
+build cache disabled so scalac really runs; warm JVM and Flutter caches):
+
+| Step | Wall time |
+| --- | --- |
+| `sbt compile` (scalac, clean) | 16 s |
+| `sbt sartEmit` (TASTy → Dart, including `dart format` of the 65k lines) | 11 s |
+| `flutter analyze` | 3 s |
+| `flutter build web` | 42 s (≈200 s from a cold Flutter cache) |
+
+The Scala compile is exactly what it would be without Sart; the emit is
+the entire added cost and scales linearly with source size.
 
 ## Reference app
 

@@ -94,6 +94,19 @@ object SartPlugin extends AutoPlugin {
         "with @DartPubspec in project code."
     )
 
+    val sartLibraries = settingKey[Seq[ModuleID]](
+      "Dependencies whose TASTy is compiled through to Dart along with this " +
+        "project — shared model modules and Sart-aware libraries. Matched " +
+        "against the resolved classpath by organization + name (cross-version " +
+        "suffix ignored). Projects reached via dependsOn are always included."
+    )
+
+    val sartStrict = settingKey[Boolean](
+      "Fail sartEmit on any Scala construct the emitter can't translate, " +
+        "reported at its Scala source location, instead of leaving a " +
+        "/* TODO */ in the Dart for the analyzer to trip over later."
+    )
+
     // ── Tasks ──────────────────────────────────────────────────────────
 
     @transient val sartEmit          = taskKey[Unit]("Compile this project and emit Dart into <sartOutDir>/lib/")
@@ -119,6 +132,8 @@ object SartPlugin extends AutoPlugin {
     sartSourceRoot := baseDirectory.value,
     sartGoldenDir  := baseDirectory.value / "sart-golden",
     sartAssets     := Seq.empty,
+    sartLibraries  := Seq.empty,
+    sartStrict     := false,
 
     // Register hidden Ivy configurations so the Sart jars resolve via
     // `update` without polluting the user's main classpath. Users still
@@ -174,7 +189,23 @@ object SartPlugin extends AutoPlugin {
       val pubName = normalizedName.value.replace('-', '_')
       val pubDesc = description.value
 
-      val args = Seq(
+      // Compile-through: dependsOn projects (their classes dirs) plus any
+      // declared library whose resolved jar is on the classpath.
+      val wanted = sartLibraries.value
+      def matches(m: ModuleID, w: ModuleID): Boolean =
+        w.organization == m.organization && (m.name == w.name || m.name.startsWith(w.name + "_"))
+      val resolved = PluginCompat.moduleJars(update.value, fileConverter.value)
+      val libJarFiles = resolved.collect { case (m, f) if wanted.exists(w => matches(m, w)) && f.getName.endsWith(".jar") => f }.distinct
+      wanted.filterNot(w => resolved.exists { case (m, _) => matches(m, w) })
+        .foreach(w => log.warn(s"sbt-sart: sartLibraries entry ${w.organization}:${w.name} is not on the compile classpath"))
+      // dependsOn projects: classes directories under sbt 1, exported jars under sbt 2 — Main handles both.
+      val projectEntries = PluginCompat.toFiles((Compile / internalDependencyClasspath).value, fileConverter.value)
+      val libraryArgs = (libJarFiles ++ projectEntries).distinct.map(f => s"--library=${f.getAbsolutePath}")
+      if (libraryArgs.nonEmpty)
+        log.info(s"sbt-sart: compiling through ${libJarFiles.size} library jar(s), ${projectEntries.size} dependsOn project(s)")
+      val strictArgs = if (sartStrict.value) Seq("--strict") else Seq.empty
+
+      val args = strictArgs ++ libraryArgs ++ Seq(
         exClasses.getAbsolutePath,
         inspectorCp,
         outDir.getAbsolutePath,

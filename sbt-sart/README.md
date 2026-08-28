@@ -44,6 +44,9 @@ Then:
 | `sartOutDir`             | `<base>/out`                   | Where Dart + pubspec are written.                     |
 | `sartSourceRoot`         | `baseDirectory.value`          | Used to relativise `/// Source:` comments.            |
 | `sartGoldenDir`          | `<base>/sart-golden`           | Directory of golden files for `sartGoldenVerify`.     |
+| `sartAssets`             | `Seq.empty`                    | Files/directories copied into `<out>/assets/` on emit. |
+| `sartLibraries`          | `Seq.empty`                    | Dependencies (`ModuleID`s) whose TASTy also compiles through to Dart. `dependsOn` projects are always included. |
+| `sartStrict`             | `false`                        | Fail `sartEmit` on any untranslatable construct, reported at its Scala source location. |
 
 ## Implementation notes
 

@@ -335,3 +335,10 @@ object FxTypes:
     case List[t] => t
     case String  => Char
   def head(xs: List[Int]): Elem[List[Int]] = xs.head
+
+// A case object under a parent WITH ctor params: no const chain is
+// possible, so the object becomes a private-ctor singleton factory.
+abstract class FxSoloBase(val n: Int)
+case object FxSolo extends FxSoloBase(1)
+class FxSoloUse:
+  def solo(): FxSoloBase = FxSolo

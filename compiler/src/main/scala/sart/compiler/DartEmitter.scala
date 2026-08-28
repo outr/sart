@@ -204,6 +204,28 @@ class DartEmitter(
       |""".stripMargin
   )
 
+  /** Every unsupported tree met during emission, as `location: what`.
+   *  Read by `Main --strict` to fail the build with Scala positions
+   *  instead of leaving the user to find the Dart comment.
+   */
+  /** Every `todo(...)` marker rendered, as (location, what). Some are
+   *  speculative — an argument list emitted and then discarded by a
+   *  stdlib rewrite — so [[unsupported]] keeps only those whose marker
+   *  actually survived into the emitted Dart.
+   */
+  private val todoRecords = scala.collection.mutable.ListBuffer[(String, String)]()
+
+  /** `<scala-file>:<line>: <what>` for each construct the emitter could
+   *  not translate and left as a `/* TODO */` marker in the output.
+   */
+  def unsupported: List[String] =
+    val body = bodyBuf.toString
+    todoRecords.toList.distinct.collect {
+      case (loc, what) if body.contains(todoMarker(loc, what)) => s"$loc: $what"
+    }
+
+  private[compiler] def todoMarker(loc: String, what: String): String = s"/* TODO $what ($loc) */"
+
   // ── Inspector entry point ──────────────────────────────────────────────
   def inspect(using quotes: Quotes)(tastys: List[Tasty[quotes.type]]): Unit =
     val e = new Pass[quotes.type](
@@ -515,12 +537,15 @@ class DartEmitter(
      *  representable in Dart at all.
      */
     private val userClasses = mutable.Set[Symbol]()
+    /** The registered tree of every user class, for body-level lookups. */
+    private val classDefs = mutable.Map[Symbol, ClassDef]()
 
     private def registerCompanions(t: Tree): Unit = t match
       case p: PackageClause => p.stats.foreach(registerCompanions)
       case cd: ClassDef if hasNative(cd.symbol) => ()
       case cd: ClassDef =>
         userClasses += cd.symbol
+        classDefs(cd.symbol) = cd
         if cd.symbol.name.endsWith("$") then
           val companion = cd.symbol.companionClass
           if companion.exists && !hasNative(companion) && !companion.flags.is(Flags.Enum)
@@ -614,7 +639,7 @@ class DartEmitter(
         if nativeModule then recordAnnotations(vd.symbol)
         else emitTopLevelVal(vd)
       case _ =>
-        line(s"/* TODO top-level: ${t.getClass.getSimpleName} */")
+        line(todo(s"top-level: ${t.getClass.getSimpleName}"))
 
     /** Emit a Dart class for a Scala `case object`. The module class has
      *  the form `FooName$` in TASTy; we strip the trailing `$` for the
@@ -630,11 +655,26 @@ class DartEmitter(
       emitSourceAttribution(sym)
       line(s"class $objName$ext {")
       indent += 1
-      // A const constructor: every reference (`Parent.Foo`) emits
-      // `const Foo()`, and Dart canonicalises const instances so `==`
-      // and `identical` behave like the Scala singleton.
-      line(s"const $objName();")
+      // A const constructor when the parent chain allows one: every
+      // reference (`Parent.Foo`) emits `const Foo()`, and Dart
+      // canonicalises const instances so `==` and `identical` behave like
+      // the Scala singleton. Otherwise (a parent with ctor params, `var`s,
+      // or a facade above it) a private ctor behind a singleton factory
+      // gives the same one-instance semantics to plain `Foo()`.
       val parentSym = parentTpt.map(_.tpe.typeSymbol)
+      if constChainOk(sym) then line(s"const $objName();")
+      else
+        val superArgs = parentInfo(cd).superArgs
+        val superInit =
+          if superArgs.isEmpty then ""
+          else
+            val rendered = parentSym match
+              case Some(p) if p.exists && !hasNative(p) => emitUserCallArgs(p.primaryConstructor, superArgs)
+              case _                                     => emitArgs(superArgs)
+            s" : super($rendered)"
+        line(s"factory $objName() => _instance;")
+        line(s"static final $objName _instance = $objName._();")
+        line(s"$objName._()$superInit;")
       if parentSym.exists(isJsonSealed) then
         blank()
         emitJsonSynths(objName, DartParamShape(Nil, Nil), Some(jsonTagOf(sym)))
@@ -755,7 +795,7 @@ class DartEmitter(
         line("}")
         blank()
       else
-        line(s"/* TODO: parameterised enum ${enumCls.name} — cases are subclasses */")
+        line(todo(s"parameterised enum ${enumCls.name} — cases are subclasses"))
         blank()
 
     /** Emit a `/// Source: <path>:<line>` dartdoc comment for the given
@@ -783,8 +823,19 @@ class DartEmitter(
         val displayed = sourceRoot match
           case Some(root) if sp.startsWith(root) => root.relativize(sp).toString
           case _                                 => sp.toString
-        line(s"/// Source: $displayed:${pos.get.startLine + 1}")
+        currentSource = s"$displayed:${pos.get.startLine + 1}"
+        line(s"/// Source: $currentSource")
       }
+
+    /** The Scala location of the member currently being emitted — what a
+     *  `/* TODO … */` gap is reported against in strict mode.
+     */
+    private var currentSource: String = "<unknown>"
+
+    /** Record a gap and hand back the `/* TODO … */` marker for the output. */
+    private def todo(what: String): String =
+      todoRecords += ((currentSource, what))
+      todoMarker(currentSource, what)
 
     /** Does this class body carry a user-written (non-synthetic,
      *  non-`<init>`) method? We use this to distinguish `given X: T with
@@ -1105,6 +1156,11 @@ class DartEmitter(
               emitUserCallArgs(parentSym.primaryConstructor, parents.superArgs)
             else emitArgs(parents.superArgs)
           s" : super($rendered)"
+      // A param-less parent of a case object declares `const X();` so the
+      // object's canonical `const` instance can chain through it (Dart
+      // rejects a const ctor over an implicit non-const super).
+      if ctorParams.isEmpty && superInit.isEmpty && hasCaseObjectDescendant(sym) && constChainOk(sym) then
+        line(s"const $className();")
       if ctorParams.nonEmpty || superInit.nonEmpty then
         def ctorParamDecl(p: ValDef): String =
           if isSuperKeyParam(p) then "super.key"
@@ -1360,6 +1416,45 @@ class DartEmitter(
       if sym.exists && sym.isTerm && sym.moduleClass.exists && isCaseObjectClass(sym.moduleClass)
       then Some(sym.moduleClass) else None
 
+    /** Can this user class (and every user class above it) carry a Dart
+     *  `const` constructor? Dart demands the whole super chain be const:
+     *  no constructor params, no `var` fields, only literal field
+     *  initialisers. Scala/JDK marker parents emit nothing and are
+     *  ignored; any other non-user parent (a facade class) is assumed
+     *  non-const.
+     */
+    private val constChainMemo = mutable.Map[Symbol, Boolean]()
+    private def constChainOk(cls: Symbol): Boolean =
+      constChainMemo.getOrElseUpdate(cls, {
+        // Scala/JDK marker parents (`Product`, `Serializable`, `Mirror.Singleton`, …) emit nothing.
+        def ignoredParent(p: Symbol): Boolean = p.fullName.startsWith("scala.") || p.fullName.startsWith("java.")
+        cls.exists && userClasses.contains(cls) && !hasNative(cls)
+          && cls.primaryConstructor.paramSymss.flatten.forall(_.isType)
+          && cls.declaredFields.forall { f =>
+            !f.flags.is(Flags.Mutable) && !f.flags.is(Flags.Lazy)
+              && (f.flags.is(Flags.ParamAccessor) || literalFieldInit(cls, f))
+          }
+          && cls.typeRef.baseClasses.filterNot(_ == cls).forall { p =>
+            ignoredParent(p) || (userClasses.contains(p) && constChainOk(p))
+          }
+      })
+
+    /** Is the field's initialiser (if any) a plain literal? Looked up on
+     *  the registered class body so abstract `val`s (no rhs) also pass.
+     */
+    private def literalFieldInit(cls: Symbol, field: Symbol): Boolean =
+      classDefs.get(cls).forall { cd =>
+        cd.body.collectFirst { case vd: ValDef if vd.symbol == field => vd } match
+          case Some(vd) => vd.rhs.forall { case Literal(_) => true; case _ => false }
+          case None     => true
+      }
+
+    /** Does any case object sit below this class? Such parents must declare
+     *  `const Parent();` for the object's `const` instance to be legal.
+     */
+    private def hasCaseObjectDescendant(cls: Symbol): Boolean =
+      userClasses.exists(c => c != cls && isCaseObjectClass(c) && c.typeRef.baseClasses.contains(cls))
+
     /** A sealed parent with tag-dispatch codecs: sealed, not an enum, with
      *  at least one codec-bearing case-class child.
      */
@@ -1583,13 +1678,13 @@ class DartEmitter(
         case tpc: TermParamClause => tpc.params
       }
       if termClauses.isEmpty then
-        line(s"/* TODO extension $sym — no term params */")
+        line(todo(s"extension $sym — no term params"))
         return
 
       val receiver = termClauses.head.headOption match
         case Some(vd: ValDef) => vd
         case _ =>
-          line(s"/* TODO extension $sym — unexpected receiver shape */")
+          line(todo(s"extension $sym — unexpected receiver shape"))
           return
 
       val methodParams = termClauses.drop(1).flatten
@@ -1743,7 +1838,7 @@ class DartEmitter(
       case other: Term =>
         emitTerminal(other, returnLast)
       case other =>
-        line(s"/* TODO body ${other.getClass.getSimpleName} */")
+        line(todo(s"body ${other.getClass.getSimpleName}"))
 
     /** Emit `try { … } on E catch (e) { … } finally { … }` as a Dart
      *  statement. Each catch-clause body is itself dispatched back through
@@ -1775,7 +1870,7 @@ class DartEmitter(
           case Ident("_") =>
             s"} catch (_) {"
           case _ =>
-            s"} catch (_) { /* TODO complex catch pattern */"
+            s"} catch (_) { ${todo("complex catch pattern")}"
         line(header)
         indent += 1
         emitBodyAsStatements(c.rhs, returnLast)
@@ -1815,7 +1910,7 @@ class DartEmitter(
         if returnLast then line(s"return ${emitExpr(term)};")
         else line(s"${emitExpr(term)};")
       case _ =>
-        line(s"/* TODO terminal ${t.getClass.getSimpleName} */")
+        line(todo(s"terminal ${t.getClass.getSimpleName}"))
 
     private def emitStmt(t: Tree): Unit = t match
       case vd: ValDef =>
@@ -1895,9 +1990,9 @@ class DartEmitter(
       case _: DefDef =>
         // Nested defs (e.g. lambda-lifted) shouldn't appear at statement
         // position in the subset we support.
-        line(s"/* TODO nested def */")
+        line(todo("nested def"))
       case _ =>
-        line(s"/* TODO stmt ${t.getClass.getSimpleName} */")
+        line(todo(s"stmt ${t.getClass.getSimpleName}"))
 
     // ── Expressions ──────────────────────────────────────────────────────
 
@@ -1925,7 +2020,7 @@ class DartEmitter(
         val cls = caseObjectValueClass(t.symbol).get
         enumParentOf(cls) match
           case Some(parent) => s"${dartName(parent)}.${cls.name.stripSuffix("$")}"
-          case None         => s"const ${dartName(cls)}()"
+          case None         => if constChainOk(cls) then s"const ${dartName(cls)}()" else s"${dartName(cls)}()"
       case id @ Ident(name) =>
         // `@DartName`d facade objects (`DartInt` → `int`) emit their Dart
         // name — the Scala identifier only exists to dodge a keyword or a
@@ -2453,7 +2548,7 @@ class DartEmitter(
         emitMemberAccess(qual, name)
 
       case other =>
-        s"/* TODO expr ${other.getClass.getSimpleName} */"
+        todo(s"expr ${other.getClass.getSimpleName}")
 
     private def isNativeSingleton(t: Term): Boolean =
       val sym = t.tpe.termSymbol
@@ -3583,7 +3678,7 @@ class DartEmitter(
       case n: Float   => n.toString
       case ()         => "null"
       case null       => "null"
-      case other      => s"/* TODO const $other */"
+      case other      => todo(s"const $other")
 
     private def escapeDartString(s: String): String =
       s.flatMap {
@@ -3633,7 +3728,7 @@ class DartEmitter(
 
       case s: Select => emitExpr(s)
       case Ident(n)  => n
-      case _         => s"/* TODO pattern ${p.getClass.getSimpleName} */"
+      case _         => todo(s"pattern ${p.getClass.getSimpleName}")
 
     /** Render a Scala `Unapply(fun, _, subPatterns)` as a Dart object
      *  pattern. Uses the case-class's declared field names to label the
@@ -4053,7 +4148,7 @@ class DartEmitter(
         }.mkString(" ")
         s"switch (${emitExpr(scrutinee)}) { $arms }"
       case term: Term       => s"${emitExpr(term)};"
-      case _                => s"/* TODO stmt-inline */"
+      case _                => todo("stmt-inline")
 
     /** Single-line `try { … } on E catch (e) { … } finally { … }` — the
      *  inline twin of `emitTryStatement`, for closure/branch bodies that
@@ -4074,7 +4169,7 @@ class DartEmitter(
           case Ident("_") =>
             s" catch (_) {"
           case _ =>
-            s" catch (_) { /* TODO complex catch pattern */"
+            s" catch (_) { ${todo("complex catch pattern")}"
         sb.append(header).append(' ').append(stmtInline(c.rhs)).append(" }")
       t.finalizer.foreach(f => sb.append(" finally { ").append(stmtInline(f)).append(" }"))
       sb.toString
