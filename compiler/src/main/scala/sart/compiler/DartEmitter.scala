@@ -2265,6 +2265,14 @@ class DartEmitter(
         args.headOption.map(emitExpr).getOrElse("null")
       case Apply(TypeApply(Select(qual, "apply"), _), args) if isSartRef(qual, "sart.stdlib.Some") || isSartRef(qual, "scala.Some") =>
         args.headOption.map(emitExpr).getOrElse("null")
+      // `Option(x)` is the same identity: a nullable value IS Dart's Option.
+      // `Option.empty[T]` is `null`.
+      case Apply(Select(qual, "apply"), args) if isSartRef(qual, "sart.stdlib.Option") || isSartRef(qual, "scala.Option") =>
+        args.headOption.map(emitExpr).getOrElse("null")
+      case Apply(TypeApply(Select(qual, "apply"), _), args) if isSartRef(qual, "sart.stdlib.Option") || isSartRef(qual, "scala.Option") =>
+        args.headOption.map(emitExpr).getOrElse("null")
+      case TypeApply(Select(qual, "empty"), _) if isSartRef(qual, "sart.stdlib.Option") || isSartRef(qual, "scala.Option") =>
+        "null"
 
       // `Todo.apply(x, y)` on a case-class companion → `Todo(x, y)`. Scala
       // compiles `Foo(args)` (no `new`) into a call to the companion's

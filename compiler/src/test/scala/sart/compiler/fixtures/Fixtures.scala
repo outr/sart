@@ -353,3 +353,9 @@ class FxCtorBody:
 class FxCtorBodyParams(val a: Int):
   var total: Int = 0
   total = a * 2
+
+
+// `Option(x)` / `Option.empty` are Dart nullability identities.
+class FxOptionApply:
+  def wrap(s: String): Option[String] = Option(s)
+  def none(): Option[Int] = Option.empty[Int]

@@ -646,3 +646,10 @@ class EmitterSuite extends FunSuite:
     val p = classBody("FxCtorBodyParams")
     assert(p.contains("FxCtorBodyParams(this.a) {\n    total = a * 2;\n  }"), p)
   }
+
+
+  test("Option(x) and Option.empty lower to the nullable value") {
+    val b = classBody("FxOptionApply")
+    assert(b.contains("String? wrap(String s) {\n    return s;\n  }"), b)
+    assert(b.contains("int? none() {\n    return null;\n  }"), b)
+  }
