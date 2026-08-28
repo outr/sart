@@ -87,6 +87,14 @@ object SartPlugin extends AutoPlugin {
       "Directory holding checked-in golden Dart for sartGoldenVerify / Accept."
     )
 
+    val sartPubspecLock = settingKey[Option[File]](
+      "A pubspec.lock copied into <out>/ on every emit so `flutter pub get` resolves exactly those " +
+      "package versions — e.g. the lock of a hand-written app the Sart build must match pixel-for-pixel."
+    )
+    val sartWebDir = settingKey[Option[File]](
+      "Directory whose contents overlay the scaffolded <out>/web/ before `flutter build web` — " +
+      "a hand-written index.html, flutter_bootstrap.js, manifest.json, icons/… (like a Flutter app's own web/ folder)."
+    )
     val sartAssets = settingKey[Seq[File]](
       "Files or directories bundled as Flutter assets: each entry is copied " +
         "into <sartOutDir>/assets/ on sartEmit (a directory contributes its " +
@@ -132,6 +140,8 @@ object SartPlugin extends AutoPlugin {
     sartSourceRoot := baseDirectory.value,
     sartGoldenDir  := baseDirectory.value / "sart-golden",
     sartAssets     := Seq.empty,
+    sartWebDir     := None,
+    sartPubspecLock := None,
     sartLibraries  := Seq.empty,
     sartStrict     := false,
 
@@ -214,6 +224,11 @@ object SartPlugin extends AutoPlugin {
         pubDesc
       )
 
+      sartPubspecLock.value.foreach { lock =>
+        if (!lock.isFile) sys.error(s"sartPubspecLock is not a file: $lock")
+        IO.copyFile(lock, outDir / "pubspec.lock")
+        log.info(s"sbt-sart: pinned package versions from $lock")
+      }
       // Bundle declared assets before the emitter runs so a failed emit
       // never leaves a half-updated assets tree ahead of stale Dart.
       val assets = sartAssets.value
@@ -274,6 +289,11 @@ object SartPlugin extends AutoPlugin {
       sartEmit.value
       val outDir = sartOutDir.value
       sbtSartScaffold("web", outDir, normalizedName.value, log)
+      sartWebDir.value.foreach { dir =>
+        if (!dir.isDirectory) sys.error(s"sartWebDir is not a directory: $dir")
+        IO.copyDirectory(dir, outDir / "web", overwrite = true, preserveLastModified = true)
+        log.info(s"sbt-sart: overlaid web/ from $dir")
+      }
       // `-Dsart.web.baseHref=/foo/` lets consumers pin the asset root
       // for project-site deploys (e.g. GitHub Pages under a subpath).
       val extra = sys.props.get("sart.web.baseHref").filter(_.nonEmpty)

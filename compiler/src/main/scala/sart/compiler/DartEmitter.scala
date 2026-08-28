@@ -1041,6 +1041,11 @@ class DartEmitter(
 
       // Member stats (val/var/def/override def); the primary-ctor body is
       // in `cd.body`, separate from the constructor params.
+      // Statements at class-body level are Scala's constructor body
+      // (`refreshJobList()` after the field declarations); they become the
+      // Dart constructor's `{ … }` block, which likewise runs after the
+      // field initialisers.
+      val ctorBody: List[Term] = cd.body.collect { case t: Term => t }
       val memberStats = cd.body.collect {
         case vd: ValDef => vd
         case dd: DefDef => dd
@@ -1159,8 +1164,20 @@ class DartEmitter(
       // A param-less parent of a case object declares `const X();` so the
       // object's canonical `const` instance can chain through it (Dart
       // rejects a const ctor over an implicit non-const super).
-      if ctorParams.isEmpty && superInit.isEmpty && hasCaseObjectDescendant(sym) && constChainOk(sym) then
+      if ctorParams.isEmpty && superInit.isEmpty && ctorBody.isEmpty
+         && hasCaseObjectDescendant(sym) && constChainOk(sym) then
         line(s"const $className();")
+      def emitCtorBody(): Unit =
+        indent += 1
+        ctorBody.foreach(emitStmt)
+        indent -= 1
+        line("}")
+      if ctorParams.isEmpty && superInit.isEmpty && ctorBody.nonEmpty then
+        if sym.flags.is(Flags.Trait) then line(todo("trait body statements"))
+        else
+          line(s"$className() {")
+          emitCtorBody()
+          blank()
       if ctorParams.nonEmpty || superInit.nonEmpty then
         def ctorParamDecl(p: ValDef): String =
           if isSuperKeyParam(p) then "super.key"
@@ -1173,7 +1190,10 @@ class DartEmitter(
           if nmd.isEmpty then pos.mkString(", ")
           else if pos.isEmpty then nmd.mkString("{", ", ", "}")
           else pos.mkString(", ") + ", " + nmd.mkString("{", ", ", "}")
-        line(s"$className($paramList)$superInit;")
+        if ctorBody.nonEmpty then
+          line(s"$className($paramList)$superInit {")
+          emitCtorBody()
+        else line(s"$className($paramList)$superInit;")
         blank()
 
       for stat <- memberStats do

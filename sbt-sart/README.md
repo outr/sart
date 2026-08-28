@@ -45,6 +45,8 @@ Then:
 | `sartSourceRoot`         | `baseDirectory.value`          | Used to relativise `/// Source:` comments.            |
 | `sartGoldenDir`          | `<base>/sart-golden`           | Directory of golden files for `sartGoldenVerify`.     |
 | `sartAssets`             | `Seq.empty`                    | Files/directories copied into `<out>/assets/` on emit. |
+| `sartPubspecLock`        | `None`                         | A `pubspec.lock` copied into `<out>/` on emit so `flutter pub get` resolves exactly those versions. |
+| `sartWebDir`             | `None`                         | Directory overlaid onto the scaffolded `<out>/web/` (custom `index.html`, `flutter_bootstrap.js`, icons) before `flutter build web`. |
 | `sartLibraries`          | `Seq.empty`                    | Dependencies (`ModuleID`s) whose TASTy also compiles through to Dart. `dependsOn` projects are always included. |
 | `sartStrict`             | `false`                        | Fail `sartEmit` on any untranslatable construct, reported at its Scala source location. |
 

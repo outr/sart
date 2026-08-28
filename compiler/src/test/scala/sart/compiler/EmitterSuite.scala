@@ -638,3 +638,11 @@ class EmitterSuite extends FunSuite:
     assert(gaps.exists(_.matches(".*Gaps\\.scala:\\d+: nested def")), gaps.mkString("\n"))
     assert(emitter.unsupported.isEmpty, emitter.unsupported.mkString("\n"))
   }
+
+
+  test("class-body statements become the Dart constructor body") {
+    val b = classBody("FxCtorBody")
+    assert(b.contains("FxCtorBody() {\n    bump();\n  }"), b)
+    val p = classBody("FxCtorBodyParams")
+    assert(p.contains("FxCtorBodyParams(this.a) {\n    total = a * 2;\n  }"), p)
+  }

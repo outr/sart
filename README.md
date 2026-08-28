@@ -231,6 +231,17 @@ bundled assets, `@DartPubspec` YAML merging, and a generated
 **Published artifacts** (local Ivy): `sart-dart_3`, `sart-stdlib_3`,
 `flutter-facades_3`, `sart-compiler_3`, `sbt-sart` (all at `0.1.0-SNAPSHOT`).
 
+## Pixel-for-pixel verification
+
+`tools/sxs/` is the side-by-side harness used on the reference app: a
+headless-Chrome driver that screenshots every page and interaction state
+of the hand-written app and of the Sart build, and a pixel differ that
+reports anything that moved. It found an emitter bug (class-body
+statements — Scala's constructor body — were silently dropped) and drove
+two plugin settings: `sartPubspecLock` (identical package versions) and
+`sartWebDir` (the app's own `web/` folder). See
+[`tools/sxs/README.md`](tools/sxs/README.md).
+
 ## Compile-time cost
 
 Sart is not a macro: nothing runs inside scalac, and the emit is a

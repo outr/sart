@@ -342,3 +342,14 @@ abstract class FxSoloBase(val n: Int)
 case object FxSolo extends FxSoloBase(1)
 class FxSoloUse:
   def solo(): FxSoloBase = FxSolo
+
+
+// Class-body statements are the Scala constructor body → Dart ctor `{ … }`.
+class FxCtorBody:
+  var n: Int = 0
+  bump()
+  def bump(): Unit = n += 1
+
+class FxCtorBodyParams(val a: Int):
+  var total: Int = 0
+  total = a * 2
