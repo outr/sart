@@ -1232,7 +1232,7 @@ class GivenExample {
 }
 
 /// Source: example/src/main/scala/example/features/GivenUsing.scala:10
-final Formatter<int> intFormatter = intFormatter();
+final Formatter<int> intFormatter = intFormatter$();
 
 /// Source: example/src/main/scala/example/features/GivenUsing.scala:10
 class intFormatter$ extends Formatter<int> {

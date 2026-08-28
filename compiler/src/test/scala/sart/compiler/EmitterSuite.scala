@@ -569,5 +569,33 @@ class EmitterSuite extends FunSuite:
     val use = classBody("FxTokenUse")
     assert(use.contains("return const FxTokenEOF();"), use)
     assert(use.contains("const FxTokenEOF() => true"), use)
+
   }
 
+  test("types Dart cannot express erase to dynamic; match types reduce") {
+    val g = classBody("FxGraph")
+    assert(g.contains("List<dynamic> get nodes;"), g)
+    assert(g.contains("dynamic get first {"), g)
+    val ig = classBody("FxIntGraph")
+    assert(ig.contains("List<int> get nodes {"), ig)
+    val t = classBody("FxTypes")
+    assert(t.contains("static dynamic firstOf(FxGraph g)"), t)
+    assert(t.contains("static String either(dynamic x)"), t)
+    assert(t.contains("static int both(dynamic x)"), t)
+    assert(t.contains("static int refined(FxGraph x)"), t)
+    assert(t.contains("static bool same(FxGraph g, FxGraph h)"), t)
+    assert(t.contains("static String show(dynamic u)"), t)
+    assert(t.contains("static dynamic lift<F, A>(FxTypesFunctor<F> fn, dynamic fa, A Function(A) f)"), t)
+    assert(t.contains("static int head(List<int> xs)"), t)
+    val uid = classBody("FxTypesUserId")
+    assert(uid.contains("static dynamic apply(String s)"), uid)
+    assert(!emittedMain.contains("<none>"), "unrepresentable type leaked as <none>")
+  }
+
+  test("nested givens keep their $ class, declare the abstraction, and narrow erased params covariantly") {
+    val t = classBody("FxTypes")
+    assert(t.contains("static late final FxTypesFunctor<FxBox> boxFunctor = FxTypesboxFunctor$();"), t)
+    assert(!t.contains("FxTypesUserId UserId"), "plain nested object must not emit a pointer val: " + t)
+    val inst = classBody("FxTypesboxFunctor$")
+    assert(inst.contains("FxBox<B> fmap<A, B>(covariant FxBox<A> fa, B Function(A) f)"), inst)
+  }

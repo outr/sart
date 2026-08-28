@@ -137,6 +137,17 @@ Dart named sections; non-literal defaults get `$default$` getters),
 `super.key` forwarding, bitwise operators, `Function0..N` types,
 for-comprehensions, string interpolation, curried calls, and more.
 
+**Types Dart can't express erase to `dynamic`** — unions, intersections,
+abstract type members and path-dependent references (`g.Node`),
+higher-kinded applications of a type parameter (`F[A]`), and opaque
+types; match types are reduced; singleton types widen and refinements
+strip. scalac has already type-checked the program, and Dart's `dynamic`
+supplies the implicit cast at each use site, so nothing is lost at
+runtime and no cast noise is emitted. Type parameters and concrete
+generics stay real Dart generics, and an implementation that narrows an
+erased parameter (a `Functor[Box]` instance's `fmap(fa: Box[A])`) gets
+Dart's `covariant` on that parameter — the Scala semantics restated.
+
 **Async**: direct-style `async { … }` bodies with `await(f)` anywhere —
 the emitter marks the enclosing function `async`, propagates through
 closures/IIFEs, and never hoists an awaited temp across a closure

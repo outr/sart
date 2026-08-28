@@ -63,6 +63,13 @@ first; nabo second.
 
 ## Workstream A — Language completeness (emitter)
 
+**Type-level erasure policy (landed 2026-08-28):** what Dart's type
+system can't express — unions, intersections, abstract type members /
+path-dependent types, HKT applications of type params, opaque types —
+erases to `dynamic`; match types reduce; singletons widen; refinements
+strip. Rationale: scalac already checked it; `dynamic` supplies implicit
+casts at use sites. Concrete generics and type parameters stay real.
+
 Gaps ranked by combined impact across both apps. Every item lands with
 fixtures + unit tests + golden coverage; `--strict` (no `/* TODO */` in
 output) becomes the gate.

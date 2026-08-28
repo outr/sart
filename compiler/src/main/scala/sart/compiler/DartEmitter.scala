@@ -810,6 +810,21 @@ class DartEmitter(
      *  line up because the Scala module reference prints as the bare
      *  object name.
      */
+    /** The pointer val behind a plain (non-given, non-case) `object` — the
+     *  object is emitted as a class of statics, so the val has no Dart
+     *  meaning (mirrors `emitTopLevelVal`).
+     */
+    private def isPlainModuleVal(sym: Symbol): Boolean =
+      sym.isTerm && sym.moduleClass.exists && !sym.flags.is(Flags.Given)
+        && !sym.moduleClass.flags.is(Flags.Case)
+
+    /** A module class emitted as a concrete class (a `given … with` singleton)
+     *  keeps its `$` suffix in Dart, so its constructor call must too.
+     */
+    private def isGivenModuleClass(sym: Symbol): Boolean =
+      sym.exists && sym.flags.is(Flags.Module) && sym.name.endsWith("$")
+        && sym.companionModule.exists && sym.companionModule.flags.is(Flags.Given)
+
     /** A `given`/`implicit` member whose type Sart can't represent — a
      *  fabric `RW[Model]`, a lightdb codec — belongs to the JVM side of a
      *  shared model module. Skipped loudly (a comment in the emitted
@@ -838,7 +853,8 @@ class DartEmitter(
         case vd: ValDef => vd
         case dd: DefDef => dd
       }.filterNot { stat =>
-        isJvmOnlyGiven(stat.symbol) || caseObjectValueClass(stat.symbol).isDefined || (
+        isJvmOnlyGiven(stat.symbol) || caseObjectValueClass(stat.symbol).isDefined
+          || isPlainModuleVal(stat.symbol) || (
         !neededDefaultGetter(stat.symbol) && (
           stat.symbol.flags.is(Flags.Synthetic) ||
           stat.symbol.flags.is(Flags.ParamAccessor) ||
@@ -1435,7 +1451,7 @@ class DartEmitter(
         if vd.symbol.flags.is(Flags.Lazy) then "late final "
         else if isMutable then "" else "final "
       }
-      val baseTpe = emitTypeRef(vd.tpt.tpe)
+      val baseTpe = emitTypeRef(declaredTypeFor(vd.tpt.tpe))
       // A null-initialised MUTABLE field of a non-nullable type is the
       // Scala spelling of Dart's `late T x;` — assigned in initState (or
       // similar) before first read, exactly as the Dart original writes it.
@@ -1470,8 +1486,22 @@ class DartEmitter(
       // Params with literal Scala defaults form a Dart named section
       // carrying the default; the rest stay positional.
       val shape = dartParamShape(dd.symbol, params)
-      val posStr = shape.positional.map(p => s"${emitTypeRef(p.tpt.tpe)} ${dartSafeName(p.name)}")
-      val nmdStr = shape.named.map((p, d) => s"${emitTypeRef(p.tpt.tpe)} ${dartSafeName(p.name)} = $d")
+      // An override whose base parameter erased to `dynamic` (an abstract
+      // type member, an `F[A]`) narrows it here — legal in Dart only with
+      // `covariant`, which is exactly the Scala semantics being restated.
+      // (Implementing an abstract member sets no Override flag — consult
+      // the overridden symbols directly; the iterator is empty otherwise.)
+      val baseErased: Set[String] =
+        sym.allOverriddenSymbols.nextOption().toList.flatMap { b =>
+          b.paramSymss.flatten.filterNot(_.isType)
+            .filter(bp => emitTypeRef(bp.termRef.widen) == "dynamic").map(_.name)
+        }.toSet
+      def paramDecl(p: ValDef): String =
+        val t = emitTypeRef(p.tpt.tpe)
+        val cov = if baseErased.contains(p.name) && t != "dynamic" then "covariant " else ""
+        s"$cov$t ${dartSafeName(p.name)}"
+      val posStr = shape.positional.map(paramDecl)
+      val nmdStr = shape.named.map((p, d) => s"${paramDecl(p)} = $d")
       val paramStr =
         if nmdStr.isEmpty then posStr.mkString(", ")
         else if posStr.isEmpty then nmdStr.mkString("{", ", ", "}")
@@ -2672,8 +2702,9 @@ class DartEmitter(
      *  infer `GlobalKey<State<StatefulWidget>>`).
      */
     private def ctorTypeName(tpe: TypeRepr): String = tpe match
-      case AppliedType(_, _) => emitTypeRef(tpe)
-      case _                 => dartName(tpe.typeSymbol)
+      case AppliedType(_, _)                        => emitTypeRef(tpe)
+      case _ if isGivenModuleClass(tpe.typeSymbol) => dartName(tpe.typeSymbol) + "$"
+      case _                                        => dartName(tpe.typeSymbol)
 
     private def emitMemberAccess(qual: Term, name: String): String =
       // @DartTopLevel facade field / constant → drop the qualifier so
@@ -4053,6 +4084,38 @@ class DartEmitter(
     private def emitTypeRef(tpe: TypeRepr): String =
       val sym = tpe.typeSymbol
       recordAnnotations(sym)
+
+      // Types Dart cannot express erase to `dynamic`: scalac has already
+      // checked them, and Dart's `dynamic` supplies the implicit casts
+      // at every use site (the "erased Object + casts" strategy, without
+      // the cast noise). Unions, intersections, bounds, abstract type
+      // members / path-dependent refs (`g.Node`), and higher-kinded
+      // applications of a type parameter (`F[A]`), and opaque types (the
+      // representation is enforced by scalac; reflection exposes only the
+      // opaque bounds). Match types reduce.
+      tpe match
+        case OrType(_, _) | AndType(_, _) => return "dynamic"
+        case _: TypeBounds                => return "dynamic"
+        case AppliedType(tycon, _) if tycon.typeSymbol.exists && tycon.typeSymbol.isTypeParam =>
+          return "dynamic"
+        case _ => ()
+      // Type aliases dealias (a match-type alias reduces on the way; one
+      // that can't reduce erases). Predef's `String`/`Map` aliases land
+      // on the same Dart names they always did.
+      if sym.exists && sym.isAliasType then
+        val expanded = tpe.dealias.simplified
+        return expanded match
+          case _: MatchType                      => "dynamic"
+          case e if e.typeSymbol == sym          => "dynamic" // couldn't expand
+          case e                                 => emitTypeRef(e)
+      tpe match
+        case _: MatchType =>
+          return tpe.simplified match
+            case _: MatchType => "dynamic"
+            case r            => emitTypeRef(r)
+        case _ => ()
+      if sym.exists && (sym.flags.is(Flags.Opaque) || (sym.isAbstractType && !sym.isTypeParam)) then
+        return "dynamic"
 
       // Hand-ported stdlib types with custom Dart representations — these
       // need to bypass the standard `base<T, U>` template because they

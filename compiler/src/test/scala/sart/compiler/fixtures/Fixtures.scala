@@ -299,3 +299,39 @@ class FxTokenUse:
   def isEof(t: FxToken): Boolean = t match
     case FxToken.EOF => true
     case FxToken.Word(_) => false
+
+// ── Types Dart can't express: erased to `dynamic` (see emitTypeRef) ──────
+
+trait FxGraph:
+  type Node
+  def nodes: List[Node]
+  def first: Node = nodes.head
+
+class FxIntGraph extends FxGraph:
+  type Node = Int
+  def nodes: List[Int] = List(1, 2)
+
+class FxBox[T](val value: T):
+  def map[U](f: T => U): FxBox[U] = FxBox(f(value))
+
+object FxTypes:
+  def firstOf(g: FxGraph): g.Node = g.first
+  def roundTrip(g: FxGraph): Boolean = g.nodes.contains(firstOf(g))
+  def either(x: Int | String): String = x.toString
+  def both(x: FxGraph & FxBox[Int]): Int = x.value
+  def refined(x: FxGraph { type Node = Int }): Int = x.first + 1
+  def same(g: FxGraph)(h: g.type): Boolean = g == h
+  opaque type UserId = String
+  object UserId:
+    def apply(s: String): UserId = s
+  def show(u: UserId): String = u
+  trait Functor[F[_]]:
+    def fmap[A, B](fa: F[A])(f: A => B): F[B]
+  def lift[F[_], A](fn: Functor[F], fa: F[A], f: A => A): F[A] = fn.fmap(fa)(f)
+  given boxFunctor: Functor[FxBox] with
+    def fmap[A, B](fa: FxBox[A])(f: A => B): FxBox[B] = fa.map(f)
+  def liftBox(b: FxBox[Int]): FxBox[Int] = lift(boxFunctor, b, (x: Int) => x + 1)
+  type Elem[X] = X match
+    case List[t] => t
+    case String  => Char
+  def head(xs: List[Int]): Elem[List[Int]] = xs.head
