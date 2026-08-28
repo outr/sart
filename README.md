@@ -159,7 +159,13 @@ writing `QueryFilter.AddressFilter`. JVM-only `given`/`implicit` members
 in companions (a fabric `RW[Model]`, a lightdb codec) are skipped with a
 comment naming them, fabric's `Json` value type rides as `dynamic`, and
 its `obj`/`arr`/`str`/`num`/`bool` builders lower to Dart literals — LN's
-`logicalnetwork-api` module compiles through Sart untouched. `@JsonModel`
+`logicalnetwork-api` module compiles through Sart untouched.
+Enumerations declared fabric-style (`sealed trait StringMatch; object
+StringMatch { case object Exact … }`) become Dart enhanced enums —
+`StringMatch.Exact` works as a value, in `==`, and in `match` — that
+serialise as `"StringMatch.Exact"` strings (`RW.enumeration`'s
+convention); Scala 3 `enum`s get the same codecs. A case object inside
+a mixed hierarchy is a const singleton with a tagged object codec. `@JsonModel`
 (force synthesis), `@JsonTag`, and `@JsonField` remain as opt-in
 overrides. `Dyn` is the typed face of
 `dynamic` (`d("k")`, `d.str`/`toInt`/`toDouble`/`toBool`/`isNull`/`toList`,
@@ -237,9 +243,8 @@ the matching host OS to actually run `flutter build`.
   platform channels — the platform-variant machinery the second
   reference app (NaboTV) needs.
 - A shared Scala "core" module compiled to both the JVM backend and the
-  Sart frontend — the codec side is done (annotation-free models, see
-  above); what remains is enumerations declared as `case object`s (fabric
-  `RW.enumeration` style) as first-class Dart values, and wiring LN's
+  Sart frontend — the codec side is done (annotation-free models and
+  enumerations, see above); what remains is wiring LN's
   `logicalnetwork-api` module through the port in place of the
   hand-consolidated `models.scala`.
 - Maven Central releases (everything is `0.1.0-SNAPSHOT` in local Ivy).

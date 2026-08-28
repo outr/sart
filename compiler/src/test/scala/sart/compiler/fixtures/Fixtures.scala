@@ -267,3 +267,35 @@ object FxApiConsts:
   val Private: fabric.Json = fabric.obj("type" -> fabric.str("SourceType.Private"))
   val Empty: fabric.Json = fabric.obj()
   val Nums: fabric.Json = fabric.arr(fabric.num(1), fabric.bool(true))
+
+// ── Enumerations: fabric `RW.enumeration` style case objects ──────────────
+
+sealed trait FxColor
+object FxColor:
+  case object Red extends FxColor
+  case object Blue extends FxColor
+  val values: List[FxColor] = List(Red, Blue)
+  def parse(s: String): FxColor = if s == "red" then Red else Blue
+  implicit val rw: fabric.rw.RW[FxColor] = { import fabric.rw.*; RW.enumeration(List(Red, Blue)) }
+
+case class FxPaint(name: String, color: FxColor, alt: Option[FxColor])
+
+class FxColorUse:
+  def isRed(c: FxColor): Boolean = c == FxColor.Red
+  def label(c: FxColor): String = c match
+    case FxColor.Red => "red"
+    case FxColor.Blue => "blue"
+  def pick(): FxColor = FxColor.Blue
+  def roundTrip(d: Dyn): FxPaint = Json.decode[FxPaint](d)
+
+// A mixed hierarchy: the case object is a const singleton, not an enum.
+sealed trait FxToken
+object FxToken:
+  case object EOF extends FxToken
+  case class Word(text: String) extends FxToken
+
+class FxTokenUse:
+  def eof(): FxToken = FxToken.EOF
+  def isEof(t: FxToken): Boolean = t match
+    case FxToken.EOF => true
+    case FxToken.Word(_) => false

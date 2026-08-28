@@ -531,3 +531,43 @@ class EmitterSuite extends FunSuite:
     assert(c.contains("[1, true]"), c)
   }
 
+
+  test("sealed-trait-of-case-objects emits a Dart enum with fabric-style string codecs") {
+    val start = emittedMain.indexOf("enum FxColor {")
+    assert(start >= 0, "enum FxColor not emitted")
+    val e = emittedMain.substring(start, emittedMain.indexOf("\n}", start) + 2)
+    assert(e.contains("Red, Blue;"), e)
+    assert(e.contains("FxColor.Red => 'FxColor.Red',"), e)
+    assert(e.contains("static FxColor fromJson(dynamic json)"), e)
+    assert(e.contains("`rw: fabric.rw.RW` is JVM-only"), e)
+    assert(e.contains("`values` is built in on Dart enums"), e)
+    assert(e.contains("static FxColor parse(String s)"), e)
+    assert(!emittedMain.contains("class FxColorRed"), "enum members must not emit as classes")
+  }
+
+  test("enum-typed fields ride on the string codecs") {
+    val p = classBody("FxPaint")
+    assert(p.contains("FxColor.fromJson(json['color'])"), p)
+    assert(p.contains("'color': color.toJson(),"), p)
+    assert(p.contains("'alt': alt?.toJson(),"), p)
+  }
+
+  test("enum members are referenced as qualified constants in values and patterns") {
+    val u = classBody("FxColorUse")
+    assert(u.contains("c == FxColor.Red"), u)
+    assert(u.contains("FxColor.Red => 'red'"), u)
+    assert(u.contains("return FxColor.Blue;"), u)
+  }
+
+  test("case objects in mixed hierarchies are const singletons with tagged codecs") {
+    val eof = classBody("FxTokenEOF")
+    assert(eof.contains("class FxTokenEOF extends FxToken {"), eof)
+    assert(eof.contains("const FxTokenEOF();"), eof)
+    assert(eof.contains("'type': 'FxToken.EOF',"), eof)
+    val parent = classBody("FxToken")
+    assert(parent.contains("if (t == 'FxToken.EOF') return FxTokenEOF.fromJson(json);"), parent)
+    val use = classBody("FxTokenUse")
+    assert(use.contains("return const FxTokenEOF();"), use)
+    assert(use.contains("const FxTokenEOF() => true"), use)
+  }
+

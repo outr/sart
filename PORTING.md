@@ -47,9 +47,7 @@ find what's missing.
    key, tag = `Outer.Inner`); classes nested in objects flatten; JVM-only
    companion givens (`RW[T]`) skip loudly; fabric `Json` → `dynamic` with
    its builders lowered. LN's `logicalnetwork-api` compiles through Sart
-   untouched. Still open: `case object` enumerations as Dart values
-   (fabric `RW.enumeration` strings), and switching the LN port from
-   `models.scala` to the shared module.
+   untouched; `case object` enumerations are Dart enums with `RW.enumeration` string codecs. Still open: switching the LN port from `models.scala` to the shared module.
 4. ~~`Dyn` type~~ **✅ landed** (with `sart.stdlib.convert`; richer
    `Map[String, Dyn]` ergonomics as needed).
 5. ~~go_router facade~~ **✅ landed** (curated — its `FutureOr` callback

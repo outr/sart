@@ -1161,7 +1161,25 @@ extension SartStringRepeatN on String {
 }
 
 /// Source: example/src/main/scala/example/features/Enums.scala:8
-enum Filter { All, Active, Completed }
+enum Filter {
+  All,
+  Active,
+  Completed;
+
+  String toJson() => switch (this) {
+    Filter.All => 'Filter.All',
+    Filter.Active => 'Filter.Active',
+    Filter.Completed => 'Filter.Completed',
+  };
+
+  static Filter fromJson(dynamic json) {
+    final String s = (json as String).toLowerCase();
+    for (final v in values) {
+      if (v.toJson().toLowerCase() == s) return v;
+    }
+    throw Exception('Unsupported Filter: ' + s);
+  }
+}
 
 /// Source: example/src/main/scala/example/features/ForComp.scala:8
 class ForCompExample {
@@ -1250,6 +1268,7 @@ sealed class Json {
     if (t == 'JsonString') return JsonString.fromJson(json);
     if (t == 'JsonNumber') return JsonNumber.fromJson(json);
     if (t == 'JsonBool') return JsonBool.fromJson(json);
+    if (t == 'JsonNull') return JsonNull.fromJson(json);
     throw Exception('Unsupported type: ' + t);
   }
 
@@ -1280,7 +1299,14 @@ class JsonBool extends Json {
 }
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:16
-class JsonNull extends Json {}
+class JsonNull extends Json {
+  const JsonNull();
+
+  static JsonNull fromJson(Map<String, dynamic> json) => JsonNull();
+
+  @override
+  Map<String, dynamic> toJson() => {'type': 'JsonNull'};
+}
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:14
 class JsonNumber extends Json {
@@ -1587,7 +1613,27 @@ class Point {
 }
 
 /// Source: example/src/main/scala/example/features/Enums.scala:11
-enum Priority { Low, Medium, High, Urgent }
+enum Priority {
+  Low,
+  Medium,
+  High,
+  Urgent;
+
+  String toJson() => switch (this) {
+    Priority.Low => 'Priority.Low',
+    Priority.Medium => 'Priority.Medium',
+    Priority.High => 'Priority.High',
+    Priority.Urgent => 'Priority.Urgent',
+  };
+
+  static Priority fromJson(dynamic json) {
+    final String s = (json as String).toLowerCase();
+    for (final v in values) {
+      if (v.toJson().toLowerCase() == s) return v;
+    }
+    throw Exception('Unsupported Priority: ' + s);
+  }
+}
 
 /// Source: example/src/main/scala/example/features/Ranges.scala:8
 class RangeExample {
@@ -1648,6 +1694,7 @@ sealed class Shape {
     final String t = json['type'] as String;
     if (t == 'Circle') return Circle.fromJson(json);
     if (t == 'Rectangle') return Rectangle.fromJson(json);
+    if (t == 'UnitSquare') return UnitSquare.fromJson(json);
     throw Exception('Unsupported type: ' + t);
   }
 
@@ -1828,7 +1875,14 @@ class TupleExample {
 }
 
 /// Source: example/src/main/scala/example/features/SealedHierarchy.scala:9
-class UnitSquare extends Shape {}
+class UnitSquare extends Shape {
+  const UnitSquare();
+
+  static UnitSquare fromJson(Map<String, dynamic> json) => UnitSquare();
+
+  @override
+  Map<String, dynamic> toJson() => {'type': 'UnitSquare'};
+}
 
 /// Source: example/src/main/scala/example/features/CaseClasses.scala:10
 class User {

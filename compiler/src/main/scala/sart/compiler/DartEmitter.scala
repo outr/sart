@@ -570,7 +570,9 @@ class DartEmitter(
           else if companion.exists && companionModules.contains(companion) then
             () // Statics merged into the companion class's own emission.
           else if sym.flags.is(Flags.Case) then
-            emitCaseObject(cd)
+            // A member of an enumeration hierarchy is a constant of the
+            // parent's Dart enum — nothing to emit on its own.
+            if enumParentOf(sym).isEmpty then emitCaseObject(cd)
           else if hasUserDefinedBody(cd) || hasUserFields(cd) then
             // A `$`-class with user-written members. Two varieties:
             //   - `given X: T with { … }` singleton → concrete class, so the
@@ -621,11 +623,89 @@ class DartEmitter(
      *  need follow-up work to translate as `FooName()` or a const instance.
      */
     private def emitCaseObject(cd: ClassDef): Unit =
-      val objName = dartName(cd.symbol)
+      val sym = cd.symbol
+      val objName = dartName(sym)
       val parentTpt = realParent(cd)
       val ext = parentTpt.map(t => s" extends ${emitTypeRef(t.tpe)}").getOrElse("")
-      emitSourceAttribution(cd.symbol)
-      line(s"class $objName$ext {}")
+      emitSourceAttribution(sym)
+      line(s"class $objName$ext {")
+      indent += 1
+      // A const constructor: every reference (`Parent.Foo`) emits
+      // `const Foo()`, and Dart canonicalises const instances so `==`
+      // and `identical` behave like the Scala singleton.
+      line(s"const $objName();")
+      val parentSym = parentTpt.map(_.tpe.typeSymbol)
+      if parentSym.exists(isJsonSealed) then
+        blank()
+        emitJsonSynths(objName, DartParamShape(Nil, Nil), Some(jsonTagOf(sym)))
+      // User members on the object (rare, but a case object can carry defs).
+      val members = staticObjectMembers(cd)
+      if members.nonEmpty then blank()
+      emitJvmOnlySkips(cd)
+      for stat <- members do
+        stat match
+          case vd: ValDef => emitField(vd)
+          case dd: DefDef => emitMethod(dd)
+      indent -= 1
+      line("}")
+      blank()
+
+    /** `sealed trait E; object E { case object A; case object B }` → a Dart
+     *  enhanced enum. Values serialise as fabric's `RW.enumeration` does:
+     *  the `"E.A"` string. The companion's other statics (a `values` list,
+     *  helpers) ride inside the enum; Dart's built-in `values`/`name`/
+     *  `index` names are reserved and skipped with a note.
+     */
+    private def emitEnumHierarchy(cd: ClassDef): Unit =
+      val sym = cd.symbol
+      val enumName = dartName(sym)
+      val members = sym.children.map(childClass)
+      emitSourceAttribution(sym)
+      line(s"enum $enumName {")
+      indent += 1
+      line(members.map(m => m.name.stripSuffix("$")).mkString("", ", ", ";"))
+      blank()
+      // Codecs.
+      line("String toJson() => switch (this) {")
+      indent += 1
+      for m <- members do
+        line(s"$enumName.${m.name.stripSuffix("$")} => '${jsonTagOf(m)}',")
+      indent -= 1
+      line("};")
+      blank()
+      line(s"static $enumName fromJson(dynamic json) {")
+      indent += 1
+      line("final String s = (json as String).toLowerCase();")
+      line("for (final v in values) {")
+      indent += 1
+      line("if (v.toJson().toLowerCase() == s) return v;")
+      indent -= 1
+      line("}")
+      line(s"throw Exception('Unsupported $enumName: ' + s);")
+      indent -= 1
+      line("}")
+      // Companion statics (minus the member vals themselves and Dart's
+      // built-in enum names).
+      companionModules.get(sym).foreach { moduleCd =>
+        val reserved = Set("values", "name", "index")
+        val statics = staticObjectMembers(moduleCd).filterNot { stat =>
+          caseObjectValueClass(stat.symbol).isDefined
+        }
+        if statics.nonEmpty then blank()
+        emitJvmOnlySkips(moduleCd)
+        for stat <- statics do
+          if reserved.contains(stat.symbol.name) then
+            line(s"// `${stat.symbol.name}` is built in on Dart enums — the Scala definition is not emitted")
+          else stat match
+            case vd: ValDef => emitField(vd, static = true)
+            case dd: DefDef => emitMethod(dd, static = true)
+      }
+      // Trait members (concrete defs shared by every value).
+      val own = cd.body.collect { case dd: DefDef if !dd.symbol.flags.is(Flags.Synthetic) && dd.rhs.isDefined => dd }
+      if own.nonEmpty then blank()
+      for dd <- own do emitMethod(dd)
+      indent -= 1
+      line("}")
       blank()
 
     /** Emit a Dart enum from the companion module of a Scala 3 enum class.
@@ -647,9 +727,32 @@ class DartEmitter(
           vd
       }
       if caseVals.nonEmpty then
-        val names = caseVals.map(_.name).mkString(", ")
+        val enumName = enumCls.name
         emitSourceAttribution(enumCls)
-        line(s"enum ${enumCls.name} { $names }")
+        line(s"enum $enumName {")
+        indent += 1
+        line(caseVals.map(_.name).mkString("", ", ", ";"))
+        blank()
+        line("String toJson() => switch (this) {")
+        indent += 1
+        for vd <- caseVals do
+          line(s"$enumName.${vd.name} => '${jsonTagOf(vd.symbol)}',")
+        indent -= 1
+        line("};")
+        blank()
+        line(s"static $enumName fromJson(dynamic json) {")
+        indent += 1
+        line("final String s = (json as String).toLowerCase();")
+        line("for (final v in values) {")
+        indent += 1
+        line("if (v.toJson().toLowerCase() == s) return v;")
+        indent -= 1
+        line("}")
+        line(s"throw Exception('Unsupported $enumName: ' + s);")
+        indent -= 1
+        line("}")
+        indent -= 1
+        line("}")
         blank()
       else
         line(s"/* TODO: parameterised enum ${enumCls.name} — cases are subclasses */")
@@ -735,7 +838,7 @@ class DartEmitter(
         case vd: ValDef => vd
         case dd: DefDef => dd
       }.filterNot { stat =>
-        isJvmOnlyGiven(stat.symbol) || (
+        isJvmOnlyGiven(stat.symbol) || caseObjectValueClass(stat.symbol).isDefined || (
         !neededDefaultGetter(stat.symbol) && (
           stat.symbol.flags.is(Flags.Synthetic) ||
           stat.symbol.flags.is(Flags.ParamAccessor) ||
@@ -848,6 +951,9 @@ class DartEmitter(
       // synthetic classes, so here we only guard against stray inner
       // synthesised helpers that somehow reached emitClassDef.
       if sym.flags.is(Flags.Synthetic) then return
+      if isEnumHierarchy(sym) then
+        emitEnumHierarchy(cd)
+        return
       // A module class emitted as a concrete class (`given X: T with …`)
       // keeps its `$` so it can't collide with the value `X` that
       // instantiates it.
@@ -1129,6 +1235,8 @@ class DartEmitter(
             case Some(vt) =>
               s"($src as Map<String, dynamic>).map((k, v) => MapEntry(k, ${jsonDecodeExpr(vt, "v")}))"
             case _ => s"($src as Map<String, dynamic>)"
+        case _ if isEnumType(sym) =>
+          s"${dartName(sym)}.fromJson($src)"
         case _ if isJsonCase(sym) || isJsonSealed(sym) =>
           s"${dartName(sym)}.fromJson($src as Map<String, dynamic>)"
         case _ => src
@@ -1162,7 +1270,7 @@ class DartEmitter(
 
     private def isJsonObjectLike(tpe: TypeRepr): Boolean =
       val sym = tpe.dealias.typeSymbol
-      isJsonCase(sym) || isJsonSealed(sym)
+      isJsonCase(sym) || isJsonSealed(sym) || isEnumType(sym)
 
     /** A case class Sart synthesizes codecs for: not a facade, not a
      *  Scala 3 enum case, and every constructor field wire-representable.
@@ -1179,6 +1287,62 @@ class DartEmitter(
               sym.primaryConstructor.paramSymss.flatten
                 .filterNot(_.isType).forall(p => isWireType(p.termRef.widen))
             }))
+
+    /** A user `case object` module class (`object StringMatch { case object Exact }`). */
+    private def isCaseObjectClass(sym: Symbol): Boolean =
+      sym.exists && userClasses.contains(sym)
+        && sym.flags.is(Flags.Module) && sym.flags.is(Flags.Case)
+
+    /** A sealed parent whose children are ALL bare case objects — an
+     *  enumeration in the fabric `RW.enumeration` sense. Emitted as a Dart
+     *  enhanced enum; values serialise as `"Parent.Member"` strings.
+     */
+    private def isEnumHierarchy(sym: Symbol): Boolean =
+      sym.exists && userClasses.contains(sym) && sym.flags.is(Flags.Sealed)
+        && !sym.flags.is(Flags.Enum) && !hasNative(sym)
+        && sym.children.nonEmpty
+        && sym.children.map(childClass).forall(c => isCaseObjectClass(c) && !hasUserMembers(c))
+
+    /** `Symbol.children` hands back the module VAL for a case object;
+     *  the class is what carries the flags and the registration.
+     */
+    private def childClass(c: Symbol): Symbol =
+      if c.isTerm && c.moduleClass.exists then c.moduleClass else c
+
+    /** Does this symbol declare any user-written member? (Case-object
+     *  scaffolding — product/equality/serialisation members — isn't all
+     *  flagged Synthetic, so it's excluded by name.)
+     */
+    private val caseScaffolding = Set(
+      "<init>", "hashCode", "toString", "equals", "canEqual", "copy", "unapply",
+      "productPrefix", "productArity", "productElement", "productElementName",
+      "productIterator", "productElementNames", "writeReplace", "readResolve"
+    )
+    private def hasUserMembers(sym: Symbol): Boolean =
+      (sym.declaredMethods ++ sym.declaredFields).exists { m =>
+        !m.flags.is(Flags.Synthetic) && !caseScaffolding.contains(m.name) && !m.name.contains("$")
+      }
+
+    /** A Scala 3 `enum` class with simple cases only — also a Dart enum. */
+    private def isScala3SimpleEnum(sym: Symbol): Boolean =
+      sym.exists && userClasses.contains(sym) && sym.flags.is(Flags.Enum)
+        && !sym.flags.is(Flags.Case)
+
+    private def isEnumType(sym: Symbol): Boolean = isEnumHierarchy(sym) || isScala3SimpleEnum(sym)
+
+    /** For a case object's module class, the enumeration parent it belongs
+     *  to (if it belongs to one).
+     */
+    private def enumParentOf(moduleClass: Symbol): Option[Symbol] =
+      if !isCaseObjectClass(moduleClass) then None
+      else moduleClass.typeRef.baseClasses.find(isEnumHierarchy)
+
+    /** A term symbol that references a case object as a value (the module
+     *  val), with its module class.
+     */
+    private def caseObjectValueClass(sym: Symbol): Option[Symbol] =
+      if sym.exists && sym.isTerm && sym.moduleClass.exists && isCaseObjectClass(sym.moduleClass)
+      then Some(sym.moduleClass) else None
 
     /** A sealed parent with tag-dispatch codecs: sealed, not an enum, with
      *  at least one codec-bearing case-class child.
@@ -1208,7 +1372,7 @@ class DartEmitter(
           args match
             case List(k, v) => isWireType(k) && isWireType(v)
             case _          => false
-        case _ => isJsonCase(sym) || isJsonSealed(sym)
+        case _ => isJsonCase(sym) || isJsonSealed(sym) || isEnumType(sym)
 
     /** `fromJson` / `toJson` for a @JsonModel case class, wire-compatible
      *  with json_serializable output (`explicitToJson: true` shape). A
@@ -1255,7 +1419,7 @@ class DartEmitter(
       line(s"static $className fromJson(Map<String, dynamic> json) {")
       indent += 1
       line("final String t = json['type'] as String;")
-      for child <- sym.children if isJsonCase(child) do
+      for child <- sym.children.map(childClass) if isJsonCase(child) || isCaseObjectClass(child) do
         line(s"if (t == '${jsonTagOf(child)}') return ${dartName(child)}.fromJson(json);")
       line("throw Exception('Unsupported type: ' + t);")
       indent -= 1
@@ -1723,6 +1887,15 @@ class DartEmitter(
       case Select(Ident("Double"), "PositiveInfinity") => "double.infinity"
       case Select(Ident("Double"), "NegativeInfinity") => "double.negativeInfinity"
       case Select(Ident("Double"), "NaN")              => "double.nan"
+      // A case object referenced as a value: an enumeration member emits
+      // its enum constant (`FxColor.Red`, always qualified — a bare `Red`
+      // only resolves inside the enum); any other case object emits its
+      // canonical const instance.
+      case t @ (Ident(_) | Select(_, _)) if caseObjectValueClass(t.symbol).isDefined =>
+        val cls = caseObjectValueClass(t.symbol).get
+        enumParentOf(cls) match
+          case Some(parent) => s"${dartName(parent)}.${cls.name.stripSuffix("$")}"
+          case None         => s"const ${dartName(cls)}()"
       case id @ Ident(name) =>
         // `@DartName`d facade objects (`DartInt` → `int`) emit their Dart
         // name — the Scala identifier only exists to dodge a keyword or a
