@@ -262,6 +262,42 @@ exactly once.
 
 ## Workstream E — Platform variants, web target & interop
 
+**NaboTV support audit (2026-08-28).** Full scan of the Flutter app
+(1,753 Dart files; 1,029 handwritten / 106k lines, 724 generated
+`.g.dart`). Nothing in it is untranslatable; what stands between Sart and
+full support:
+
+1. **Platform-variant emission — the one real design feature.** 16
+   `export 'x_stub.dart' if (dart.library.io/js_interop) 'x_io|web.dart'`
+   switches over ~50 io/web/stub variant files (`lib/platform/`, games JS
+   runtime). Sart emits a single `main.dart` today; this needs
+   multi-library emission plus a variant mechanism (e.g. `@DartPlatform`)
+   producing conditional-export headers.
+2. **Enum wire values.** Nabo enums serialize as plain values
+   (`@JsonValue('movie')`), not the fabric `Parent.Member` convention —
+   enum members need a per-member tag override.
+3. **Generators.** One `sync*`/`yield` site (ws durable client); either
+   emitter support or a hand-rewritten iterator.
+4. **JS interop authoring.** 7 `dart:js_interop` hits + one extension
+   type (hls.js binding); representable as @native facades once (1)
+   exists.
+5. **Facades (mechanical, facadegen).** ~20 packages: media_kit(+video),
+   webview_flutter(×3), youtube_player_iframe, lottie, flutter_map,
+   fl_chart, qr_flutter, opus/pcm audio, multicast_dns, crypto,
+   flutter_secure_storage, shared_preferences(+tvos), path_provider,
+   url_launcher, cached_network_image(+cache_manager), animations,
+   flutter_js; plus stdlib facades for dart:io (22 files),
+   MethodChannel/EventChannel (17 files), and Isolate.run/compute
+   (callbacks must be object methods → emitted static, which Dart
+   isolates require).
+
+Already covered, no work: all 724 codegen files vanish (case-class
+toJson/fromJson/copyWith/==), records/tuples, enhanced enums, operators,
+CustomPainter, StreamController/Timer, go_router/http/web_socket_channel/
+file_picker/package:web facades. The roku/ and webos-lite/ apps are
+non-Flutter and out of scope. Port scale: ~3× the LN app by line count.
+
+
 1. **Web is the primary target for LN**: `flutter build web --wasm` with
    a dart2js fallback. Emitted Dart must be **dart2wasm-clean** (no
    `dart:html`/legacy `dart:js` — use `package:web`; already Sart's
