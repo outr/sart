@@ -296,9 +296,12 @@ the matching host OS to actually run `flutter build`.
 
 ## Not yet
 - Full scala3-library TASTy compile-through (the "Layer B" of Phase 2).
-- Conditional exports / `dart:js_interop` extension-type facades /
-  platform channels — the platform-variant machinery the second
-  reference app (NaboTV) needs.
+- `dart:js_interop` extension-type facades / platform channels — the
+  interop layers the second reference app (NaboTV) needs. (The
+  platform-variant machinery itself landed: `@DartLibrary` routes a
+  class into its own library file, `@DartVariants` generates the
+  conditional-export switch — see
+  [docs/design/platform-variants.md](docs/design/platform-variants.md).)
 - A shared Scala "core" module compiled to both the JVM backend and the
   Sart frontend — the codec side is done (annotation-free models and
   enumerations, see above); what remains is wiring LN's

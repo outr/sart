@@ -29,11 +29,28 @@ class DartEmitter(
 ) extends Inspector:
 
   // ── State collected across inspection runs ─────────────────────────────
-  private val imports       = mutable.LinkedHashSet[String]()
+  /** One emitted .dart file: `main.dart` by default; `@DartLibrary`
+   *  routes a top-level class/object (and everything it emits) into its
+   *  own file with its own import header — the basis of platform-variant
+   *  emission (see docs/design/platform-variants.md).
+   */
+  private[compiler] final class LibraryTarget(val path: String):
+    val body    = new StringBuilder
+    val imports = mutable.LinkedHashSet[String]()
+
+  private val mainTarget      = new LibraryTarget("main.dart")
+  private val extraLibraries  = mutable.LinkedHashMap[String, LibraryTarget]()
+  private def libraryTarget(path: String): LibraryTarget =
+    if path == "main.dart" then mainTarget
+    else extraLibraries.getOrElseUpdate(path, new LibraryTarget(path))
+  /** `@DartVariants` conditional-export switch files: path → content. */
+  private val variantSwitches = mutable.LinkedHashMap[String, String]()
+  /** Every rendered file (path → content incl. header), for tests. */
+  val renderedLibraries = mutable.LinkedHashMap[String, String]()
+
   private val packages      = mutable.LinkedHashSet[DartPkg]()
   private val pubspecBlocks = mutable.LinkedHashSet[String]()
   private val shimsNeeded   = mutable.LinkedHashSet[DartShim]()
-  private val bodyBuf       = new StringBuilder
 
   private case class DartPkg(name: String, version: String, sdk: String)
 
@@ -219,7 +236,7 @@ class DartEmitter(
    *  not translate and left as a `/* TODO */` marker in the output.
    */
   def unsupported: List[String] =
-    val body = bodyBuf.toString
+    val body = (mainTarget :: extraLibraries.values.toList).map(_.body.toString).mkString("\n")
     todoRecords.toList.distinct.collect {
       case (loc, what) if body.contains(todoMarker(loc, what)) => s"$loc: $what"
     }
@@ -229,7 +246,7 @@ class DartEmitter(
   // ── Inspector entry point ──────────────────────────────────────────────
   def inspect(using quotes: Quotes)(tastys: List[Tasty[quotes.type]]): Unit =
     val e = new Pass[quotes.type](
-      bodyBuf, imports, packages, pubspecBlocks, shimsNeeded,
+      packages, pubspecBlocks, shimsNeeded,
       optionShim, tryShim, eitherShim, sourceRoot
     )
     // Two phases: every tree is registered (user classes, companions)
@@ -251,20 +268,44 @@ class DartEmitter(
     for shim <- shimsNeeded do
       Files.writeString(libDir.resolve(shim.fileName), shim.content, StandardCharsets.UTF_8)
 
-    // All imports (including shim filenames) flow through the `imports`
-    // set — sart.stdlib.Option adds its shim filename in emitTypeRef, and
-    // facades like Try/Either add theirs via `@DartImport`. Emitting here
-    // without deduplicating would double-import the shim filenames.
-    val header = new StringBuilder
-    for i <- imports.toList.sorted do
-      // Entries are `path` or `path>>>alias` (aliased imports).
-      i.split(">>>") match
-        case Array(p, a) => header.append(s"import '$p' as $a;\n")
-        case _           => header.append(s"import '$i';\n")
-    if imports.nonEmpty then header.append('\n')
+    // All imports (including shim filenames) flow through each target's
+    // `imports` set — sart.stdlib.Option adds its shim filename in
+    // emitTypeRef, facades add theirs via `@DartImport`. Project-relative
+    // entries (no ':') are lib-root-relative and get relativised against
+    // the library's own directory.
+    def renderHeader(target: LibraryTarget, extraFirst: List[String]): String =
+      val dir = java.nio.file.Paths.get(target.path).getParent
+      def rel(p: String): String =
+        if p.contains(':') || dir == null then p
+        else dir.relativize(java.nio.file.Paths.get(p)).toString.replace('\\', '/')
+      val header = new StringBuilder
+      extraFirst.foreach(p => header.append(s"import '${rel(p)}';\n"))
+      for i <- target.imports.toList.sorted do
+        // Entries are `path` or `path>>>alias` (aliased imports).
+        i.split(">>>") match
+          case Array(p, a) => header.append(s"import '${rel(p)}' as $a;\n")
+          case _           => header.append(s"import '${rel(i)}';\n")
+      if target.imports.nonEmpty || extraFirst.nonEmpty then header.append('\n')
+      header.toString
 
-    val mainDart = header.toString + bodyBuf.toString
-    Files.writeString(libDir.resolve("main.dart"), mainDart, StandardCharsets.UTF_8)
+    def writeLib(path: String, content: String): Unit =
+      val f = libDir.resolve(path)
+      Files.createDirectories(f.getParent)
+      Files.writeString(f, content, StandardCharsets.UTF_8)
+      renderedLibraries(path) = content
+
+    val mainDart = renderHeader(mainTarget, Nil) + mainTarget.body.toString
+    writeLib("main.dart", mainDart)
+
+    // Variant/extra libraries: shared emitted types live in main.dart, so
+    // every extra library imports it (Dart import cycles are legal).
+    for target <- extraLibraries.values do
+      writeLib(target.path, renderHeader(target, List("main.dart")) + target.body.toString)
+
+    for (path, content) <- variantSwitches do
+      if extraLibraries.contains(path) then
+        throw new RuntimeException(s"sart: @DartVariants switch '$path' collides with an emitted @DartLibrary")
+      writeLib(path, content)
 
     val pubspec = renderPubspec()
     Files.writeString(outDir.resolve("pubspec.yaml"), pubspec, StandardCharsets.UTF_8)
@@ -362,8 +403,6 @@ class DartEmitter(
   // path-dependent on a stable `quotes` — we don't have to thread it through
   // every method signature by hand.
   private class Pass[Q <: Quotes & Singleton](
-    out: StringBuilder,
-    imports: mutable.LinkedHashSet[String],
     packages: mutable.LinkedHashSet[DartPkg],
     pubspecBlocks: mutable.LinkedHashSet[String],
     shimsNeeded: mutable.LinkedHashSet[DartShim],
@@ -375,6 +414,11 @@ class DartEmitter(
     import q.reflect.*
 
     private var indent = 0
+    // Emission routes through the current library target; `@DartLibrary`
+    // on a top-level class switches it for that class's emission.
+    private var currentLib: LibraryTarget = mainTarget
+    private def out: StringBuilder = currentLib.body
+    private def imports: mutable.LinkedHashSet[String] = currentLib.imports
     private def ind(): String = "  " * indent
     private def line(s: String): Unit = { out.append(ind()); out.append(s); out.append('\n') }
     private def blank(): Unit = out.append('\n')
@@ -461,18 +505,67 @@ class DartEmitter(
             if name.nonEmpty then packages += DartPkg(name, version, sdk)
           case "sart.dart.DartPubspec" =>
             constArgs(a).collectFirst { case s: String => s }.foreach(pubspecBlocks += _)
+          case "sart.dart.DartVariants" =>
+            val default = annoArg(a, "default", 0).collect { case s: String => s }.getOrElse("")
+            val io      = annoArg(a, "io",      1).collect { case s: String => s }.getOrElse("")
+            val web     = annoArg(a, "web",     2).collect { case s: String => s }.getOrElse("")
+            dartImportPathOf(sym) match
+              case Some(switchPath) if default.nonEmpty =>
+                variantSwitches(switchPath) = renderVariantSwitch(switchPath, default, io, web)
+              case _ =>
+                throw new RuntimeException(
+                  s"sart: @DartVariants on ${sym.fullName} needs a `default` variant and an @DartImport path for the switch file")
           case _ =>
+
+    /** The `@DartVariants` conditional-export switch: platform builds
+     *  resolve the same top-level names against different libraries.
+     */
+    private def renderVariantSwitch(switchPath: String, default: String, io: String, web: String): String =
+      val dir = java.nio.file.Paths.get(switchPath).getParent
+      def rel(p: String): String =
+        if dir == null then p
+        else dir.relativize(java.nio.file.Paths.get(p)).toString.replace('\\', '/')
+      val sb = new StringBuilder("// Generated by Sart — platform-variant switch. Do not edit.\n")
+      sb.append(s"export '${rel(default)}'")
+      if io.nonEmpty  then sb.append(s" if (dart.library.io) '${rel(io)}'")
+      if web.nonEmpty then sb.append(s" if (dart.library.js_interop) '${rel(web)}'")
+      sb.append(";\n").toString
+
+    /** Reference-time import recording: whichever library is emitting the
+     *  reference gets the facade's `@DartImport` — the mechanism that
+     *  keeps `package:web` out of main.dart when only a web variant
+     *  library uses it. Imports only (pubspec entries keep their
+     *  declaration-time ordering).
+     */
+    private def recordImportOf(sym: Symbol): Unit =
+      for
+        s <- relatedSyms(sym)
+        a <- s.annotations if annoFqn(a) == "sart.dart.DartImport"
+        path <- constArgs(a).collectFirst { case str: String => str }
+      do
+        imports += importAlias(s).map(al => s"$path>>>$al").getOrElse(path)
+        path match
+          case "sart_try.dart"    => shimsNeeded += tryShim
+          case "sart_either.dart" => shimsNeeded += eitherShim
+          case "sart_option.dart" => shimsNeeded += optionShim
+          case _                  => ()
 
     /** Pull the emitted Dart name from `@DartName(...)` if present, and
      *  prefix with the facade's import alias when its `@DartImport`
      *  declares one.
      */
     private def dartName(sym: Symbol): String =
-      val base = sym.annotations.collectFirst {
-        case a if annoFqn(a) == "sart.dart.DartName" =>
-          constArgs(a).collectFirst { case s: String => s }
-      }.flatten.getOrElse(nestedFlatName(sym))
-      importAlias(sym).map(al => s"$al.$base").getOrElse(base)
+      // Reference-time side channels: guard cross-library references to
+      // emitted classes; record facade imports into the emitting library.
+      if userClasses.contains(sym) then
+        libraryOfSym.get(sym) match
+          case Some(p) if p != currentLib.path =>
+            return s"${todo(s"cross-library reference to ${sym.name.stripSuffix("$")} (lives in $p) — go through its variant facade")}${nestedFlatName(sym)}"
+          case _ => ()
+      else recordImportOf(sym)
+      val base = annoString(relatedSyms(sym), "sart.dart.DartName").getOrElse(nestedFlatName(sym))
+      relatedSyms(sym).flatMap(importAlias(_).toList).headOption
+        .map(al => s"$al.$base").getOrElse(base)
 
     /** Dart has no nested classes, so a class declared inside an `object`
      *  (`object QueryFilter { case class AddressFilter(…) }`) flattens to
@@ -539,6 +632,29 @@ class DartEmitter(
     private val userClasses = mutable.Set[Symbol]()
     /** The registered tree of every user class, for body-level lookups. */
     private val classDefs = mutable.Map[Symbol, ClassDef]()
+    /** Emission home of `@DartLibrary`-routed user classes. */
+    private val libraryOfSym = mutable.Map[Symbol, String]()
+
+    /** The declaration cluster an annotation may sit on: the symbol, its
+     *  module class (for a module val), its module val (for a module
+     *  class) — object annotations land on different members of the
+     *  trio depending on how the symbol was resolved.
+     */
+    private def relatedSyms(sym: Symbol): List[Symbol] =
+      val mc = if sym.isTerm && sym.moduleClass.exists then List(sym.moduleClass) else Nil
+      val mv = if sym.isType && sym.companionModule.exists then List(sym.companionModule) else Nil
+      (sym :: mc ::: mv).filter(_.exists).distinct
+
+    private def annoString(syms: List[Symbol], fqn: String): Option[String] =
+      syms.flatMap(_.annotations).collectFirst {
+        case a if annoFqn(a) == fqn => constArgs(a).collectFirst { case s: String => s }
+      }.flatten
+
+    private def dartLibraryOf(sym: Symbol): Option[String] =
+      annoString(relatedSyms(sym), "sart.dart.DartLibrary")
+
+    private def dartImportPathOf(sym: Symbol): Option[String] =
+      annoString(relatedSyms(sym), "sart.dart.DartImport")
 
     private def registerCompanions(t: Tree): Unit = t match
       case p: PackageClause => p.stats.foreach(registerCompanions)
@@ -546,6 +662,7 @@ class DartEmitter(
       case cd: ClassDef =>
         userClasses += cd.symbol
         classDefs(cd.symbol) = cd
+        dartLibraryOf(cd.symbol).foreach(p => libraryOfSym(cd.symbol) = p)
         if cd.symbol.name.endsWith("$") then
           val companion = cd.symbol.companionClass
           if companion.exists && !hasNative(companion) && !companion.flags.is(Flags.Enum)
@@ -560,7 +677,17 @@ class DartEmitter(
         () // Scala imports are irrelevant; we emit our own Dart imports
       case p: PackageClause =>
         p.stats.foreach(runTop)
-      case cd: ClassDef =>
+      case cd: ClassDef if dartLibraryOf(cd.symbol).isDefined =>
+        // `@DartLibrary(path)`: this class and everything it emits land in
+        // their own .dart file with their own import header.
+        val saved = currentLib
+        currentLib = libraryTarget(dartLibraryOf(cd.symbol).get)
+        try runTopClass(cd)
+        finally currentLib = saved
+      case cd: ClassDef => runTopClass(cd)
+      case t => runTopOther(t)
+
+    private def runTopClass(cd: ClassDef): Unit =
         val sym = cd.symbol
         val name = sym.name
         if hasNative(sym) then
@@ -619,6 +746,8 @@ class DartEmitter(
           () // Synthetic/anonymous classes — skip.
         else
           emitClassDef(cd)
+
+    private def runTopOther(t: Tree): Unit = t match
       case dd: DefDef =>
         if dd.symbol.flags.is(Flags.ExtensionMethod) then
           // @native extension defs are facades for REAL Dart extensions

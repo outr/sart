@@ -105,7 +105,7 @@ class FxRanges:
   def exclusive(n: Int): List[Int] = (0 until n).toList
   def squared(n: Int): List[Int]   = (0 until n).map(i => i * i).toList
 
-import sart.dart.{Dyn, Json, JsonField, JsonModel, JsonTag}
+import sart.dart.{native, DartImport, DartLibrary, DartName, DartVariants, Dyn, Json, JsonField, JsonModel, JsonTag}
 
 @JsonModel
 case class FxKeyed(@JsonField("_id") id: String, label: String)
@@ -359,3 +359,27 @@ class FxCtorBodyParams(val a: Int):
 class FxOptionApply:
   def wrap(s: String): Option[String] = Option(s)
   def none(): Option[Int] = Option.empty[Int]
+
+
+// ── Platform-variant emission: switch facade + two variant libraries. ──
+@native
+@DartImport("platform/fx_fs.dart")
+@DartVariants(default = "platform/fx_fs_stub.dart", web = "platform/fx_fs_web.dart")
+object FxFs:
+  def isFullscreen(): Boolean = native.value
+  def label(o: Option[String]): String = native.value
+
+@DartLibrary("platform/fx_fs_stub.dart")
+@DartName("FxFs")
+object FxFsStub:
+  def isFullscreen(): Boolean = false
+  def label(o: Option[String]): String = o.getOrElse("none")
+
+@DartLibrary("platform/fx_fs_web.dart")
+@DartName("FxFs")
+object FxFsWeb:
+  def isFullscreen(): Boolean = true
+  def label(o: Option[String]): String = o.getOrElse("web")
+
+class FxFsUse:
+  def check(): Boolean = FxFs.isFullscreen()

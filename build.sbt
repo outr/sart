@@ -323,14 +323,12 @@ lazy val root = (project in file("."))
       sartEmit.value
       val outDir    = baseDirectory.value / "out"
       val goldenDir = baseDirectory.value / "compiler" / "src" / "test" / "resources" / "expected"
-      // Cover main.dart, pubspec.yaml, AND every stdlib-shim file the
-      // emitter wrote into `out/lib/` alongside main.dart. This way a
-      // regression in the shim system shows up in the verify step.
-      val libPairs = Option(outDir./("lib").listFiles())
-        .getOrElse(Array.empty[File])
-        .toSeq
-        .filter(_.getName.endsWith(".dart"))
-        .map(f => f -> (goldenDir / f.getName))
+      // Cover main.dart, pubspec.yaml, AND every other .dart file the
+      // emitter wrote under `out/lib/` — stdlib shims and @DartLibrary /
+      // @DartVariants platform libraries in subdirectories included.
+      val libDir = outDir / "lib"
+      val libPairs = (libDir ** "*.dart").get()
+        .map(f => f -> (goldenDir / IO.relativize(libDir, f).getOrElse(f.getName)))
       val pairs = libPairs :+ (outDir / "pubspec.yaml" -> goldenDir / "pubspec.yaml")
       val drifts = pairs.flatMap { case (actual, expected) =>
         val a = IO.read(actual)
@@ -368,13 +366,15 @@ lazy val root = (project in file("."))
       val outDir    = baseDirectory.value / "out"
       val goldenDir = baseDirectory.value / "compiler" / "src" / "test" / "resources" / "expected"
       IO.createDirectory(goldenDir)
-      // Copy every .dart file under lib/ (main.dart + any shims) plus
-      // pubspec.yaml into the golden directory.
-      val libFiles = Option(outDir./("lib").listFiles())
-        .getOrElse(Array.empty[File])
-        .toSeq
-        .filter(_.getName.endsWith(".dart"))
-      libFiles.foreach(f => IO.copyFile(f, goldenDir / f.getName))
+      // Copy every .dart file under lib/ (main.dart, shims, platform
+      // libraries in subdirectories) into the golden directory, keeping
+      // relative paths.
+      val libDir = outDir / "lib"
+      (libDir ** "*.dart").get().foreach { f =>
+        val target = goldenDir / IO.relativize(libDir, f).getOrElse(f.getName)
+        IO.createDirectory(target.getParentFile)
+        IO.copyFile(f, target)
+      }
       IO.copyFile(outDir / "pubspec.yaml", goldenDir / "pubspec.yaml")
       streams.value.log.info(s"sart: updated golden files under $goldenDir")
     },

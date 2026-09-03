@@ -102,6 +102,30 @@ final class DartPubspec(val yaml: String) extends StaticAnnotation
  */
 final class DartTopLevel extends StaticAnnotation
 
+// ─── Platform-variant emission (docs/design/platform-variants.md) ─────────
+
+/** Routes a top-level class/object into its own emitted library file
+ *  (`lib/<path>`) with its own import header, instead of `main.dart`.
+ *  The unit of platform isolation: a `dart:io`-touching implementation
+ *  annotated `@DartLibrary("platform/x_io.dart")` keeps `dart:io` out of
+ *  every other library's import graph.
+ */
+final class DartLibrary(val path: String) extends StaticAnnotation
+
+/** On a `@native` object that also has `@DartImport(path)`: generates
+ *  `lib/<path>` as a Dart conditional-export switch over `@DartLibrary`
+ *  variant files —
+ *  `export '<default>' if (dart.library.io) '<io>' if (dart.library.js_interop) '<web>';`
+ *  Each variant declares the same Dart-side API under the same emitted
+ *  name (`@DartName`); the object's own members are the facade the app
+ *  calls. Omitted axes fall back to `default`.
+ */
+final class DartVariants(
+  val default: String,
+  val io: String = "",
+  val web: String = ""
+) extends StaticAnnotation
+
 // ─── JSON codec synthesis ──────────────────────────────────────────────────
 
 /** Forces JSON codec synthesis (`fromJson`/`toJson`) for a case class

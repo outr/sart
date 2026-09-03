@@ -1,7 +1,11 @@
 # Platform-variant emission
 
-Status: **design** (2026-09-03). Workstream E item 1; the one structural
-feature between Sart and NaboTV support.
+Status: **implemented** (2026-09-03) — `@DartLibrary` + `@DartVariants`
+landed with fixtures, recursive goldens, and an example-app triple
+(`example/.../features/PlatformVariants.scala`, surfaced in the launcher
+app bar); the web build's bundle contains exactly the web variant.
+Remaining from this design: the strict cross-variant signature audit
+(v2) and a real NaboTV triple as the end-to-end proof.
 
 ## Problem
 

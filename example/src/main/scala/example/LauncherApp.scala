@@ -3,6 +3,7 @@ package example
 import flutter.runApp
 import flutter.material.*
 import example.apps.*
+import example.features.PlatformName
 
 // `@main` entry for the Sart example app. Launches a hub that routes
 // into each bundled demo. Each row's `build` callback is invoked with
@@ -40,7 +41,10 @@ class LauncherHome extends StatelessWidget:
   override def build(context: BuildContext): Widget =
     Scaffold(
       appBar = AppBar(
-        title = Text("Sart Demos"),
+        // The subtitle exercises platform-variant emission: PlatformName
+        // resolves through a generated conditional export to a
+        // per-platform library (features/PlatformVariants.scala).
+        title = Text(s"Sart Demos — ${PlatformName.describe()}"),
         backgroundColor = Theme.of(context).colorScheme.inversePrimary
       ),
       body = ListView.builder(

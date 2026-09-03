@@ -653,3 +653,25 @@ class EmitterSuite extends FunSuite:
     assert(b.contains("String? wrap(String s) {\n    return s;\n  }"), b)
     assert(b.contains("int? none() {\n    return null;\n  }"), b)
   }
+
+
+  test("@DartLibrary routes emission into per-platform libraries with their own headers") {
+    val libs = emitter.renderedLibraries
+    val stub = libs("platform/fx_fs_stub.dart")
+    assert(stub.startsWith("import '../main.dart';"), stub.linesIterator.take(3).mkString("\n"))
+    assert(stub.contains("import '../sart_option.dart';"), stub)
+    assert(stub.contains("class FxFs {"), stub)
+    assert(stub.contains("static bool isFullscreen()"), stub)
+    val web = libs("platform/fx_fs_web.dart")
+    assert(web.contains("class FxFs {"), web)
+    assert(!emittedMain.contains("\nclass FxFs {"), "variant impls must not land in main.dart")
+    assert(!emittedMain.contains("FxFsStub"), "variant impls must not land in main.dart")
+  }
+
+  test("@DartVariants generates the conditional-export switch; call sites use the facade") {
+    val switch = emitter.renderedLibraries("platform/fx_fs.dart")
+    assert(switch.contains(
+      "export 'fx_fs_stub.dart' if (dart.library.js_interop) 'fx_fs_web.dart';"), switch)
+    assert(emittedMain.contains("import 'platform/fx_fs.dart';"), "facade import missing in main")
+    assert(classBody("FxFsUse").contains("return FxFs.isFullscreen();"), classBody("FxFsUse"))
+  }

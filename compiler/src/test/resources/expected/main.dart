@@ -2,11 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'platform/platform_name.dart';
 import 'sart_either.dart';
 import 'sart_option.dart';
 import 'sart_try.dart';
 
-/// Source: example/src/main/scala/example/LauncherApp.scala:13
+/// Source: example/src/main/scala/example/LauncherApp.scala:14
 class Demo {
   final String title;
   final String subtitle;
@@ -36,14 +37,14 @@ class Demo {
       Demo(title ?? this.title, subtitle ?? this.subtitle, build ?? this.build);
 }
 
-/// Source: example/src/main/scala/example/LauncherApp.scala:11
+/// Source: example/src/main/scala/example/LauncherApp.scala:12
 void main() {
   runApp(LauncherApp());
 }
 
-/// Source: example/src/main/scala/example/LauncherApp.scala:19
+/// Source: example/src/main/scala/example/LauncherApp.scala:20
 class LauncherApp extends StatelessWidget {
-  /// Source: example/src/main/scala/example/LauncherApp.scala:20
+  /// Source: example/src/main/scala/example/LauncherApp.scala:21
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -57,7 +58,7 @@ class LauncherApp extends StatelessWidget {
   }
 }
 
-/// Source: example/src/main/scala/example/LauncherApp.scala:30
+/// Source: example/src/main/scala/example/LauncherApp.scala:31
 class LauncherHome extends StatelessWidget {
   final List<Demo> demos = [
     Demo('Showcase', 'Kitchen-sink feature demo', (ctx) => ShowcaseApp()),
@@ -68,12 +69,12 @@ class LauncherHome extends StatelessWidget {
     Demo('Two-screen', 'Navigator.push demo', (ctx) => HomeScreen()),
   ];
 
-  /// Source: example/src/main/scala/example/LauncherApp.scala:40
+  /// Source: example/src/main/scala/example/LauncherApp.scala:41
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Sart Demos'),
+        title: Text('Sart Demos — ${PlatformName.describe()}'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: ListView.builder(
@@ -1587,6 +1588,14 @@ class PatternMatchExample {
       int _ => 'int',
       _ => 'other',
     };
+  }
+}
+
+/// Source: example/src/main/scala/example/features/PlatformVariants.scala:39
+class PlatformVariantDemo {
+  /// Source: example/src/main/scala/example/features/PlatformVariants.scala:40
+  String platformLabel() {
+    return PlatformName.describe();
   }
 }
 
