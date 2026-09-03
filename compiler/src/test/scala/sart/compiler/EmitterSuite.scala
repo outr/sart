@@ -87,9 +87,9 @@ class EmitterSuite extends FunSuite:
 
   /** Slice the emitted Dart down to the body of one class so a substring
    *  match doesn't accidentally hit a sibling fixture's emission. */
-  private def classBody(name: String): String =
-    val start = emittedMain.indexOf(s"class $name")
-    require(start >= 0, s"class $name not found in emitted output")
+  private def classBody(name: String, kind: String = "class"): String =
+    val start = emittedMain.indexOf(s"$kind $name")
+    require(start >= 0, s"$kind $name not found in emitted output")
     val tail  = emittedMain.substring(start)
     // crude but good enough: stop at the next top-level `class ` or EOF
     val end = tail.indexOf("\nclass ", 1) match
@@ -674,4 +674,15 @@ class EmitterSuite extends FunSuite:
       "export 'fx_fs_stub.dart' if (dart.library.js_interop) 'fx_fs_web.dart';"), switch)
     assert(emittedMain.contains("import 'platform/fx_fs.dart';"), "facade import missing in main")
     assert(classBody("FxFsUse").contains("return FxFs.isFullscreen();"), classBody("FxFsUse"))
+  }
+
+
+  test("@JsonTag on enum members overrides the wire value") {
+    val lvl = classBody("FxReviewLevel", kind = "enum")
+    assert(lvl.contains("FxReviewLevel.Movie => 'movie',"), lvl)
+    assert(lvl.contains("FxReviewLevel.Episode => 'episode',"), lvl)
+    assert(lvl.contains("FxReviewLevel.Other => 'FxReviewLevel.Other',"), lvl)
+    val q = classBody("FxQuality", kind = "enum")
+    assert(q.contains("FxQuality.Low => 'sd',"), q)
+    assert(q.contains("FxQuality.High => 'hd',"), q)
   }

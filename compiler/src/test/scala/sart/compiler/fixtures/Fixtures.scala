@@ -107,6 +107,7 @@ class FxRanges:
 
 import sart.dart.{native, DartImport, DartLibrary, DartName, DartVariants, Dyn, Json, JsonField, JsonModel, JsonTag}
 
+
 @JsonModel
 case class FxKeyed(@JsonField("_id") id: String, label: String)
 
@@ -383,3 +384,16 @@ object FxFsWeb:
 
 class FxFsUse:
   def check(): Boolean = FxFs.isFullscreen()
+
+
+// ── Per-member enum wire values: @JsonTag overrides the default
+// "Parent.Member" convention (nabo's @JsonValue('movie') equivalent). ──
+sealed trait FxReviewLevel
+object FxReviewLevel:
+  @JsonTag("movie") case object Movie extends FxReviewLevel
+  @JsonTag("episode") case object Episode extends FxReviewLevel
+  case object Other extends FxReviewLevel
+
+enum FxQuality:
+  @JsonTag("sd") case Low
+  @JsonTag("hd") case High

@@ -137,9 +137,12 @@ final class DartVariants(
 final class JsonModel extends StaticAnnotation
 
 /** Overrides the `type` discriminator a sealed-hierarchy member writes
- *  and matches in JSON. Defaults to fabric's convention: the capitalised
- *  tail of the fully-qualified name — `Outer.Inner` for a class nested in
- *  an object, the bare name at top level.
+ *  and matches in JSON, and the wire value of an enum member
+ *  (`@JsonTag("movie") case object Movie` serialises as `"movie"` — the
+ *  equivalent of json_serializable's `@JsonValue`). Defaults to fabric's
+ *  convention: the capitalised tail of the fully-qualified name —
+ *  `Outer.Inner` for a class nested in an object, the bare name at top
+ *  level, `Parent.Member` for enum members.
  */
 final class JsonTag(val tag: String) extends StaticAnnotation
 

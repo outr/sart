@@ -441,10 +441,10 @@ class DartEmitter(
      *  wire without annotations.
      */
     private def jsonTagOf(sym: Symbol): String =
-      sym.annotations.collectFirst {
-        case a if annoFqn(a) == "sart.dart.JsonTag" =>
-          constArgs(a).collectFirst { case s: String => s }
-      }.flatten.getOrElse {
+      // The annotation may sit on the module val or the module class,
+      // depending on how the member was resolved (enum children arrive as
+      // either). Consult the whole declaration cluster.
+      annoString(relatedSyms(sym), "sart.dart.JsonTag").getOrElse {
         val parts = sym.fullName.replace("$", ".").split('.').filter(_.nonEmpty)
         val chain = parts.dropWhile(p => p.head.isLower)
         if chain.isEmpty then parts.lastOption.getOrElse(sym.name) else chain.mkString(".")

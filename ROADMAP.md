@@ -267,20 +267,24 @@ exactly once.
 `.g.dart`). Nothing in it is untranslatable; what stands between Sart and
 full support:
 
-1. **Platform-variant emission — the one real design feature.**
-   Design written: [docs/design/platform-variants.md](docs/design/platform-variants.md)
-   (`@DartLibrary` per-file emission targets + `@DartVariants` generated
-   conditional-export switches; the switch object doubles as the facade). 16
+1. **Platform-variant emission.** ✅ Landed (2026-09-03):
+   [docs/design/platform-variants.md](docs/design/platform-variants.md)
+   — `@DartLibrary` per-file emission targets with per-library import
+   headers, `@DartVariants` generated conditional-export switches (the
+   switch object doubles as the facade), reference-time import routing,
+   cross-library guard. Example-app triple proves the web build selects
+   the web variant. Remaining: strict cross-variant signature audit (v2). 16
    `export 'x_stub.dart' if (dart.library.io/js_interop) 'x_io|web.dart'`
    switches over ~50 io/web/stub variant files (`lib/platform/`, games JS
    runtime). Sart emits a single `main.dart` today; this needs
    multi-library emission plus a variant mechanism (e.g. `@DartPlatform`)
    producing conditional-export headers.
-2. **Enum wire values.** Nabo enums serialize as plain values
-   (`@JsonValue('movie')`), not the fabric `Parent.Member` convention —
-   enum members need a per-member tag override.
-3. **Generators.** One `sync*`/`yield` site (ws durable client); either
-   emitter support or a hand-rewritten iterator.
+2. **Enum wire values.** ✅ Landed (2026-09-03): `@JsonTag` on an enum
+   member (case object or Scala 3 enum case) overrides its wire value —
+   the `@JsonValue('movie')` equivalent.
+3. **Generators.** One `sync*`/`yield` site (ws durable client). Scala
+   has no `yield`-generator syntax to translate FROM — the port rewrites
+   that one iterator explicitly; nothing to build in Sart.
 4. **JS interop authoring.** 7 `dart:js_interop` hits + one extension
    type (hls.js binding); representable as @native facades once (1)
    exists.
