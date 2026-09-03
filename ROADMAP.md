@@ -267,7 +267,10 @@ exactly once.
 `.g.dart`). Nothing in it is untranslatable; what stands between Sart and
 full support:
 
-1. **Platform-variant emission — the one real design feature.** 16
+1. **Platform-variant emission — the one real design feature.**
+   Design written: [docs/design/platform-variants.md](docs/design/platform-variants.md)
+   (`@DartLibrary` per-file emission targets + `@DartVariants` generated
+   conditional-export switches; the switch object doubles as the facade). 16
    `export 'x_stub.dart' if (dart.library.io/js_interop) 'x_io|web.dart'`
    switches over ~50 io/web/stub variant files (`lib/platform/`, games JS
    runtime). Sart emits a single `main.dart` today; this needs
