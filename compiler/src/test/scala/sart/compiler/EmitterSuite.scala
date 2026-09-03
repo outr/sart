@@ -686,3 +686,11 @@ class EmitterSuite extends FunSuite:
     assert(q.contains("FxQuality.Low => 'sd',"), q)
     assert(q.contains("FxQuality.High => 'hd',"), q)
   }
+
+  test("enum wire values derive from the companion fabric RW chain (leaf.lowerCase)") {
+    val r = classBody("FxRating", kind = "enum")
+    assert(r.contains("FxRating.Movie => 'movie',"), r)
+    assert(r.contains("// `rw: fabric.rw.RW` is JVM-only (no Dart form) — not emitted") || !r.contains("rw"), r)
+    val sp = classBody("FxSpeed", kind = "enum")
+    assert(sp.contains("FxSpeed.Slow => 'slow',"), sp)
+  }

@@ -397,3 +397,16 @@ object FxReviewLevel:
 enum FxQuality:
   @JsonTag("sd") case Low
   @JsonTag("hd") case High
+
+// ── Wire style derived from the shared code's own fabric RW definition:
+// no Sart annotation needed on code shared with a JVM server. ──
+sealed trait FxRating
+object FxRating:
+  implicit val rw: fabric.rw.RW[FxRating] = fabric.rw.RW.gen[FxRating].leaf.lowerCase
+  case object Movie extends FxRating
+  case object Episode extends FxRating
+
+enum FxSpeed:
+  case Slow, Fast
+object FxSpeed:
+  implicit val rw: fabric.rw.RW[FxSpeed] = fabric.rw.RW.gen[FxSpeed].leaf.lowerCase

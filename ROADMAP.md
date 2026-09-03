@@ -279,9 +279,12 @@ full support:
    runtime). Sart emits a single `main.dart` today; this needs
    multi-library emission plus a variant mechanism (e.g. `@DartPlatform`)
    producing conditional-export headers.
-2. **Enum wire values.** ✅ Landed (2026-09-03): `@JsonTag` on an enum
-   member (case object or Scala 3 enum case) overrides its wire value —
-   the `@JsonValue('movie')` equivalent.
+2. **Enum wire values.** ✅ Landed (2026-09-03), annotation-free: Sart
+   derives the wire style from the companion's own fabric RW chain
+   (`RW.gen.leaf.lowerCase` → `"movie"`), so shared server/frontend code
+   needs no Sart reference; `@JsonTag` remains as the explicit override.
+   Applies to enum members and sealed discriminators alike (fabric's
+   `mapType` transforms both).
 3. **Generators.** One `sync*`/`yield` site (ws durable client). Scala
    has no `yield`-generator syntax to translate FROM — the port rewrites
    that one iterator explicitly; nothing to build in Sart.

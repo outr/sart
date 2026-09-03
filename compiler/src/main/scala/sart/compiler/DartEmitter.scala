@@ -447,8 +447,71 @@ class DartEmitter(
       annoString(relatedSyms(sym), "sart.dart.JsonTag").getOrElse {
         val parts = sym.fullName.replace("$", ".").split('.').filter(_.nonEmpty)
         val chain = parts.dropWhile(p => p.head.isLower)
-        if chain.isEmpty then parts.lastOption.getOrElse(sym.name) else chain.mkString(".")
+        val default = if chain.isEmpty then parts.lastOption.getOrElse(sym.name) else chain.mkString(".")
+        wireStyleFor(sym)(default)
       }
+
+    /** Wire-value styling DERIVED from the shared code's own fabric `RW`
+     *  definition, so a module shared with a JVM server needs no Sart
+     *  annotation: `implicit val rw: RW[T] = RW.gen.leaf.lowerCase` in
+     *  the companion makes members serialise as `"movie"` instead of
+     *  `"ReviewLevel.Movie"`. fabric's `mapType` applies the same
+     *  transformation to sealed-hierarchy discriminators, so both codec
+     *  families route through this.
+     */
+    private case class WireStyle(leaf: Boolean = false, lower: Boolean = false, upper: Boolean = false):
+      def apply(tag: String): String =
+        var t = if leaf then tag.substring(tag.lastIndexOf('.') + 1) else tag
+        if lower then t = t.toLowerCase
+        if upper then t = t.toUpperCase
+        t
+
+    private val wireStyleMemo = mutable.Map[Symbol, WireStyle]()
+
+    /** The nearest sealed/enum root above `sym` (or `sym` itself for the
+     *  enum class), whose companion may define the fabric RW.
+     */
+    private def wireStyleFor(sym: Symbol): WireStyle =
+      val cls =
+        if sym.isTerm && sym.moduleClass.exists then sym.moduleClass
+        else if sym.isTerm then sym.termRef.widen.dealias.typeSymbol
+        else sym
+      if !cls.exists || !cls.isType then WireStyle()
+      else
+        val root = cls.typeRef.baseClasses.find { b =>
+          userClasses.contains(b) && (b.flags.is(Flags.Sealed) || b.flags.is(Flags.Enum))
+        }
+        root.map(rwStyleOf).getOrElse(WireStyle())
+
+    private def rwStyleOf(root: Symbol): WireStyle =
+      wireStyleMemo.getOrElseUpdate(root, {
+        val companion =
+          if root.companionModule.exists && root.companionModule.moduleClass.exists
+          then root.companionModule.moduleClass else Symbol.noSymbol
+        val rwRhs = classDefs.get(companion).flatMap { cd =>
+          cd.body.collectFirst {
+            case vd: ValDef
+                if vd.tpt.tpe.dealias.typeSymbol.fullName == "fabric.rw.RW" && vd.rhs.isDefined =>
+              vd.rhs.get
+          }
+        }
+        rwRhs.map { rhs =>
+          // Walk the combinator spine: `RW.gen.leaf.lowerCase` arrives as
+          // Selects stacked on the (inlined) derivation — collect the
+          // styling combinators, ignore everything else.
+          def walk(t: Term, acc: WireStyle): WireStyle = t match
+            case Select(q, "leaf")      => walk(q, acc.copy(leaf = true))
+            case Select(q, "lowerCase") => walk(q, acc.copy(lower = true))
+            case Select(q, "upperCase") => walk(q, acc.copy(upper = true))
+            case Select(q, _)           => walk(q, acc)
+            case Apply(f, _)            => walk(f, acc)
+            case TypeApply(f, _)        => walk(f, acc)
+            case Typed(e, _)            => walk(e, acc)
+            case Inlined(_, _, _)       => acc // derivation expansion — stop
+            case _                      => acc
+          walk(rhs, WireStyle())
+        }.getOrElse(WireStyle())
+      })
 
     /** Unwrap a `Literal(Constant(...))` into its underlying value, whatever
      *  the concrete `Constant` subtype is.
