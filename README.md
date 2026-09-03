@@ -179,8 +179,10 @@ of wire-shaped, other models) gets `fromJson`/`toJson` synthesised, and
 every sealed hierarchy of such case classes dispatches on a `type`
 discriminator — so a model module shared with a JVM backend carries
 **no reference to Sart at all**. Defaults follow fabric's conventions
-(`RW.gen`): the JSON key is the field name (`_id` stays `_id`) and the
-tag is the capitalised tail of the fully-qualified name (`object
+(`RW.gen`): the JSON key is the Scala field name — `_id` and
+backtick-`type` included, the Dart-side identifier is sanitised
+separately — and the tag is the capitalised tail of the fully-qualified
+name (`object
 QueryFilter { case class AddressFilter }` → `"QueryFilter.AddressFilter"`,
 a top-level class → its bare name). Classes nested in objects flatten to
 `QueryFilterAddressFilter` on the Dart side; call sites and patterns keep
@@ -193,7 +195,10 @@ Enumerations declared fabric-style (`sealed trait StringMatch; object
 StringMatch { case object Exact … }`) become Dart enhanced enums —
 `StringMatch.Exact` works as a value, in `==`, and in `match` — that
 serialise as `"StringMatch.Exact"` strings (`RW.enumeration`'s
-convention); Scala 3 `enum`s get the same codecs. A case object inside
+convention); Scala 3 `enum`s get the same codecs. When the companion's
+own fabric RW carries styling (`RW.gen.leaf.lowerCase`) or fabric's
+`@serialized`/`@typeField` annotations, Sart derives the wire values
+from those — the shared module defines its format exactly once. A case object inside
 a mixed hierarchy is a const singleton with a tagged object codec. `@JsonModel`
 (force synthesis), `@JsonTag`, and `@JsonField` remain as opt-in
 overrides. `Dyn` is the typed face of
