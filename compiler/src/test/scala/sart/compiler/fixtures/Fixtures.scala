@@ -410,3 +410,19 @@ enum FxSpeed:
   case Slow, Fast
 object FxSpeed:
   implicit val rw: fabric.rw.RW[FxSpeed] = fabric.rw.RW.gen[FxSpeed].leaf.lowerCase
+
+// ── Annotation-free field names: the SCALA name is the wire key; the
+// Dart identifier is sanitised (leading underscore is private/illegal in
+// Dart named params). fabric annotations in shared code are honored. ──
+case class FxDoc(`type`: String, _id: String, value: Int)
+
+case class FxSer(@fabric.rw.serialized("df") displayField: String, n: Int)
+
+@fabric.rw.typeField("kind")
+sealed trait FxShapeK
+case class FxCircleK(radius: Double) extends FxShapeK
+case class FxRectK(w: Double, h: Double) extends FxShapeK
+
+class FxDocUse:
+  def readId(d: FxDoc): String = d._id
+  def readType(d: FxDoc): String = d.`type`

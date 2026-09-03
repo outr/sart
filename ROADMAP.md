@@ -284,7 +284,11 @@ full support:
    (`RW.gen.leaf.lowerCase` → `"movie"`), so shared server/frontend code
    needs no Sart reference; `@JsonTag` remains as the explicit override.
    Applies to enum members and sealed discriminators alike (fabric's
-   `mapType` transforms both).
+   `mapType` transforms both). Field names too (2026-09-03): the Scala
+   field name is the wire key (`_id`, backtick-`type` — the Dart
+   identifier is sanitised separately), and fabric's `@serialized` /
+   `@typeField` annotations in shared code are honored, so `@JsonField`
+   is now also just an escape hatch.
 3. **Generators.** One `sync*`/`yield` site (ws durable client). Scala
    has no `yield`-generator syntax to translate FROM — the port rewrites
    that one iterator explicitly; nothing to build in Sart.

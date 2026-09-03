@@ -694,3 +694,24 @@ class EmitterSuite extends FunSuite:
     val sp = classBody("FxSpeed", kind = "enum")
     assert(sp.contains("FxSpeed.Slow => 'slow',"), sp)
   }
+
+  test("underscore/keyword Scala field names stay the wire key, sanitised in Dart") {
+    val d = classBody("FxDoc")
+    assert(d.contains("final String id;"), d)
+    assert(d.contains("FxDoc(this.type, this.id, this.value);"), d)
+    assert(d.contains("json['_id']"), d)
+    assert(d.contains("'_id': id,"), d)
+    assert(d.contains("'type': type,"), d)
+    assert(classBody("FxDocUse").contains("return d.id;"), classBody("FxDocUse"))
+    assert(classBody("FxDocUse").contains("return d.type;"), classBody("FxDocUse"))
+  }
+
+  test("fabric @serialized and @typeField from shared code drive the wire keys") {
+    val ser = classBody("FxSer")
+    assert(ser.contains("json['df']"), ser)
+    assert(ser.contains("'df': displayField,"), ser)
+    val root = classBody("FxShapeK")
+    assert(root.contains("json['kind'] as String"), root)
+    val circle = classBody("FxCircleK")
+    assert(circle.contains("'kind': 'FxCircleK',"), circle)
+  }

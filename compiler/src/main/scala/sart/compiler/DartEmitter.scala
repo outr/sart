@@ -671,6 +671,25 @@ class DartEmitter(
     private def dartSafeName(name: String): String =
       if dartReserved(name) then s"${name}_" else name
 
+    /** Dart-side identifier for a USER-class member. A leading underscore
+     *  means library-private in Dart (and is outright illegal on named
+     *  parameters like copyWith's), so `_id` becomes `id` — while the
+     *  JSON codecs keep the Scala name as the wire key, so a shared model
+     *  can name its field `_id` exactly as the server serialises it,
+     *  with no Sart annotation.
+     */
+    private def dartFieldIdent(name: String): String =
+      val stripped = name.dropWhile(_ == '_')
+      dartSafeName(if stripped.isEmpty then name else stripped)
+
+    /** Member reference through a receiver: sanitise only when the
+     *  receiver is a class Sart itself emits (facade members mirror real
+     *  Dart names and must pass through untouched — `List.of` etc.).
+     */
+    private def memberIdent(qual: Term, name: String): String =
+      val recv = qual.tpe.widen.dealias.typeSymbol
+      if recv.exists && userClasses.contains(recv) then dartFieldIdent(name) else name
+
     // ── Top-level driver ─────────────────────────────────────────────────
 
     /** Phase 1 — record what this tree declares. Runs over EVERY tree
@@ -869,7 +888,9 @@ class DartEmitter(
         line(s"$objName._()$superInit;")
       if parentSym.exists(isJsonSealed) then
         blank()
-        emitJsonSynths(objName, DartParamShape(Nil, Nil), Some(jsonTagOf(sym)))
+        val sealedRoot = parentSym.filter(isJsonSealed)
+        emitJsonSynths(objName, DartParamShape(Nil, Nil), Some(jsonTagOf(sym)),
+          sealedRoot.map(typeKeyOf).getOrElse("type"))
       // User members on the object (rare, but a case object can carry defs).
       val members = staticObjectMembers(cd)
       if members.nonEmpty then blank()
@@ -1334,7 +1355,7 @@ class DartEmitter(
         val accessor = sym.fieldMember(p.name)
         val isVar = (accessor.exists && accessor.flags.is(Flags.Mutable)) || p.symbol.flags.is(Flags.Mutable)
         val fin = if isVar then "" else "final "
-        line(s"$fin$tn ${p.name};")
+        line(s"$fin$tn ${dartFieldIdent(p.name)};")
 
       // User-class primary constructors: params without defaults stay
       // positional (matching how Scala call sites invoke them); params
@@ -1373,8 +1394,8 @@ class DartEmitter(
       if ctorParams.nonEmpty || superInit.nonEmpty then
         def ctorParamDecl(p: ValDef): String =
           if isSuperKeyParam(p) then "super.key"
-          else if isFieldParam(p) then s"this.${p.name}"
-          else s"${emitTypeRef(p.tpt.tpe)} ${p.name}"
+          else if isFieldParam(p) then s"this.${dartFieldIdent(p.name)}"
+          else s"${emitTypeRef(p.tpt.tpe)} ${dartFieldIdent(p.name)}"
         val pos = ctorShape.positional.map(ctorParamDecl)
         val nmd = ctorShape.named.map((p, d) =>
           if isSuperKeyParam(p) then "super.key" else s"${ctorParamDecl(p)} = $d")
@@ -1405,7 +1426,8 @@ class DartEmitter(
       val sealedJsonParent = parents.extendsTpt.map(_.tpe.typeSymbol)
         .filter(p => isJsonSealed(p))
       if sym.flags.is(Flags.Case) && (hasJsonModel(sym) || isJsonCase(sym)) then
-        emitJsonSynths(className, ctorShape, sealedJsonParent.map(_ => jsonTagOf(sym)))
+        emitJsonSynths(className, ctorShape, sealedJsonParent.map(_ => jsonTagOf(sym)),
+          sealedJsonParent.map(typeKeyOf).getOrElse("type"))
       if isJsonSealed(sym) then
         emitSealedJsonDispatch(className, sym)
 
@@ -1435,7 +1457,7 @@ class DartEmitter(
      *  `Option[T]` → `T?` lands (Phase 2), swap in a sentinel.
      */
     private def emitCaseClassSynths(className: String, params: List[ValDef], shape: DartParamShape): Unit =
-      val names = params.map(_.name)
+      val names = params.map(p => dartFieldIdent(p.name))
       val types = params.map(p => emitTypeRef(p.tpt.tpe))
 
       // ==  (the constructor above already emitted a trailing blank line).
@@ -1475,8 +1497,8 @@ class DartEmitter(
         s"$opt $n"
       }.mkString(", ")
       val cwArgs =
-        (shape.positional.map(p => s"${p.name} ?? this.${p.name}") ++
-          shape.named.map((p, _) => s"${p.name}: ${p.name} ?? this.${p.name}")).mkString(", ")
+        (shape.positional.map(p => s"${dartFieldIdent(p.name)} ?? this.${dartFieldIdent(p.name)}") ++
+          shape.named.map((p, _) => s"${dartFieldIdent(p.name)}: ${dartFieldIdent(p.name)} ?? this.${dartFieldIdent(p.name)}")).mkString(", ")
       line(s"$className copyWith({$cwParams}) =>")
       indent += 1
       line(s"$className($cwArgs);")
@@ -1708,14 +1730,20 @@ class DartEmitter(
       p.symbol.annotations.collectFirst {
         case a if annoFqn(a) == "sart.dart.JsonField" =>
           constArgs(a).collectFirst { case s: String => s }
-      }.flatten.getOrElse(p.name)
+      }.flatten
+        // fabric's own rename annotation — shared code stays Sart-free.
+        .orElse(p.symbol.annotations.collectFirst {
+          case a if annoFqn(a) == "fabric.rw.serialized" =>
+            constArgs(a).collectFirst { case s: String if s.nonEmpty => s }
+        }.flatten)
+        .getOrElse(p.name)
 
-    private def emitJsonSynths(className: String, shape: DartParamShape, tag: Option[String]): Unit =
+    private def emitJsonSynths(className: String, shape: DartParamShape, tag: Option[String], typeKey: String = "type"): Unit =
       val all = shape.positional ++ shape.named.map(_._1)
       // fromJson — constructor call mirrors the emitted ctor shape.
       val ctorArgs =
         (shape.positional.map(p => jsonDecodeExpr(p.tpt.tpe, s"json['${jsonKeyOf(p)}']")) ++
-          shape.named.map((p, _) => s"${p.name}: ${jsonDecodeExpr(p.tpt.tpe, s"json['${jsonKeyOf(p)}']")}"))
+          shape.named.map((p, _) => s"${dartFieldIdent(p.name)}: ${jsonDecodeExpr(p.tpt.tpe, s"json['${jsonKeyOf(p)}']")}"))
           .mkString(", ")
       line(s"static $className fromJson(Map<String, dynamic> json) =>")
       indent += 1
@@ -1728,9 +1756,9 @@ class DartEmitter(
       if tag.isDefined then line("@override")
       line(s"Map<String, dynamic> toJson() => {")
       indent += 1
-      for p <- all if !(tag.isDefined && jsonKeyOf(p) == "type") do
-        line(s"'${jsonKeyOf(p)}': ${jsonEncodeExpr(p.tpt.tpe, p.name.toString)},")
-      tag.foreach(t => line(s"'type': '$t',"))
+      for p <- all if !(tag.isDefined && jsonKeyOf(p) == typeKey) do
+        line(s"'${jsonKeyOf(p)}': ${jsonEncodeExpr(p.tpt.tpe, dartFieldIdent(p.name))},")
+      tag.foreach(t => line(s"'$typeKey': '$t',"))
       indent -= 1
       line("};")
       blank()
@@ -1738,10 +1766,17 @@ class DartEmitter(
     /** The sealed parent's side of the codec: an abstract `toJson` and a
      *  `fromJson` factory dispatching on the `type` discriminator.
      */
+    /** The wire key of the sealed discriminator: fabric's own
+     *  `@typeField("kind")` on the root (shared code, no Sart reference)
+     *  or the default `type`.
+     */
+    private def typeKeyOf(root: Symbol): String =
+      annoString(relatedSyms(root), "fabric.rw.typeField").getOrElse("type")
+
     private def emitSealedJsonDispatch(className: String, sym: Symbol): Unit =
       line(s"static $className fromJson(Map<String, dynamic> json) {")
       indent += 1
-      line("final String t = json['type'] as String;")
+      line(s"final String t = json['${typeKeyOf(sym)}'] as String;")
       for child <- sym.children.map(childClass) if isJsonCase(child) || isCaseObjectClass(child) do
         line(s"if (t == '${jsonTagOf(child)}') return ${dartName(child)}.fromJson(json);")
       line("throw Exception('Unsupported type: ' + t);")
@@ -1767,7 +1802,7 @@ class DartEmitter(
         case _          => false
       }
       if isLate then
-        line(s"${prefix}late $baseTpe ${vd.name};")
+        line(s"${prefix}late $baseTpe ${dartFieldIdent(vd.name)};")
       else
         // Null-initialised vals: Dart's sound null safety rejects
         // `Foo x = null`, so add a `?` to the type when the RHS is a
@@ -1778,7 +1813,7 @@ class DartEmitter(
           case None if isMutable && !baseTpe.endsWith("?") => baseTpe + "?"
           case _                                        => baseTpe
         val init = vd.rhs.map(r => s" = ${emitExpr(r)}").getOrElse("")
-        line(s"$prefix$tpe ${vd.name}$init;")
+        line(s"$prefix$tpe ${dartFieldIdent(vd.name)}$init;")
 
     private def emitMethod(dd: DefDef, static: Boolean = false): Unit =
       val sym = dd.symbol
@@ -1787,6 +1822,7 @@ class DartEmitter(
       emitSourceAttribution(sym)
       if sym.flags.is(Flags.Override) && !static then line("@override")
       val staticPrefix = if static then "static " else ""
+      val methodName = dartFieldIdent(dd.name)
 
       val retType = emitTypeRef(dd.returnTpt.tpe)
       val params = dd.paramss.flatMap(_.params).collect { case vd: ValDef => vd }
@@ -1827,8 +1863,8 @@ class DartEmitter(
           val isAsync = asyncWrapped.isDefined || containsAwait(body)
           val asyncMark = if isAsync then " async" else ""
           val header =
-            if isGetter then s"$staticPrefix$retType get ${sym.name}$asyncMark {"
-            else s"$staticPrefix$retType ${sym.name}$tparams($paramStr)$asyncMark {"
+            if isGetter then s"$staticPrefix$retType get $methodName$asyncMark {"
+            else s"$staticPrefix$retType $methodName$tparams($paramStr)$asyncMark {"
           line(header)
           indent += 1
           val savedShadowed = shadowedNames
@@ -1839,8 +1875,8 @@ class DartEmitter(
           line("}")
           blank()
         case None =>
-          if isGetter then line(s"$staticPrefix$retType get ${sym.name};")
-          else line(s"$staticPrefix$retType ${sym.name}$tparams($paramStr);")
+          if isGetter then line(s"$staticPrefix$retType get $methodName;")
+          else line(s"$staticPrefix$retType $methodName$tparams($paramStr);")
 
     /** Extract `[T <: Foo, U]`-style type parameters from a `DefDef`
      *  (including the primary constructor, which is how class-level type
@@ -2244,6 +2280,7 @@ class DartEmitter(
           else if sym.exists && sym.moduleClass.exists && hasNative(sym.moduleClass) then sym.moduleClass
           else Symbol.noSymbol
         if carrier.exists then dartName(carrier).stripSuffix("$")
+        else if sym.exists && sym.owner.exists && userClasses.contains(sym.owner) then dartFieldIdent(name)
         else dartSafeName(name)
       case This(_) => "this"
       case _: Super => "super"
@@ -3066,9 +3103,9 @@ class DartEmitter(
         return emitExpr(qual)
 
       if dartMethodNamesNeedingParens(name) && !isNativeSingleton(qual) then
-        return s"${selectPrefix(qual, name)}$name()"
+        return s"${selectPrefix(qual, name)}${memberIdent(qual, name)}()"
 
-      s"${selectPrefix(qual, name)}$name"
+      s"${selectPrefix(qual, name)}${memberIdent(qual, name)}"
 
     /** Single place to render `qual.name(args…)` so Scala → Dart method
      *  name mappings land consistently regardless of which emitExpr entry
@@ -3123,7 +3160,7 @@ class DartEmitter(
             val v = arg match
               case NamedArg(_, x) => x
               case o              => o
-            s"${params(i).name}: ${emitExpr(v)}"
+            s"${dartFieldIdent(params(i).name)}: ${emitExpr(v)}"
         }
         return s"${selectPrefix(qual)}copyWith(${named.mkString(", ")})"
 
@@ -3155,8 +3192,8 @@ class DartEmitter(
           // shape: named args for literal-defaulted params, positional
           // (name-stripped) for the rest.
           if isUserCallable(fnSym) then
-            s"${selectPrefix(qual, name)}$name(${emitUserCallArgs(fnSym, cleanedArgs)})"
-          else s"${selectPrefix(qual, name)}$name($argStr)"
+            s"${selectPrefix(qual, name)}${memberIdent(qual, name)}(${emitUserCallArgs(fnSym, cleanedArgs)})"
+          else s"${selectPrefix(qual, name)}${memberIdent(qual, name)}($argStr)"
 
     /** Lookup helper: walks `stdlibRewrites`, returning the first matching
      *  template's rendered output or `None`. Method-call entries receive
@@ -3863,7 +3900,7 @@ class DartEmitter(
           val inner = arg match
             case NamedArg(_, v) => v
             case other          => other
-          if isNamed then named += s"${pOpt.get.name}: ${emitExpr(inner)}"
+          if isNamed then named += s"${dartFieldIdent(pOpt.get.name)}: ${emitExpr(inner)}"
           else pos += emitExpr(inner)
         else if !isNamed then
           // A positional param's default — the Dart signature can't carry

@@ -151,8 +151,11 @@ final class JsonModel extends StaticAnnotation
 final class JsonTag(val tag: String) extends StaticAnnotation
 
 /** Overrides the JSON key a model field reads/writes — the counterpart
- *  of json_serializable's `@JsonKey(name: '...')`. Defaults to the field
- *  name, so a field literally named `_id` needs nothing.
+ *  of json_serializable's `@JsonKey(name: '...')`. Rarely needed: the
+ *  wire key defaults to the SCALA field name (a shared model can name
+ *  its field `_id` or `` `type` `` exactly as the server serialises it —
+ *  the emitted Dart identifier is sanitised separately), and fabric's
+ *  own `@serialized("name")` is honored when shared code uses it.
  */
 final class JsonField(val name: String) extends StaticAnnotation
 
