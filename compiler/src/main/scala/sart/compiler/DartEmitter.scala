@@ -1532,6 +1532,9 @@ class DartEmitter(
            | "scala.collection.immutable.Seq" =>
           arg0.map(a => s"($src as List<dynamic>).map((e) => ${jsonDecodeExpr(a, "e")}).toList()")
             .getOrElse(src)
+        case "scala.collection.immutable.Set" =>
+          arg0.map(a => s"($src as List<dynamic>).map((e) => ${jsonDecodeExpr(a, "e")}).toSet()")
+            .getOrElse(s"($src as List<dynamic>).toSet()")
         case "scala.collection.immutable.Map" =>
           arg1 match
             // Dyn-valued maps stay raw; every other value type decodes
@@ -1566,6 +1569,12 @@ class DartEmitter(
           arg0 match
             case Some(a) if isJsonObjectLike(a) => s"$ref.map((e) => e.toJson()).toList()"
             case _                              => ref
+        // A Set field: jsonEncode cannot serialise a Dart Set — always
+        // ride as a List on the wire (fabric reads/writes JSON arrays).
+        case "scala.collection.immutable.Set" =>
+          arg0 match
+            case Some(a) if isJsonObjectLike(a) => s"$ref.map((e) => e.toJson()).toList()"
+            case _                              => s"$ref.toList()"
         case "scala.collection.immutable.Map" =>
           tpe match
             case AppliedType(_, List(_, v: TypeRepr)) if isJsonObjectLike(v) =>

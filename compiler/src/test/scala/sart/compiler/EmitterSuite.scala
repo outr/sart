@@ -715,3 +715,11 @@ class EmitterSuite extends FunSuite:
     val circle = classBody("FxCircleK")
     assert(circle.contains("'kind': 'FxCircleK',"), circle)
   }
+
+  test("Set fields encode as JSON arrays and decode back to sets") {
+    val t = classBody("FxTags")
+    assert(t.contains("'tags': tags.toList(),"), t)
+    assert(t.contains("(json['tags'] as List<dynamic>)"), t)
+    assert(t.contains(".toSet()"), t)
+    assert(t.contains("geoms.map((e) => e.toJson()).toList(),"), t)
+  }

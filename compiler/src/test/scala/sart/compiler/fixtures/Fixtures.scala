@@ -426,3 +426,6 @@ case class FxRectK(w: Double, h: Double) extends FxShapeK
 class FxDocUse:
   def readId(d: FxDoc): String = d._id
   def readType(d: FxDoc): String = d.`type`
+
+// Set fields ride as JSON arrays (jsonEncode cannot serialise a Dart Set).
+case class FxTags(name: String, tags: Set[String], geoms: Set[FxPlainModel])
