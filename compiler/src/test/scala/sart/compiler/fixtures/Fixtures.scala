@@ -429,3 +429,53 @@ class FxDocUse:
 
 // Set fields ride as JSON arrays (jsonEncode cannot serialise a Dart Set).
 case class FxTags(name: String, tags: Set[String], geoms: Set[FxPlainModel])
+
+// ── Wire-primitive foreign types (--wire-mapping): FxId→String,
+// FxStamp→int, FxWrapped→FxWrapTarget (an emitted delegate class). ──
+case class FxWrapTarget(a: String, b: Int)
+
+case class FxRow(
+  _id: fxforeign.FxId[FxRow],
+  created: fxforeign.FxStamp,
+  who: fxforeign.FxWrapped
+) extends fxforeign.FxDocBase[FxRow]
+
+object FxRow extends fxforeign.FxSchemaBase[FxRow]:
+  val schemaThing: fxforeign.FxId[FxRow] = fxforeign.FxId("x")
+
+class FxRowUse:
+  def readId(r: FxRow): String = r._id.value
+
+// Members whose signature touches unmapped foreign machinery are skipped.
+object FxRowOps:
+  def schemaLookup(base: fxforeign.FxSchemaBase[FxRow]): String = "x"
+  def fine(): Int = 1
+
+class FxRowMake:
+  def make(): FxRow = FxRow(fxforeign.FxId("r1"), fxforeign.FxStamp(5L), fxforeign.FxWrapped("a", 1))
+
+class FxDirUse:
+  def isUp(d: fxforeign.FxDir): Boolean = d == fxforeign.FxDir.Up
+
+class FxColorLabel:
+  def label(c: FxColor): String = c.toString
+
+// 2-arg RW.enumeration (custom asString = _.toString): bare member names.
+enum FxSignal:
+  case Sell, Drill
+object FxSignal:
+  implicit val rw: fabric.rw.RW[FxSignal] = fabric.rw.RW.enumeration(FxSignal.values.toList, _.toString)
+
+// Underscore-strip collision: both `id` and `_id` exist — `_id` → `id_`.
+case class FxBoth(id: Int, _id: String)
+class FxBothUse:
+  def raw(b: FxBoth): String = b._id
+
+class FxFlatOpt:
+  def initials(parts: List[Option[String]]): String =
+    parts.flatten.flatMap(p => p.headOption.map(c => c.toString)).mkString.toUpperCase
+  def joinSet(s: Set[String]): String = s.mkString(", ")
+
+class FxFlattenKinds:
+  def opts(xs: List[Option[String]]): List[String] = xs.flatten
+  def lists(xs: List[List[Int]]): List[Int] = xs.flatten

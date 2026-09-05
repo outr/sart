@@ -25,7 +25,15 @@ class DartEmitter(
   outDir: Path,
   sourceRoot: Option[Path] = None,
   projectName: String = "sart_example",
-  projectDescription: String = "Scala-authored Flutter app, compiled via Sart."
+  projectDescription: String = "Scala-authored Flutter app, compiled via Sart.",
+  /** Wire-primitive foreign types (`--wire-mapping=fqn=DartType`): library
+   *  types whose JSON form is a bare primitive (lightdb `Id` → String,
+   *  `Timestamp` → int) or matches an emitted class's wire shape
+   *  (`com.outr.model.Auth` → ApiAuth). Types map in type position; the
+   *  codecs cast primitives / delegate to the target class's
+   *  fromJson/toJson; `.value` on a primitive-mapped wrapper is identity.
+   */
+  wireMappings: Map[String, String] = Map.empty
 ) extends Inspector:
 
   // ── State collected across inspection runs ─────────────────────────────
@@ -500,6 +508,14 @@ class DartEmitter(
           // Selects stacked on the (inlined) derivation — collect the
           // styling combinators, ignore everything else.
           def walk(t: Term, acc: WireStyle): WireStyle = t match
+            // `RW.enumeration(list, asString)` with a custom stringifier:
+            // the overwhelmingly common form is `_.toString` — bare member
+            // names on the wire (leaf style).
+            case Apply(fn, args) if args.sizeIs >= 2 && !isDefaultArg(args(1)) && (fn match
+                case Select(_, "enumeration") => true
+                case TypeApply(Select(_, "enumeration"), _) => true
+                case _ => false) =>
+              acc.copy(leaf = true)
             case Select(q, "leaf")      => walk(q, acc.copy(leaf = true))
             case Select(q, "lowerCase") => walk(q, acc.copy(lower = true))
             case Select(q, "upperCase") => walk(q, acc.copy(upper = true))
@@ -678,9 +694,36 @@ class DartEmitter(
      *  can name its field `_id` exactly as the server serialises it,
      *  with no Sart annotation.
      */
+    private val fieldRenameMemo = mutable.Map[Symbol, Map[String, String]]()
+    /** Per-class rename table for underscore-led members: `_id` strips to
+     *  `id` unless the class also declares `id`, in which case it becomes
+     *  `id_` (both can appear on real server documents — the wire keys
+     *  stay distinct because they use the raw Scala names).
+     */
+    private def fieldRenames(cls: Symbol): Map[String, String] =
+      fieldRenameMemo.getOrElseUpdate(cls, {
+        val names = (cls.primaryConstructor.paramSymss.flatten.filterNot(_.isType).map(_.name)
+          ++ cls.declaredFields.map(_.name)).toSet
+        names.iterator.filter(_.startsWith("_")).map { n =>
+          val stripped = n.dropWhile(_ == '_')
+          n -> (if stripped.isEmpty || names(stripped) then stripped + "_" else stripped)
+        }.toMap
+      })
+
+    /** The class whose members are currently being emitted — the rename
+     *  context for `dartFieldIdent(name)` when no owner is passed.
+     */
+    private var currentFieldOwner: Symbol = Symbol.noSymbol
+
     private def dartFieldIdent(name: String): String =
-      val stripped = name.dropWhile(_ == '_')
-      dartSafeName(if stripped.isEmpty then name else stripped)
+      dartFieldIdent(currentFieldOwner, name)
+
+    private def dartFieldIdent(owner: Symbol, name: String): String =
+      if owner.exists && userClasses.contains(owner) && fieldRenames(owner).contains(name) then
+        dartSafeName(fieldRenames(owner)(name))
+      else
+        val stripped = name.dropWhile(_ == '_')
+        dartSafeName(if stripped.isEmpty then name else stripped)
 
     /** Member reference through a receiver: sanitise only when the
      *  receiver is a class Sart itself emits (facade members mirror real
@@ -688,7 +731,7 @@ class DartEmitter(
      */
     private def memberIdent(qual: Term, name: String): String =
       val recv = qual.tpe.widen.dealias.typeSymbol
-      if recv.exists && userClasses.contains(recv) then dartFieldIdent(name) else name
+      if recv.exists && userClasses.contains(recv) then dartFieldIdent(recv, name) else name
 
     // ── Top-level driver ─────────────────────────────────────────────────
 
@@ -803,6 +846,11 @@ class DartEmitter(
             emitEnumFromCompanion(cd, companion)
           else if companion.exists && companionModules.contains(companion) then
             () // Statics merged into the companion class's own emission.
+          else if cd.parents.exists(p => findParentType(p).exists(tt => isForeignParent(tt.tpe.typeSymbol))) then
+            // A schema/model companion (`object User extends
+            // RecordDocumentModel[User]`) — db machinery, not wire shape.
+            line(s"// `${name.stripSuffix("$")}` companion extends a JVM-only base — not emitted")
+            blank()
           else if sym.flags.is(Flags.Case) then
             // A member of an enumeration hierarchy is a constant of the
             // parent's Dart enum — nothing to emit on its own.
@@ -893,9 +941,10 @@ class DartEmitter(
           sealedRoot.map(typeKeyOf).getOrElse("type"))
       // User members on the object (rare, but a case object can carry defs).
       val members = staticObjectMembers(cd)
+      currentFieldOwner = cd.symbol
       if members.nonEmpty then blank()
       emitJvmOnlySkips(cd)
-      for stat <- members do
+      for stat <- members if !skipJvmOnly(stat) do
         stat match
           case vd: ValDef => emitField(vd)
           case dd: DefDef => emitMethod(dd)
@@ -946,7 +995,7 @@ class DartEmitter(
         }
         if statics.nonEmpty then blank()
         emitJvmOnlySkips(moduleCd)
-        for stat <- statics do
+        for stat <- statics if !skipJvmOnly(stat) do
           if reserved.contains(stat.symbol.name) then
             line(s"// `${stat.symbol.name}` is built in on Dart enums — the Scala definition is not emitted")
           else stat match
@@ -956,7 +1005,7 @@ class DartEmitter(
       // Trait members (concrete defs shared by every value).
       val own = cd.body.collect { case dd: DefDef if !dd.symbol.flags.is(Flags.Synthetic) && dd.rhs.isDefined => dd }
       if own.nonEmpty then blank()
-      for dd <- own do emitMethod(dd)
+      for dd <- own if !skipJvmOnly(dd) do emitMethod(dd)
       indent -= 1
       line("}")
       blank()
@@ -1105,6 +1154,80 @@ class DartEmitter(
           line(s"// `${vd.name}: ${vd.tpt.tpe.dealias.typeSymbol.fullName}` is JVM-only (no Dart form) — not emitted")
         }
 
+    /** Deep representability for member SIGNATURES: every type reached
+     *  through params/result must be native, emitted, wire-mapped, or
+     *  scala/java/fabric vocabulary. A companion def that takes a lightdb
+     *  `Field.Indexed` has no Dart form — skipped with a comment.
+     */
+    private def isDeepRepresentable(rawTpe: TypeRepr): Boolean =
+      val t = rawTpe.dealias
+      t match
+        case AppliedType(tycon, args) =>
+          isDeepRepresentable(tycon) && args.collect { case tr: TypeRepr => tr }.forall(isDeepRepresentable)
+        case _ =>
+          val sym = t.typeSymbol
+          !sym.exists || sym.isTypeParam || hasNative(sym) || userClasses.contains(sym)
+            || wireMappings.contains(sym.fullName)
+            || sym.fullName.startsWith("scala.")
+            || (sym.fullName.startsWith("java.lang.") && sym.fullName != "java.lang.Class")
+            || sym.fullName.startsWith("sart.") || sym.fullName.startsWith("flutter.")
+            || Set("fabric.Json", "fabric.Obj", "fabric.Arr", "fabric.Str",
+                   "fabric.Num", "fabric.Bool", "fabric.Null").contains(sym.fullName)
+
+    private def isJvmOnlyMember(sym: Symbol): Boolean =
+      def sigTypes(t: TypeRepr): List[TypeRepr] = t match
+        case mt: MethodType => mt.paramTypes ++ sigTypes(mt.resType)
+        case pt: PolyType   =>
+          pt.paramBounds.flatMap(b => List(b.low, b.hi)) ++ sigTypes(pt.resType)
+        case bt: ByNameType => sigTypes(bt.underlying)
+        case r              => List(r)
+      !sigTypes(sym.termRef.widen).forall(isDeepRepresentable)
+
+    /** Does the member's BODY reach into JVM-only vocabulary (a lightdb
+     *  static, `getClass`, fabric's Definition …)? Such members can't
+     *  translate even when their signature is clean.
+     */
+    private def bodyIsJvmOnly(stat: Definition): Boolean = bodyJvmOnlyOffender(stat).isDefined
+
+    private def bodyJvmOnlyOffender(stat: Definition): Option[String] =
+      val rhs: Option[Tree] = stat match
+        case vd: ValDef => vd.rhs
+        case dd: DefDef => dd.rhs
+        case _          => None
+      rhs.flatMap { body =>
+        val acc = new TreeAccumulator[Option[String]]:
+          def foldTree(found: Option[String], t: Tree)(owner: Symbol): Option[String] =
+            if found.isDefined then found
+            else t match
+              case id @ (_: Ident | _: Select) if id.symbol.exists && id.symbol.isTerm =>
+                val s = id.symbol
+                val o = s.owner
+                val mapped = o.exists && (
+                  wireMappings.contains(o.fullName.stripSuffix("$"))
+                    || (o.companionClass.exists && wireMappings.contains(o.companionClass.fullName))
+                    // fabric's package-level builders (obj/arr/str/…) all lower.
+                    || (o.fullName.startsWith("fabric.") && o.fullName.contains("package")))
+                val ownerBad = o.exists && o.isClassDef && !o.flags.is(Flags.Package)
+                  && !mapped && !isDeepRepresentable(o.typeRef)
+                // `toString` exists on every Dart object — never a blocker.
+                if ownerBad && s.name != "toString" then Some(s"${o.fullName.stripSuffix("$")}.${s.name}")
+                else if s.name == "getClass" then Some("getClass")
+                else foldOverTree(found, t)(owner)
+              case _ => foldOverTree(found, t)(owner)
+        acc.foldTree(None, body)(Symbol.spliceOwner)
+      }
+
+    private def skipJvmOnly(stat: Definition): Boolean =
+      if isJvmOnlyMember(stat.symbol) then
+        line(s"// `${stat.symbol.name}` has a JVM-only signature (no Dart form) — not emitted")
+        true
+      else
+        bodyJvmOnlyOffender(stat) match
+          case Some(off) =>
+            line(s"// `${stat.symbol.name}` uses JVM-only `$off` in its body — not emitted")
+            true
+          case None => false
+
     private def isRepresentableType(tpe: TypeRepr): Boolean =
       val sym = tpe.typeSymbol
       val fq = sym.fullName
@@ -1139,7 +1262,7 @@ class DartEmitter(
       emitJvmOnlySkips(cd)
       line(s"$objName._();")
       blank()
-      for stat <- memberStats do
+      for stat <- memberStats if !skipJvmOnly(stat) do
         stat match
           case vd: ValDef => emitField(vd, static = true)
           case dd: DefDef => emitMethod(dd, static = true)
@@ -1175,6 +1298,15 @@ class DartEmitter(
     )
     private val skippedParentSimples = Set("Product", "Serializable", "Equals")
 
+    /** A parent Dart cannot extend: a library class that is neither a
+     *  facade nor Sart-emitted (lightdb `RecordDocument`, an ORM base…).
+     *  The Scala compiler enforced its contract; the Dart side drops it.
+     */
+    private def isForeignParent(s: Symbol): Boolean =
+      s.exists && !hasNative(s) && !userClasses.contains(s)
+        && !s.fullName.startsWith("scala.") && !s.fullName.startsWith("java.")
+        && !s.fullName.startsWith("sart.")
+
     /** Walk tree shapes like `Apply(TypeApply(Select(New(tt), "<init>"),
      *  tpArgs), valArgs)` to the underlying parent `TypeTree`.
      */
@@ -1192,7 +1324,7 @@ class DartEmitter(
     private def realParent(cd: ClassDef): Option[TypeTree] =
       cd.parents.flatMap(findParentType).find { tt =>
         val s = tt.tpe.typeSymbol
-        !skippedParentFqns(s.fullName) && !skippedParentSimples(s.name)
+        !skippedParentFqns(s.fullName) && !skippedParentSimples(s.name) && !isForeignParent(s)
       }
 
     /** Full parent decomposition: the extends-parent with its constructor
@@ -1213,7 +1345,7 @@ class DartEmitter(
       val real = cd.parents.flatMap { p =>
         findParentType(p).filter { tt =>
           val s = tt.tpe.typeSymbol
-          !skippedParentFqns(s.fullName) && !skippedParentSimples(s.name)
+          !skippedParentFqns(s.fullName) && !skippedParentSimples(s.name) && !isForeignParent(s)
         }.map(tt => (tt, parentCtorArgs(p)))
       }
       real match
@@ -1225,6 +1357,12 @@ class DartEmitter(
       if hasNative(sym) then
         recordAnnotations(sym)
         return
+      val savedFieldOwner = currentFieldOwner
+      currentFieldOwner = sym
+      try emitClassDefInner(cd, sym)
+      finally currentFieldOwner = savedFieldOwner
+
+    private def emitClassDefInner(cd: ClassDef, sym: Symbol): Unit =
 
       // `runTop` already filters by name (skips $-ending companions unless
       // they're enum, case-object, or have a user-defined body) and
@@ -1409,7 +1547,7 @@ class DartEmitter(
         else line(s"$className($paramList)$superInit;")
         blank()
 
-      for stat <- memberStats do
+      for stat <- memberStats if !skipJvmOnly(stat) do
         stat match
           case vd: ValDef => emitField(vd)
           case dd: DefDef => emitMethod(dd)
@@ -1431,15 +1569,21 @@ class DartEmitter(
       if isJsonSealed(sym) then
         emitSealedJsonDispatch(className, sym)
 
-      // Companion-object members land here as Dart statics.
+      // Companion-object members land here as Dart statics — unless the
+      // companion extends a JVM-only base (a lightdb model/schema object):
+      // that whole body is db machinery, not wire shape.
       companionModules.get(sym).foreach { moduleCd =>
-        val statics = staticObjectMembers(moduleCd)
-        if statics.nonEmpty then blank()
-        emitJvmOnlySkips(moduleCd)
-        for stat <- statics do
-          stat match
-            case vd: ValDef => emitField(vd, static = true)
-            case dd: DefDef => emitMethod(dd, static = true)
+        if moduleCd.parents.exists(p => findParentType(p).exists(tt => isForeignParent(tt.tpe.typeSymbol))) then
+          blank()
+          line(s"// `$className` companion extends a JVM-only base — not emitted")
+        else
+          val statics = staticObjectMembers(moduleCd)
+          if statics.nonEmpty then blank()
+          emitJvmOnlySkips(moduleCd)
+          for stat <- statics if !skipJvmOnly(stat) do
+            stat match
+              case vd: ValDef => emitField(vd, static = true)
+              case dd: DefDef => emitMethod(dd, static = true)
       }
 
       indent -= 1
@@ -1524,6 +1668,14 @@ class DartEmitter(
         case "scala.Double"     => s"($src as num).toDouble()"
         case "scala.Boolean"    => s"($src as bool)"
         case "java.lang.String" => s"($src as String)"
+        case fqn if wireMappings.contains(fqn) =>
+          wireMappings(fqn) match
+            case "String"  => s"($src as String)"
+            case "int"     => s"($src as num).toInt()"
+            case "double"  => s"($src as num).toDouble()"
+            case "bool"    => s"($src as bool)"
+            case "dynamic" => src
+            case cls       => s"$cls.fromJson($src as Map<String, dynamic>)"
         case "sart.dart.Dyn" | "fabric.Json" => src
         case "scala.Option" | "sart.stdlib.Option" =>
           arg0.map(a => s"$src == null ? null : ${jsonDecodeExpr(a, src)}")
@@ -1560,6 +1712,10 @@ class DartEmitter(
       sym.fullName match
         case "scala.Int" | "scala.Long" | "scala.Double" | "scala.Boolean"
            | "java.lang.String" | "sart.dart.Dyn" | "fabric.Json" => ref
+        case fqn if wireMappings.contains(fqn) =>
+          wireMappings(fqn) match
+            case "String" | "int" | "double" | "bool" | "dynamic" => ref
+            case _                                                => s"$ref.toJson()"
         case "scala.Option" | "sart.stdlib.Option" =>
           arg0 match
             case Some(a) if isJsonObjectLike(a) => s"$ref?.toJson()"
@@ -1726,6 +1882,7 @@ class DartEmitter(
           args match
             case List(k, v) => isWireType(k) && isWireType(v)
             case _          => false
+        case fqn if wireMappings.contains(fqn) => true
         case _ => isJsonCase(sym) || isJsonSealed(sym) || isEnumType(sym)
 
     /** `fromJson` / `toJson` for a @JsonModel case class, wire-compatible
@@ -2273,6 +2430,17 @@ class DartEmitter(
       // its enum constant (`FxColor.Red`, always qualified — a bare `Red`
       // only resolves inside the enum); any other case object emits its
       // canonical const instance.
+      // A case-object member of a String-mapped foreign enumeration
+      // (`lightdb.SortDirection.Ascending`) emits its wire literal —
+      // fabric's enumeration convention, `"Parent.Member"`.
+      case t @ (Ident(_) | Select(_, _))
+          if t.symbol.isTerm && t.symbol.moduleClass.exists
+             && t.symbol.moduleClass.typeRef.baseClasses.exists { b =>
+               wireMappings.get(b.fullName).contains("String") && b != t.symbol.moduleClass
+             } =>
+        val root = t.symbol.moduleClass.typeRef.baseClasses
+          .find(b => wireMappings.get(b.fullName).contains("String") && b != t.symbol.moduleClass).get
+        s"'${root.name.stripSuffix("$")}.${t.symbol.name.stripSuffix("$")}'"
       case t @ (Ident(_) | Select(_, _)) if caseObjectValueClass(t.symbol).isDefined =>
         val cls = caseObjectValueClass(t.symbol).get
         enumParentOf(cls) match
@@ -2289,7 +2457,7 @@ class DartEmitter(
           else if sym.exists && sym.moduleClass.exists && hasNative(sym.moduleClass) then sym.moduleClass
           else Symbol.noSymbol
         if carrier.exists then dartName(carrier).stripSuffix("$")
-        else if sym.exists && sym.owner.exists && userClasses.contains(sym.owner) then dartFieldIdent(name)
+        else if sym.exists && sym.owner.exists && userClasses.contains(sym.owner) then dartFieldIdent(sym.owner, name)
         else dartSafeName(name)
       case This(_) => "this"
       case _: Super => "super"
@@ -2301,6 +2469,13 @@ class DartEmitter(
       // underlying argument. This case has to run before the generic
       // `Apply(Select(qual, name), args)` branch would otherwise emit
       // `Predef.augmentString(s)` literally.
+      // `option2Iterable(x)`: Scala's Option→Iterable bridge (a flatMap
+      // over an Option-returning lambda). An Option is a nullable value
+      // here, so the iterable form is a 0/1-element list.
+      case Apply(fn, List(arg)) if isScalaImplicitWrapper(fn) && wrapperName(fn) == "option2Iterable" =>
+        s"((vOpt) => vOpt == null ? const [] : [vOpt])(${emitExpr(arg)})"
+      case Apply(TypeApply(fn, _), List(arg)) if isScalaImplicitWrapper(fn) && wrapperName(fn) == "option2Iterable" =>
+        s"((vOpt) => vOpt == null ? const [] : [vOpt])(${emitExpr(arg)})"
       case Apply(fn, List(arg)) if isScalaImplicitWrapper(fn) =>
         emitExpr(arg)
       case Apply(TypeApply(fn, _), List(arg)) if isScalaImplicitWrapper(fn) =>
@@ -2382,6 +2557,8 @@ class DartEmitter(
       // `new Foo(args)` → `Foo(args)`. For facade classes (@native) we keep
       // Scala named args as Dart named args (Dart constructor is named-form).
       // For user classes we strip names — the emitted Dart ctor is positional.
+      case Apply(Select(New(tpt), _), args) if wireMappings.contains(tpt.tpe.typeSymbol.fullName) =>
+        emitWireMappedCtor(wireMappings(tpt.tpe.typeSymbol.fullName), args)
       case Apply(Select(New(tpt), _), args) =>
         recordAnnotations(tpt.tpe.typeSymbol)
         val ctorName = ctorTypeName(tpt.tpe)
@@ -2511,6 +2688,18 @@ class DartEmitter(
         args.headOption.map(emitExpr).getOrElse("null")
       case TypeApply(Select(qual, "empty"), _) if isSartRef(qual, "sart.stdlib.Option") || isSartRef(qual, "scala.Option") =>
         "null"
+
+      // Wire-mapped foreign constructions: a primitive-mapped wrapper
+      // (`Id("x")`, `AuthToken(t)`, `Timestamp(ms)`) IS its argument; a
+      // class-mapped one (`Auth(id, tok)` → ApiAuth) constructs the target.
+      case Apply(TypeApply(Select(q2, "apply"), _), args)
+          if q2.symbol.exists && q2.symbol.companionClass.exists
+             && wireMappings.contains(q2.symbol.companionClass.fullName) =>
+        emitWireMappedCtor(wireMappings(q2.symbol.companionClass.fullName), args)
+      case Apply(Select(q2, "apply"), args)
+          if q2.symbol.exists && q2.symbol.companionClass.exists
+             && wireMappings.contains(q2.symbol.companionClass.fullName) =>
+        emitWireMappedCtor(wireMappings(q2.symbol.companionClass.fullName), args)
 
       // `Todo.apply(x, y)` on a case-class companion → `Todo(x, y)`. Scala
       // compiles `Foo(args)` (no `new`) into a call to the companion's
@@ -2816,6 +3005,19 @@ class DartEmitter(
       case other =>
         todo(s"expr ${other.getClass.getSimpleName}")
 
+    /** Construction of a wire-mapped foreign type: primitive targets are
+     *  transparent wrappers (the sole argument IS the value); class
+     *  targets construct the emitted equivalent positionally.
+     */
+    private def emitWireMappedCtor(target: String, args: List[Term]): String =
+      val cleaned = args.map { case NamedArg(_, v) => v; case o => o }.filterNot(isDefaultArg)
+      target match
+        case "String" | "int" | "double" | "bool" | "dynamic" =>
+          cleaned match
+            case List(a) => emitExpr(a)
+            case _       => todo(s"wire-mapped $target construction with ${cleaned.size} args")
+        case cls => s"$cls(${cleaned.map(emitExpr).mkString(", ")})"
+
     private def isNativeSingleton(t: Term): Boolean =
       val sym = t.tpe.termSymbol
       sym.exists && hasNative(sym)
@@ -2985,6 +3187,8 @@ class DartEmitter(
      */
     private val scalaImplicitWrapperSimples = Set(
       "augmentString", "unaugmentString",
+      "int2long", "int2double", "int2float", "long2double", "long2float",
+      "float2double", "char2int", "short2int", "byte2int",
       "intWrapper", "longWrapper", "floatWrapper", "doubleWrapper",
       "charWrapper", "byteWrapper", "shortWrapper", "booleanWrapper",
       "wrapRefArray", "wrapIntArray", "wrapDoubleArray", "wrapLongArray",
@@ -2992,6 +3196,12 @@ class DartEmitter(
       "wrapBooleanArray", "wrapUnitArray", "genericWrapArray",
       "refArrayOps"
     )
+
+    private def wrapperName(t: Term): String = t match
+      case id: Ident => id.name
+      case s: Select => s.name
+      case TypeApply(inner, _) => wrapperName(inner)
+      case _ => ""
 
     private def isScalaImplicitWrapper(t: Term): Boolean =
       val sym = t match
@@ -3068,6 +3278,20 @@ class DartEmitter(
       case _                                        => dartName(tpe.typeSymbol)
 
     private def emitMemberAccess(qual: Term, name: String): String =
+      // `.value` on a primitive-mapped wire wrapper (lightdb Id,
+      // Timestamp, AuthToken — AnyVals over their wire form) is identity.
+      val recvFqn = qual.tpe.widen.dealias.typeSymbol match
+        case s if s.exists => s.fullName
+        case _             => ""
+      if name == "value" && wireMappings.get(recvFqn).exists(Set("String", "int", "double", "bool", "dynamic")) then
+        return emitExpr(qual)
+      // `.toString` on an emitted enumeration is the WIRE string: emit
+      // `toJson()`. (For default-style enums Dart's own toString produces
+      // the same "Parent.Member" text; toJson also honours @JsonTag / RW
+      // styling, so it is always the value the server sees.)
+      if name == "toString" && qual.tpe.widen.dealias.typeSymbol.exists
+         && isEnumType(qual.tpe.widen.dealias.typeSymbol) then
+        return s"${selectPrefix(qual, name)}toJson()"
       // @DartTopLevel facade field / constant → drop the qualifier so
       // `math.pi` emits as `pi` (or `alias.pi` for aliased imports).
       if isDartTopLevel(qual) then
@@ -3112,6 +3336,9 @@ class DartEmitter(
         return emitExpr(qual)
 
       if dartMethodNamesNeedingParens(name) && !isNativeSingleton(qual) then
+        if name == "toString" && qual.tpe.widen.dealias.typeSymbol.exists
+           && isEnumType(qual.tpe.widen.dealias.typeSymbol) then
+          return s"${selectPrefix(qual, name)}toJson()"
         return s"${selectPrefix(qual, name)}${memberIdent(qual, name)}()"
 
       s"${selectPrefix(qual, name)}${memberIdent(qual, name)}"
@@ -3136,6 +3363,11 @@ class DartEmitter(
       // the parens we'd otherwise emit.
       if args.isEmpty && dartGetterNames(name) then
         return emitMemberAccess(qual, name)
+
+      // `.toString` on an emitted enumeration is its WIRE string.
+      if name == "toString" && args.isEmpty && qual.tpe.widen.dealias.typeSymbol.exists
+         && isEnumType(qual.tpe.widen.dealias.typeSymbol) then
+        return s"${selectPrefix(qual, name)}toJson()"
 
       // `Dyn` bridge: index access and getter-shaped calls on `dynamic`.
       if isDynReceiver(qual) then
@@ -3169,7 +3401,7 @@ class DartEmitter(
             val v = arg match
               case NamedArg(_, x) => x
               case o              => o
-            s"${dartFieldIdent(params(i).name)}: ${emitExpr(v)}"
+            s"${dartFieldIdent(params(i).maybeOwner.maybeOwner, params(i).name)}: ${emitExpr(v)}"
         }
         return s"${selectPrefix(qual)}copyWith(${named.mkString(", ")})"
 
@@ -3194,7 +3426,7 @@ class DartEmitter(
       if name == "fromEnvironment" then
         return s"const ${selectPrefix(qual, name)}$name($argStr)"
 
-      stdlibRewrite(qual, name, isGetter = false, argList, argStr) match
+      stdlibRewrite(qual, name, isGetter = false, argList, argStr, cleanedArgs) match
         case Some(rendered) => rendered
         case None =>
           // Calls to methods Sart itself emits must match the emitted
@@ -3211,7 +3443,8 @@ class DartEmitter(
      */
     private def stdlibRewrite(
       qual: Term, name: String, isGetter: Boolean,
-      argList: List[String] = Nil, argStr: String = ""
+      argList: List[String] = Nil, argStr: String = "",
+      argTerms: List[Term] = Nil
     ): Option[String] =
       stdlibRewrites.find { e =>
         e.scalaName == name && e.isGetter == isGetter && e.receiver(qual)
@@ -3223,6 +3456,8 @@ class DartEmitter(
           // `qualExpr` into `??`/`.`-chains keep the intended grouping.
           qualExpr = if needsParensAsReceiver(qual) then s"($q)" else q,
           args     = argStr,
+          argTerms = argTerms,
+          qualTerm = Some(qual),
           argList  = argList
         ))
       }
@@ -3238,8 +3473,42 @@ class DartEmitter(
       prefix:   String,
       qualExpr: String,
       args:     String,
-      argList:  List[String]
-    )
+      argList:  List[String],
+      argTerms: List[Term] = Nil,
+      qualTerm: Option[Term] = None
+    ):
+      /** Is the receiver a collection of Options (nullable elements)? */
+      def elemIsOption: Boolean = qualTerm.exists { q =>
+        q.tpe.widen.dealias match
+          case AppliedType(_, List(e: TypeRepr)) =>
+            val fq = e.dealias.typeSymbol.fullName
+            fq == "scala.Option" || fq == "sart.stdlib.Option"
+          case _ => false
+      }
+      /** Does the (first) argument — a lambda — return an Option?
+       *  (`Option` IS `IterableOnce`, so `flatMap(_.headOption)` arrives
+       *  with no conversion wrapper; the nullable lowering then needs a
+       *  0/1-element list at the Iterable seam.)
+       */
+      def fnReturnsOption: Boolean = argTerms.headOption.exists { t =>
+        def isOpt(r: TypeRepr): Boolean =
+          val fq = r.dealias.typeSymbol.fullName
+          fq == "scala.Option" || fq == "sart.stdlib.Option" || fq == "scala.Some" || fq == "scala.None$"
+        def fromType(tp: TypeRepr): Boolean = tp.dealias match
+          case AppliedType(_, ts) if ts.nonEmpty =>
+            ts.last match
+              case r: TypeRepr => isOpt(r)
+              case _           => false
+          case _ => false
+        def fromTree(tt: Term): Boolean = tt match
+          // The closure's static type is upcast to IterableOnce; the
+          // BODY's type still says Option.
+          case Block(List(dd: DefDef), _) => dd.rhs.exists(b => isOpt(b.tpe.widen))
+          case Inlined(_, _, e: Term) => fromTree(e)
+          case Typed(e, _)            => fromTree(e)
+          case _ => false
+        fromType(t.tpe.widen) || fromTree(t)
+      }
 
     private case class StdlibRewrite(
       receiver:  Term => Boolean,
@@ -3293,10 +3562,17 @@ class DartEmitter(
       listCall("concat")    (c => s"(${c.prefix.stripSuffix(".")} + ${c.args})"),
       listCall("filter")    (c => s"${c.prefix}where(${c.args}).toList()"),
       listCall("withFilter")(c => s"${c.prefix}where(${c.args}).toList()"),
-      listCall("flatMap")   (c => s"${c.prefix}expand(${c.args}).toList()"),
+      listCall("flatMap")   { c =>
+        if c.fnReturnsOption then
+          s"${c.prefix}expand((eOpt) { final vOpt = (${c.args})(eOpt); return vOpt == null ? const [] : [vOpt]; }).toList()"
+        else s"${c.prefix}expand(${c.args}).toList()"
+      },
       // Terminal scalars — no .toList() wrap.
       listCall("foldLeft")  (c => s"${c.prefix}fold(${c.args})"),
       listCall("mkString")  (c => s"${c.prefix}join(${c.args})"),
+      StdlibRewrite(isListLikeReceiver, "mkString", isGetter = true, c => s"${c.prefix}join()"),
+      StdlibRewrite(isSetReceiver, "mkString", isGetter = false, c => s"${c.prefix}join(${c.args})"),
+      StdlibRewrite(isSetReceiver, "mkString", isGetter = true, c => s"${c.prefix}join()"),
       // Direct renames where Dart's name differs from Scala's.
       listCall("drop")(c => s"${c.qualExpr}.skip(${c.args}).toList()"),
       listRename("dropWhile", "skipWhile"),
@@ -3420,7 +3696,14 @@ class DartEmitter(
       // explicit arg, so cover both the getter and method shapes; the
       // method form ignores args entirely.
       listGetExpr("flatten")(q => s"$q.expand((x) => x).toList()"),
-      listCall("flatten")(c => s"${c.qualExpr}.expand((x) => x).toList()"),
+      listCall("flatten")   { c =>
+        // Flattening a List[Option[T]] drops nulls (each element is the
+        // 0/1-element iterable of the nullable lowering); a List[List[T]]
+        // spreads its element lists.
+        if c.elemIsOption then
+          s"${c.prefix}expand((vOpt) => vOpt == null ? const [] : [vOpt]).toList()"
+        else s"${c.qualExpr}.expand((x) => x).toList()"
+      },
       // `xs.distinct` — go through Set to dedupe; Dart's Set preserves
       // insertion order, matching Scala's `distinct` semantics.
       listGetExpr("distinct")(q => s"$q.toSet().toList()"),
@@ -3909,7 +4192,7 @@ class DartEmitter(
           val inner = arg match
             case NamedArg(_, v) => v
             case other          => other
-          if isNamed then named += s"${dartFieldIdent(pOpt.get.name)}: ${emitExpr(inner)}"
+          if isNamed then named += s"${dartFieldIdent(pOpt.get.maybeOwner.maybeOwner, pOpt.get.name)}: ${emitExpr(inner)}"
           else pos += emitExpr(inner)
         else if !isNamed then
           // A positional param's default — the Dart signature can't carry
@@ -4477,6 +4760,11 @@ class DartEmitter(
         case _ => ()
       if sym.exists && (sym.flags.is(Flags.Opaque) || (sym.isAbstractType && !sym.isTypeParam)) then
         return "dynamic"
+
+      // Wire-primitive foreign types: mapped by fully-qualified name,
+      // type arguments dropped (`Id[User]` → `String`).
+      if sym.exists && wireMappings.contains(sym.fullName) then
+        return wireMappings(sym.fullName)
 
       // Hand-ported stdlib types with custom Dart representations — these
       // need to bypass the standard `base<T, U>` template because they

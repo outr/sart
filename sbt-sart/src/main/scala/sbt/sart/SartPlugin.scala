@@ -91,6 +91,11 @@ object SartPlugin extends AutoPlugin {
       "A pubspec.lock copied into <out>/ on every emit so `flutter pub get` resolves exactly those " +
       "package versions — e.g. the lock of a hand-written app the Sart build must match pixel-for-pixel."
     )
+    val sartWireMappings = settingKey[Map[String, String]](
+      "Wire-primitive foreign types: fully-qualified Scala type -> Dart type. A library type whose " +
+      "JSON form is a bare primitive (lightdb Id -> String, Timestamp -> int) or an emitted class " +
+      "with the same wire shape (com.outr.model.Auth -> ApiAuth). Applied in type position and codecs."
+    )
     val sartWebDir = settingKey[Option[File]](
       "Directory whose contents overlay the scaffolded <out>/web/ before `flutter build web` — " +
       "a hand-written index.html, flutter_bootstrap.js, manifest.json, icons/… (like a Flutter app's own web/ folder)."
@@ -141,6 +146,7 @@ object SartPlugin extends AutoPlugin {
     sartGoldenDir  := baseDirectory.value / "sart-golden",
     sartAssets     := Seq.empty,
     sartWebDir     := None,
+    sartWireMappings := Map.empty,
     sartPubspecLock := None,
     sartLibraries  := Seq.empty,
     sartStrict     := false,
@@ -214,8 +220,9 @@ object SartPlugin extends AutoPlugin {
       if (libraryArgs.nonEmpty)
         log.info(s"sbt-sart: compiling through ${libJarFiles.size} library jar(s), ${projectEntries.size} dependsOn project(s)")
       val strictArgs = if (sartStrict.value) Seq("--strict") else Seq.empty
+      val wireArgs = sartWireMappings.value.toSeq.sortBy(_._1).map { case (k, v) => s"--wire-mapping=$k=$v" }
 
-      val args = strictArgs ++ libraryArgs ++ Seq(
+      val args = strictArgs ++ wireArgs ++ libraryArgs ++ Seq(
         exClasses.getAbsolutePath,
         inspectorCp,
         outDir.getAbsolutePath,

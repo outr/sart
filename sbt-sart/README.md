@@ -48,6 +48,7 @@ Then:
 | `sartPubspecLock`        | `None`                         | A `pubspec.lock` copied into `<out>/` on emit so `flutter pub get` resolves exactly those versions. |
 | `sartWebDir`             | `None`                         | Directory overlaid onto the scaffolded `<out>/web/` (custom `index.html`, `flutter_bootstrap.js`, icons) before `flutter build web`. |
 | `sartLibraries`          | `Seq.empty`                    | Dependencies (`ModuleID`s) whose TASTy also compiles through to Dart. `dependsOn` projects are always included. |
+| `sartWireMappings`       | `Map.empty`                    | Wire-primitive foreign types (`"lightdb.id.Id" -> "String"`): mapped in type position, cast/delegated in the synthesized codecs. |
 | `sartStrict`             | `false`                        | Fail `sartEmit` on any untranslatable construct, reported at its Scala source location. |
 
 ## Implementation notes

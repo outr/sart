@@ -28,6 +28,8 @@ object Main:
     val (flags, positional) = args.toList.partition(_.startsWith("--"))
     val strict = flags.contains("--strict")
     val libraries = flags.collect { case f if f.startsWith("--library=") => f.stripPrefix("--library=") }
+    val wireMappings = flags.collect { case f if f.startsWith("--wire-mapping=") => f.stripPrefix("--wire-mapping=") }
+      .flatMap { m => m.split("=", 2) match { case Array(a, b) => Some(a -> b); case _ => None } }.toMap
 
     if positional.length < 3 || positional.length > 6 then
       System.err.println(
@@ -55,7 +57,7 @@ object Main:
     if libraries.nonEmpty then
       println(s"Compiling through ${libJars.size} library jar(s) and ${libDirs.size} project dir(s)")
 
-    val emitter = new DartEmitter(outDir, sourceRoot, projectName, projectDesc)
+    val emitter = new DartEmitter(outDir, sourceRoot, projectName, projectDesc, wireMappings)
     val ok = TastyInspector.inspectAllTastyFiles(tastyFiles, jars, classpath)(emitter)
     if !ok then
       System.err.println("TASTy inspection failed")

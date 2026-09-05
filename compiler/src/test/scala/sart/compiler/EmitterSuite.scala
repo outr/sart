@@ -56,7 +56,12 @@ class EmitterSuite extends FunSuite:
       codeSourcePath(classOf[scala.Option[?]]),        // scala-library
       codeSourcePath(classOf[sart.dart.native])        // sart-dart annotations
     ).distinct
-    val emitter = new DartEmitter(outDir)
+    val emitter = new DartEmitter(outDir, wireMappings = Map(
+      "fxforeign.FxId"      -> "String",
+      "fxforeign.FxStamp"   -> "int",
+      "fxforeign.FxWrapped" -> "FxWrapTarget",
+      "fxforeign.FxDir"     -> "String"
+    ))
     val ok = TastyInspector.inspectAllTastyFiles(tastyFiles, Nil, cp)(emitter)
     require(ok, "TASTy inspection failed")
     emitter.writeOutput()
@@ -722,4 +727,69 @@ class EmitterSuite extends FunSuite:
     assert(t.contains("(json['tags'] as List<dynamic>)"), t)
     assert(t.contains(".toSet()"), t)
     assert(t.contains("geoms.map((e) => e.toJson()).toList(),"), t)
+  }
+
+  test("wire-mapped foreign types: primitives in type position, codecs cast/delegate") {
+    val r = classBody("FxRow")
+    assert(r.contains("final String id;"), r)
+    assert(r.contains("final int created;"), r)
+    assert(r.contains("final FxWrapTarget who;"), r)
+    assert(!r.contains("class FxRow extends"), "foreign parent must be dropped: " + r)
+    assert(r.contains("(json['_id'] as String)"), r)
+    assert(r.contains("(json['created'] as num).toInt()"), r)
+    assert(r.contains("FxWrapTarget.fromJson(json['who'] as Map<String, dynamic>)"), r)
+    assert(r.contains("'who': who.toJson(),"), r)
+    assert(emittedMain.contains("// `FxRow` companion extends a JVM-only base — not emitted"), "schema companion must be skipped")
+    assert(!emittedMain.contains("schemaThing"), "schema companion members must not emit")
+    assert(classBody("FxRowUse").contains("return r.id;"), classBody("FxRowUse"))
+  }
+
+  test("members with JVM-only signatures are skipped with a comment") {
+    val ops = classBody("FxRowOps")
+    assert(ops.contains("// `schemaLookup` has a JVM-only signature (no Dart form) — not emitted"), ops)
+    assert(!ops.contains("schemaLookup("), ops)
+    assert(ops.contains("static int fine()"), ops)
+  }
+
+  test("wire-mapped constructions: wrappers are transparent, class targets construct") {
+    val m = classBody("FxRowMake")
+    assert(m.contains("return FxRow('r1', 5, FxWrapTarget('a', 1));"), m)
+  }
+
+
+  test("case objects of a String-mapped foreign enumeration emit wire literals") {
+    val d = classBody("FxDirUse")
+    assert(d.contains("return d == 'FxDir.Up';"), d)
+  }
+
+  test("toString on an emitted enum is its wire value (toJson)") {
+    assert(emittedMain.contains("FxColorLabel"), "fixture present")
+    val l = classBody("FxColorLabel")
+    assert(l.contains("return c.toJson();"), l)
+  }
+
+  test("two-arg RW.enumeration yields bare member wire names") {
+    val sig = classBody("FxSignal", kind = "enum")
+    assert(sig.contains("FxSignal.Sell => 'Sell',"), sig)
+  }
+
+  test("underscore-strip collisions fall back to a trailing underscore") {
+    val b = classBody("FxBoth")
+    assert(b.contains("final int id;"), b)
+    assert(b.contains("final String id_;"), b)
+    assert(b.contains("json['_id']"), b)
+    assert(classBody("FxBothUse").contains("return b.id_;"), classBody("FxBothUse"))
+  }
+
+  test("flatMap over Option-returning lambdas guards nulls; mkString getter and Set forms map to join") {
+    val f = classBody("FxFlatOpt")
+    assert(f.contains("== null ? const [] : ["), f)
+    assert(f.contains(".join()"), f)
+    assert(f.contains("s.join(', ')"), f)
+  }
+
+  test("flatten: Option elements null-guard, List elements spread") {
+    val f = classBody("FxFlattenKinds")
+    assert(f.contains("vOpt == null ? const [] : [vOpt]"), f)
+    assert(f.contains(".expand((x) => x).toList()"), f)
   }
