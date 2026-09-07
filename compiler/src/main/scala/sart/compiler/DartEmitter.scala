@@ -890,6 +890,7 @@ class DartEmitter(
           // the actual Dart extension.
           if hasNative(dd.symbol) then recordAnnotations(dd.symbol)
           else emitExtensionMethod(dd)
+        else if dd.returnTpt.tpe.dealias.typeSymbol.fullName == "scala.Conversion" then ()
         else emitTopLevelDef(dd)
       case vd: ValDef =>
         // The value side of a facade `object` (`val Uri = Uri$()`) has no
@@ -900,6 +901,7 @@ class DartEmitter(
           c.exists && hasNative(c)
         }))
         if nativeModule then recordAnnotations(vd.symbol)
+        else if vd.tpt.tpe.dealias.typeSymbol.fullName == "scala.Conversion" then ()
         else emitTopLevelVal(vd)
       case _ =>
         line(todo(s"top-level: ${t.getClass.getSimpleName}"))
@@ -2450,6 +2452,8 @@ class DartEmitter(
         enumParentOf(cls) match
           case Some(parent) => s"${dartName(parent)}.${cls.name.stripSuffix("$")}"
           case None         => if constChainOk(cls) then s"const ${dartName(cls)}()" else s"${dartName(cls)}()"
+      case t @ (Ident("Nil") | Select(_, "Nil")) if t.symbol.exists && t.symbol.fullName.startsWith("scala.") =>
+        "[]"
       case id @ Ident(name) =>
         // `@DartName`d facade objects (`DartInt` → `int`) emit their Dart
         // name — the Scala identifier only exists to dodge a keyword or a
@@ -2561,6 +2565,18 @@ class DartEmitter(
       // `new Foo(args)` → `Foo(args)`. For facade classes (@native) we keep
       // Scala named args as Dart named args (Dart constructor is named-form).
       // For user classes we strip names — the emitted Dart ctor is positional.
+      // A given `Conversion[A, B].apply(x)` where A is a wire-mapped type
+      // (Id, AuthToken, EmailAddress, Timestamp, …) is the transparent
+      // accessor bridge: A and B share one Dart representation, so the
+      // conversion is identity — emit just the value. This lets the port
+      // consume rich shared DTOs (`user.id` where a String is wanted)
+      // without `.value`/`.token` noise; the JVM conversion body never
+      // reaches Dart.
+      case Apply(fn, List(arg)) if isConversionApply(fn) =>
+        emitExpr(arg)
+      case Apply(TypeApply(fn, _), List(arg)) if isConversionApply(fn) =>
+        emitExpr(arg)
+
       case Apply(Select(New(tpt), _), args) if wireMappings.contains(tpt.tpe.typeSymbol.fullName) =>
         emitWireMappedCtor(wireMappings(tpt.tpe.typeSymbol.fullName), args)
       case Apply(Select(New(tpt), _), args) =>
@@ -2828,6 +2844,16 @@ class DartEmitter(
         s"[...${emitExpr(lhs)}, ${emitExpr(rhs)}]"
       case Apply(TypeApply(Select(lhs, name), _), List(rhs)) if isListLikeReceiver(lhs) && (name == "+:" || name == "prepended") =>
         s"[${emitExpr(rhs)}, ...${emitExpr(lhs)}]"
+      // Scala cons `x :: xs` desugars to `xs.::(x)` (right-assoc); `a ::: b`
+      // to `b.:::(a)`. Receiver is the list, arg the prepended element/list.
+      case Apply(Select(lhs, "::"), List(rhs)) if isListLikeReceiver(lhs) =>
+        s"[${emitExpr(rhs)}, ...${emitExpr(lhs)}]"
+      case Apply(TypeApply(Select(lhs, "::"), _), List(rhs)) if isListLikeReceiver(lhs) =>
+        s"[${emitExpr(rhs)}, ...${emitExpr(lhs)}]"
+      case Apply(Select(lhs, ":::"), List(rhs)) if isListLikeReceiver(lhs) =>
+        s"[...${emitExpr(rhs)}, ...${emitExpr(lhs)}]"
+      case Apply(TypeApply(Select(lhs, ":::"), _), List(rhs)) if isListLikeReceiver(lhs) =>
+        s"[...${emitExpr(rhs)}, ...${emitExpr(lhs)}]"
 
       // `xs(i)` (index access) → `xs[i]`.
       case Apply(Select(recv, "apply"), List(idx)) if isListLikeReceiver(recv) =>
@@ -3021,6 +3047,25 @@ class DartEmitter(
             case List(a) => emitExpr(a)
             case _       => todo(s"wire-mapped $target construction with ${cleaned.size} args")
         case cls => s"$cls(${cleaned.map(emitExpr).mkString(", ")})"
+
+    /** An application of `scala.Conversion.apply` — a Scala 3 given
+     *  conversion firing at an adaptation site. */
+    private def isConversionApply(fn: Term): Boolean =
+      val s = fn.symbol
+      def derivesConversion(t: TypeRepr): Boolean =
+        t.widen.dealias.baseClasses.exists(_.fullName == "scala.Conversion")
+      (s.exists && s.name == "apply" && s.owner.exists && s.owner.fullName == "scala.Conversion")
+        || derivesConversion(fn.tpe)
+        || (fn match { case Select(qual, "apply") => derivesConversion(qual.tpe); case _ => false })
+
+    /** A given conversion is identity in Dart when its source and result
+     *  erase to the SAME Dart type — the essence of the wire-mapped
+     *  bridge (`Id[T]` and `String` are both `String`; `List[Id[T]]` and
+     *  `List[String]` are both `List<String>`). Guarded so a genuine
+     *  value-changing conversion (`Int` → `String`) is never dropped.
+     */
+    private def conversionIsIdentity(arg: Term, app: Term): Boolean =
+      emitTypeRef(arg.tpe.widen.dealias) == emitTypeRef(app.tpe.widen.dealias)
 
     private def isNativeSingleton(t: Term): Boolean =
       val sym = t.tpe.termSymbol
@@ -3287,8 +3332,20 @@ class DartEmitter(
       val recvFqn = qual.tpe.widen.dealias.typeSymbol match
         case s if s.exists => s.fullName
         case _             => ""
-      if name == "value" && wireMappings.get(recvFqn).exists(Set("String", "int", "double", "bool", "dynamic")) then
-        return emitExpr(qual)
+      val prims = Set("String", "int", "double", "bool", "dynamic")
+      if wireMappings.get(recvFqn).exists(prims) then
+        val member = qual.tpe.widen.dealias.typeSymbol.methodMember(name).headOption
+          .orElse(Option(qual.tpe.widen.dealias.typeSymbol.fieldMember(name)).filter(_.exists))
+        def resultType(t: TypeRepr): TypeRepr = t match
+          case mt: MethodType => resultType(mt.resType)
+          case pt: PolyType   => resultType(pt.resType)
+          case bt: ByNameType => bt.underlying
+          case r              => r
+        val returnsSamePrim = member.exists { m =>
+          try emitTypeRef(resultType(m.termRef.widen.dealias)) == wireMappings(recvFqn)
+          catch case _: Throwable => false
+        }
+        if returnsSamePrim then return emitExpr(qual)
       // `.toString` on an emitted enumeration is the WIRE string: emit
       // `toJson()`. (For default-style enums Dart's own toString produces
       // the same "Parent.Member" text; toJson also honours @JsonTag / RW
@@ -3563,6 +3620,7 @@ class DartEmitter(
       // but a spread literal computes the element LUB — matching Scala's
       // `++` unification (List[Text] ++ List[Card] → List[Widget]).
       listCall("++")        (c => s"[...(${c.prefix.stripSuffix(".")}), ...(${c.args})]"),
+      listCall("filterNot") (c => s"${c.prefix}where((eNot) => !((${c.args})(eNot))).toList()"),
       listCall("concat")    (c => s"(${c.prefix.stripSuffix(".")} + ${c.args})"),
       listCall("filter")    (c => s"${c.prefix}where(${c.args}).toList()"),
       listCall("withFilter")(c => s"${c.prefix}where(${c.args}).toList()"),
@@ -4279,6 +4337,15 @@ class DartEmitter(
       case TypedOrTest(u: Unapply, tpt) =>
         emitUnapplyPattern(u, body, explicitType = Some(tpt.tpe))
 
+      // A case object in PATTERN position: emit the object pattern
+      // `Foo()` (a TYPE test — required for Dart sealed-switch
+      // exhaustiveness), not the `const Foo()` VALUE form. Enum-hierarchy
+      // members match as their qualified constant `Parent.Member`.
+      case t @ (Ident(_) | Select(_, _)) if caseObjectValueClass(t.symbol).isDefined =>
+        val cls = caseObjectValueClass(t.symbol).get
+        enumParentOf(cls) match
+          case Some(parent) => s"${dartName(parent)}.${cls.name.stripSuffix("$")}"
+          case None         => s"${dartName(cls)}()"
       case s: Select => emitExpr(s)
       case Ident(n)  => n
       case _         => todo(s"pattern ${p.getClass.getSimpleName}")

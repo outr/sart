@@ -484,3 +484,38 @@ class FxFlattenKinds:
 case class FxMappedAway(x: Int)
 class FxMappedUse:
   def wrap(): FxMappedAway = FxMappedAway(1)
+
+// Transparent-accessor bridge: a given Conversion from a wire-mapped type
+// erases to the value itself.
+import scala.language.implicitConversions
+given fxIdToString: Conversion[fxforeign.FxUserId, String] = _.value
+
+class FxBridgeUse:
+  def needString(s: String): String = s
+  def go(id: fxforeign.FxUserId): String = needString(id)
+
+// Conversion givens are compile-only bridges; they must not emit.
+import scala.language.implicitConversions as implicitConversions2
+given fxStampToInt: Conversion[fxforeign.FxStamp, Int] = _.value.toInt
+class FxStampUse:
+  def year(s: fxforeign.FxStamp): Int = s
+
+class FxConsOps:
+  def cons(x: Int, xs: List[Int]): List[Int] = x :: xs
+  def concat(a: List[Int], b: List[Int]): List[Int] = a ::: b
+
+class FxNilFilter:
+  def empty(): List[Int] = Nil
+  def evens(xs: List[Int]): List[Int] = xs.filterNot(x => x % 2 == 1)
+
+// Case object in a mixed sealed hierarchy, matched: object pattern, not const.
+sealed trait FxSt
+object FxSt:
+  case object A extends FxSt
+  case object B extends FxSt
+  case class C(n: Int) extends FxSt
+class FxStMatch:
+  def f(t: FxSt): Int = t match
+    case FxSt.A => 0
+    case FxSt.B => 1
+    case FxSt.C(n) => n

@@ -61,7 +61,8 @@ class EmitterSuite extends FunSuite:
       "fxforeign.FxStamp"   -> "int",
       "fxforeign.FxWrapped" -> "FxWrapTarget",
       "fxforeign.FxDir"     -> "String",
-      "sart.compiler.fixtures.FxMappedAway" -> "FxWrapTarget"
+      "sart.compiler.fixtures.FxMappedAway" -> "FxWrapTarget",
+      "fxforeign.FxUserId"  -> "String"
     ))
     val ok = TastyInspector.inspectAllTastyFiles(tastyFiles, Nil, cp)(emitter)
     require(ok, "TASTy inspection failed")
@@ -592,7 +593,7 @@ class EmitterSuite extends FunSuite:
     assert(parent.contains("if (t == 'FxToken.EOF') return FxTokenEOF.fromJson(json);"), parent)
     val use = classBody("FxTokenUse")
     assert(use.contains("return const FxTokenEOF();"), use)
-    assert(use.contains("const FxTokenEOF() => true"), use)
+    assert(use.contains("FxTokenEOF() => true") && !use.contains("const FxTokenEOF() => true"), use)
 
   }
 
@@ -798,4 +799,29 @@ class EmitterSuite extends FunSuite:
   test("a wire-mapped user type emits no class of its own; references use the target") {
     assert(!emittedMain.contains("class FxMappedAway"), "wire-mapped class must not emit")
     assert(classBody("FxMappedUse").contains("FxWrapTarget(1)"), classBody("FxMappedUse"))
+  }
+
+  test("a given Conversion from a wire-mapped type erases to identity") {
+    val b = classBody("FxBridgeUse")
+    assert(b.contains("return needString(id);"), b)
+    assert(!b.contains(".apply("), b)
+    assert(!b.contains(".value"), b)
+  }
+
+  test("Scala :: and ::: lower to Dart spread literals") {
+    val b = classBody("FxConsOps")
+    assert(b.contains("[x, ...xs]"), b)
+    assert(b.contains("[...a, ...b]"), b)
+  }
+
+  test("Nil emits an empty list and filterNot maps to negated where") {
+    val b = classBody("FxNilFilter")
+    assert(b.contains("return [];"), b)
+    assert(b.contains(".where((eNot) => !("), b)
+  }
+
+  test("case objects in pattern position emit object patterns for sealed exhaustiveness") {
+    val b = classBody("FxStMatch")
+    assert(b.contains("FxStA() =>"), b)
+    assert(!b.contains("const FxStA() =>"), b)
   }

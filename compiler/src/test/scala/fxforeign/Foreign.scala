@@ -13,3 +13,5 @@ sealed trait FxDir
 object FxDir:
   case object Up extends FxDir
   case object Down extends FxDir
+
+case class FxUserId(value: String)
