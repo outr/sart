@@ -825,3 +825,18 @@ class EmitterSuite extends FunSuite:
     assert(b.contains("FxStA() =>"), b)
     assert(!b.contains("const FxStA() =>"), b)
   }
+
+  test("js_interop: extension type + external globals + toJS") {
+    val ei = emittedMain.indexOf("extension type FxHls")
+    assert(emittedMain.substring(0, ei).takeRight(220).contains("@JS('Hls')"), emittedMain.substring(0, ei).takeRight(220))
+    val hls = classBody("FxHls", kind = "extension type")
+    assert(hls.contains("external FxHls(JSObject config);"), hls)
+    assert(hls.contains("external void loadSource(String url);"), hls)
+    assert(emittedMain.contains("@JS('window.Hls')"), "external global")
+    assert(emittedMain.contains("external JSAny fxHlsGlobal") || emittedMain.contains("external JSAny get fxHlsGlobal"), "external getter")
+    val use = classBody("FxHlsUse")
+    assert(use.contains("return FxHls(cfg);"), use)
+    assert(use.contains("h.loadSource(u)"), use)
+    assert(use.contains("'GET'.toJS"), use)
+    assert(emittedMain.contains("import 'dart:js_interop';"), "import")
+  }

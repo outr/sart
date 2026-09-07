@@ -882,6 +882,15 @@ class DartEmitter(
           emitClassDef(cd)
 
     private def runTopOther(t: Tree): Unit = t match
+      case dd: DefDef if jsGlobalName(dd.symbol).isDefined =>
+        // `@JsGlobal("x")` → `@JS(x) external <sig>` (get for 0-arg).
+        imports += "dart:js_interop"
+        val js = jsGlobalName(dd.symbol).get
+        val tag = if js.nonEmpty then js else dartFieldIdent(dd.name)
+        emitSourceAttribution(dd.symbol)
+        line(s"@JS('$tag')")
+        line(externalMemberDecl(dd))
+        blank()
       case dd: DefDef =>
         if dd.symbol.flags.is(Flags.ExtensionMethod) then
           // @native extension defs are facades for REAL Dart extensions
@@ -1368,6 +1377,59 @@ class DartEmitter(
       try emitClassDefInner(cd, sym)
       finally currentFieldOwner = savedFieldOwner
 
+    /** `@JsType(js)` — the JS name to bind, or the Dart name when empty. */
+    private def jsTypeName(sym: Symbol): Option[String] =
+      relatedSyms(sym).flatMap(_.annotations).collectFirst {
+        case a if annoFqn(a) == "sart.dart.JsType" =>
+          constArgs(a).collectFirst { case s: String => s }.getOrElse("")
+      }
+
+    private def jsGlobalName(sym: Symbol): Option[String] =
+      relatedSyms(sym).flatMap(_.annotations).collectFirst {
+        case a if annoFqn(a) == "sart.dart.JsGlobal" =>
+          constArgs(a).collectFirst { case s: String => s }.getOrElse("")
+      }
+
+    /** Render one method as a Dart js_interop `external` declaration. */
+    private def externalMemberDecl(dd: DefDef): String =
+      val retType = emitTypeRef(dd.returnTpt.tpe)
+      val params  = dd.paramss.flatMap(_.params).collect { case vd: ValDef => vd }
+      val name    = dartFieldIdent(dd.name)
+      if params.isEmpty && dd.paramss.isEmpty then s"external $retType get $name;"
+      else
+        val ps = params.map(v => s"${emitTypeRef(v.tpt.tpe)} ${dartSafeName(v.name)}").mkString(", ")
+        s"external $retType $name($ps);"
+
+    /** Emit a Scala class as a Dart js_interop extension type over
+     *  `JSObject`, with `@JS`, an `external` constructor, and `external`
+     *  members. imports dart:js_interop.
+     */
+    private def emitJsExtensionType(cd: ClassDef, sym: Symbol, jsName: String): Unit =
+      imports += "dart:js_interop"
+      recordAnnotations(sym)
+      val name = dartName(sym)
+      val tag  = if jsName.nonEmpty then jsName else name
+      emitSourceAttribution(sym)
+      line(s"@JS('$tag')")
+      line(s"extension type $name._(JSObject _) implements JSObject {")
+      indent += 1
+      // Primary-constructor params → external constructor.
+      val ctor = cd.constructor
+      val ctorParams = ctor.paramss.flatMap(_.params).collect { case vd: ValDef => vd }
+      if ctorParams.nonEmpty then
+        val ps = ctorParams.map(v => s"${emitTypeRef(v.tpt.tpe)} ${dartSafeName(v.name)}").mkString(", ")
+        line(s"external $name($ps);")
+      else
+        line(s"external $name();")
+      for stat <- cd.body do stat match
+        case dd: DefDef if !dd.symbol.flags.is(Flags.Synthetic) && dd.symbol.name != "<init>" =>
+          emitSourceAttribution(dd.symbol)
+          line(externalMemberDecl(dd))
+        case _ => ()
+      indent -= 1
+      line("}")
+      blank()
+
     private def emitClassDefInner(cd: ClassDef, sym: Symbol): Unit =
 
       // `runTop` already filters by name (skips $-ending companions unless
@@ -1375,6 +1437,9 @@ class DartEmitter(
       // synthetic classes, so here we only guard against stray inner
       // synthesised helpers that somehow reached emitClassDef.
       if sym.flags.is(Flags.Synthetic) then return
+      if jsTypeName(sym).isDefined then
+        emitJsExtensionType(cd, sym, jsTypeName(sym).get)
+        return
       if isEnumHierarchy(sym) then
         emitEnumHierarchy(cd)
         return

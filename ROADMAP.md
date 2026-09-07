@@ -292,9 +292,12 @@ full support:
 3. **Generators.** One `sync*`/`yield` site (ws durable client). Scala
    has no `yield`-generator syntax to translate FROM — the port rewrites
    that one iterator explicitly; nothing to build in Sart.
-4. **JS interop authoring.** 7 `dart:js_interop` hits + one extension
-   type (hls.js binding); representable as @native facades once (1)
-   exists.
+4. **JS interop authoring.** ✅ Landed (2026-09-07): `@JsType(jsName)`
+   emits a Dart `extension type X._(JSObject _) implements JSObject` with
+   `external` ctor/members; `@JsGlobal(jsName)` emits top-level `@JS
+   external`; `sart.dart.js_interop` provides JSObject/JSAny/JSString/…
+   and `.toJS`/`.toDart`/`dartify`. The exact emitted syntax passes
+   `dart analyze` (hls.js binding validated).
 5. **Facades (mechanical, facadegen).** ~20 packages: media_kit(+video),
    webview_flutter(×3), youtube_player_iframe, lottie, flutter_map,
    fl_chart, qr_flutter, opus/pcm audio, multicast_dns, crypto,

@@ -519,3 +519,18 @@ class FxStMatch:
     case FxSt.A => 0
     case FxSt.B => 1
     case FxSt.C(n) => n
+
+// dart:js_interop authoring: an extension type binding + external global.
+import sart.dart.{JsType, JsGlobal, JSObject, JSAny, JSString, JSNumber, toJS}
+@JsType("Hls")
+class FxHls(config: JSObject) extends JSObject:
+  def loadSource(url: String): Unit = native.value
+  def destroy(): Unit = native.value
+
+@JsGlobal("window.Hls")
+def fxHlsGlobal: JSAny = native.value
+
+class FxHlsUse:
+  def make(cfg: JSObject): FxHls = FxHls(cfg)
+  def load(h: FxHls, u: String): Unit = h.loadSource(u)
+  def tag(): JSString = "GET".toJS

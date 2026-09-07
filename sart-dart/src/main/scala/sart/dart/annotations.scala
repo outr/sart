@@ -217,3 +217,23 @@ object Futures:
    */
   def delayed(duration: Any, body: () => Unit): scala.concurrent.Future[Unit] =
     scala.concurrent.Future.successful(body())
+
+// ─── dart:js_interop authoring ─────────────────────────────────────────────
+//
+// Author browser-JS bindings in Scala. Unlike @native (which binds an
+// EXISTING Dart declaration and emits nothing), these EMIT js_interop
+// Dart: an `extension type` over `JSObject`, or top-level `@JS external`
+// members. The class/def bodies are `native.value` — never run on the
+// JVM; Sart replaces them with `external`.
+
+/** Emit the annotated class as a Dart js_interop `extension type`:
+ *  `@JS("<jsName>") extension type <Name>._(JSObject _) implements JSObject`.
+ *  Every method becomes `external`; the primary constructor becomes an
+ *  `external` constructor. Bind a JS class/global (`@JsType("Hls")`).
+ */
+final class JsType(val jsName: String = "") extends StaticAnnotation
+
+/** A top-level `@JS("<jsName>") external` member — a JS global function,
+ *  getter, or value. On a parameterless def Sart emits `external get`.
+ */
+final class JsGlobal(val jsName: String = "") extends StaticAnnotation
