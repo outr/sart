@@ -112,10 +112,21 @@ lazy val `flutter-facades` = (project in file("flutter-facades"))
     name := "flutter-facades"
   )
 
+// A general-purpose cross-platform video/audio player, authored in Scala.
+// Published like the other core modules and consumed via `sartLibraries`
+// (or a project dependency). Extracted from the NaboTV player as a
+// reusable library — Nabo specifics removed.
+lazy val `sart-player` = (project in file("sart-player"))
+  .dependsOn(`sart-dart`, `sart-stdlib`, `flutter-facades`)
+  .settings(
+    name := "sart-player",
+    Compile / scalacOptions ++= Seq("-Yretain-trees")
+  )
+
 // The user program — the pure-Scala counter app. Its `.tasty` files are
 // the input to the Sart compiler.
 lazy val example = (project in file("example"))
-  .dependsOn(`flutter-facades`, `sart-stdlib`)
+  .dependsOn(`flutter-facades`, `sart-stdlib`, `sart-player`)
   .settings(
     name := "sart-example",
     // Keep TASTy around so the compiler can read it.
@@ -159,7 +170,7 @@ lazy val `sart-facadegen` = (project in file("sart-facadegen"))
   )
 
 lazy val root = (project in file("."))
-  .aggregate(`sart-dart`, `sart-stdlib`, `flutter-facades`, example, compiler, `sart-facadegen`)
+  .aggregate(`sart-dart`, `sart-stdlib`, `flutter-facades`, `sart-player`, example, compiler, `sart-facadegen`)
   .settings(
     name := "sart",
 
@@ -192,8 +203,14 @@ lazy val root = (project in file("."))
       // The 4th arg is the source root that the emitter uses to
       // relativise `/// Source:` attribution comments.
       val sourceRoot = baseDirectory.value.getAbsolutePath
+      // The sart-player library is a dependency: emit its classes too
+      // (the CLI --library= compile-through, as the sbt-sart plugin does
+      // for sartLibraries / dependsOn projects).
+      val playerClasses = (`sart-player` / Compile / classDirectory).value
+      val libArgs = Seq(s"--library=${playerClasses.getAbsolutePath}")
       val rc = sys.process.Process(Seq(
-        "java", "-cp", runCp, "sart.compiler.Main",
+        "java", "-cp", runCp, "sart.compiler.Main"
+      ) ++ libArgs ++ Seq(
         exClasses.getAbsolutePath, cp, outDir.getAbsolutePath, sourceRoot
       )).!
       if (rc != 0) sys.error(s"sart.compiler.Main exited $rc")
@@ -479,6 +496,7 @@ lazy val root = (project in file("."))
       (`sart-dart` / publishLocal).value
       (`sart-stdlib` / publishLocal).value
       (`flutter-facades` / publishLocal).value
+      (`sart-player` / publishLocal).value
       (compiler / publishLocal).value
 
       // sbt-sart/ is its own sbt build (cross-built: Scala 2.12 → sbt 1.x,

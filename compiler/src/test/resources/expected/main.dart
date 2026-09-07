@@ -422,27 +422,27 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-/// Source: example/src/main/scala/example/apps/PlayerApp.scala:15
+/// Source: example/src/main/scala/example/apps/PlayerApp.scala:12
 class PlayerApp extends StatefulWidget {
-  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:16
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:13
   @override
   State<PlayerApp> createState() {
     return PlayerAppState();
   }
 }
 
-/// Source: example/src/main/scala/example/apps/PlayerApp.scala:18
+/// Source: example/src/main/scala/example/apps/PlayerApp.scala:15
 class PlayerAppState extends State<PlayerApp> {
-  late VideoPlayerController video;
-  late VideoPlayerController audio;
+  late PlayerController video;
+  late PlayerController audio;
   bool ready = false;
 
-  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:23
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:20
   @override
   void initState() async {
     super.initState();
-    video = VideoPlayerController.networkUrl(Uri.parse('sample.mp4'));
-    audio = VideoPlayerController.networkUrl(Uri.parse('sample.mp3'));
+    video = PlayerController(NetworkSource('sample.mp4'));
+    audio = PlayerController(NetworkSource('sample.mp3'));
     (await video.initialize());
     (await audio.initialize());
     setState(() {
@@ -450,7 +450,7 @@ class PlayerAppState extends State<PlayerApp> {
     });
   }
 
-  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:31
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:28
   @override
   void dispose() {
     video.dispose();
@@ -458,7 +458,7 @@ class PlayerAppState extends State<PlayerApp> {
     super.dispose();
   }
 
-  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:36
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:33
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -469,11 +469,7 @@ class PlayerAppState extends State<PlayerApp> {
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(
-                    width: 320.0,
-                    height: 240.0,
-                    child: VideoPlayer(video),
-                  ),
+                  SizedBox(width: 320.0, height: 240.0, child: video.view),
                   SizedBox(height: 16.0),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -2045,5 +2041,141 @@ class Wrapping {
   /// Source: example/src/main/scala/example/features/Generics.scala:16
   Box<T> wrap<T>(T value) {
     return Box<T>(value);
+  }
+}
+
+/// Source: sart-player/src/main/scala/sart/player/Player.scala:12
+class AssetSource extends MediaSource {
+  final String name;
+  AssetSource(this.name);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is AssetSource && other.name == name;
+
+  @override
+  int get hashCode => name.hashCode;
+
+  @override
+  String toString() => 'AssetSource(name: $name)';
+
+  AssetSource copyWith({String? name}) => AssetSource(name ?? this.name);
+  static AssetSource fromJson(Map<String, dynamic> json) =>
+      AssetSource((json['name'] as String));
+
+  @override
+  Map<String, dynamic> toJson() => {'name': name, 'type': 'AssetSource'};
+}
+
+/// Source: sart-player/src/main/scala/sart/player/Player.scala:10
+sealed class MediaSource {
+  static MediaSource fromJson(Map<String, dynamic> json) {
+    final String t = json['type'] as String;
+    if (t == 'NetworkSource') return NetworkSource.fromJson(json);
+    if (t == 'AssetSource') return AssetSource.fromJson(json);
+    throw Exception('Unsupported type: ' + t);
+  }
+
+  Map<String, dynamic> toJson();
+}
+
+/// Source: sart-player/src/main/scala/sart/player/Player.scala:11
+class NetworkSource extends MediaSource {
+  final String url;
+  NetworkSource(this.url);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is NetworkSource && other.url == url;
+
+  @override
+  int get hashCode => url.hashCode;
+
+  @override
+  String toString() => 'NetworkSource(url: $url)';
+
+  NetworkSource copyWith({String? url}) => NetworkSource(url ?? this.url);
+  static NetworkSource fromJson(Map<String, dynamic> json) =>
+      NetworkSource((json['url'] as String));
+
+  @override
+  Map<String, dynamic> toJson() => {'url': url, 'type': 'NetworkSource'};
+}
+
+/// Source: sart-player/src/main/scala/sart/player/Player.scala:20
+class PlayerController {
+  final MediaSource source;
+  PlayerController(this.source);
+
+  late final VideoPlayerController backend = switch (source) {
+    NetworkSource(url: var url) => VideoPlayerController.networkUrl(
+      Uri.parse(url),
+    ),
+    AssetSource(name: var name) => VideoPlayerController.asset(name),
+  };
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:26
+  Future<void> initialize() {
+    return backend.initialize();
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:27
+  Future<void> play() {
+    return backend.play();
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:28
+  Future<void> pause() {
+    return backend.pause();
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:29
+  Future<void> seekTo(Duration position) {
+    return backend.seekTo(position);
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:30
+  Future<void> setLooping(bool looping) {
+    return backend.setLooping(looping);
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:31
+  Future<void> setVolume(double volume) {
+    return backend.setVolume(volume);
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:32
+  Future<void> dispose() {
+    return backend.dispose();
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:34
+  bool get isPlaying {
+    return backend.value.isPlaying;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:35
+  bool get isInitialized {
+    return backend.value.isInitialized;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:36
+  Duration get position {
+    return backend.value.position;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:37
+  Duration get duration {
+    return backend.value.duration;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:38
+  double get aspectRatio {
+    return backend.value.aspectRatio;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:42
+  Widget get view {
+    return VideoPlayer(backend);
   }
 }

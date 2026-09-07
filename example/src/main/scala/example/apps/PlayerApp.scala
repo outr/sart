@@ -1,29 +1,26 @@
 package example.apps
 
 import sart.dart.*
-import sart.stdlib.Uri
+import sart.player.*
 import flutter.material.*
-import example.player.*
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-/** Spike: a cross-platform video/audio player authored entirely in Scala,
- *  over the `video_player` facade. Proves Sart can build a real media
- *  player that actually plays — the de-risking slice for a general
- *  `sart-player` library extracted from NaboPlayer.
+/** Demo of the reusable `sart-player` library (a project dependency here;
+ *  a published `sartLibraries` entry in a real app). Plays a video and an
+ *  audio source through the general-purpose `PlayerController`.
  */
 class PlayerApp extends StatefulWidget:
   override def createState(): State[PlayerApp] = PlayerAppState()
 
 class PlayerAppState extends State[PlayerApp]:
-  private var video: VideoPlayerController = null
-  private var audio: VideoPlayerController = null
+  private var video: PlayerController = null
+  private var audio: PlayerController = null
   private var ready: Boolean = false
 
   override def initState(): Unit =
     super.initState()
-    video = VideoPlayerController.networkUrl(Uri.parse("sample.mp4"))
-    audio = VideoPlayerController.networkUrl(Uri.parse("sample.mp3"))
+    video = PlayerController(NetworkSource("sample.mp4"))
+    audio = PlayerController(NetworkSource("sample.mp3"))
     await(video.initialize())
     await(audio.initialize())
     setState(() => ready = true)
@@ -41,11 +38,7 @@ class PlayerAppState extends State[PlayerApp]:
         else Column(
           mainAxisAlignment = MainAxisAlignment.center,
           children = List(
-            SizedBox(
-              width = 320.0,
-              height = 240.0,
-              child = VideoPlayer(video)
-            ),
+            SizedBox(width = 320.0, height = 240.0, child = video.view),
             SizedBox(height = 16.0),
             Row(
               mainAxisAlignment = MainAxisAlignment.center,
