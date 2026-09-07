@@ -60,7 +60,8 @@ class EmitterSuite extends FunSuite:
       "fxforeign.FxId"      -> "String",
       "fxforeign.FxStamp"   -> "int",
       "fxforeign.FxWrapped" -> "FxWrapTarget",
-      "fxforeign.FxDir"     -> "String"
+      "fxforeign.FxDir"     -> "String",
+      "sart.compiler.fixtures.FxMappedAway" -> "FxWrapTarget"
     ))
     val ok = TastyInspector.inspectAllTastyFiles(tastyFiles, Nil, cp)(emitter)
     require(ok, "TASTy inspection failed")
@@ -792,4 +793,9 @@ class EmitterSuite extends FunSuite:
     val f = classBody("FxFlattenKinds")
     assert(f.contains("vOpt == null ? const [] : [vOpt]"), f)
     assert(f.contains(".expand((x) => x).toList()"), f)
+  }
+
+  test("a wire-mapped user type emits no class of its own; references use the target") {
+    assert(!emittedMain.contains("class FxMappedAway"), "wire-mapped class must not emit")
+    assert(classBody("FxMappedUse").contains("FxWrapTarget(1)"), classBody("FxMappedUse"))
   }

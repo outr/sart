@@ -815,6 +815,10 @@ class DartEmitter(
     private def runTopClass(cd: ClassDef): Unit =
         val sym = cd.symbol
         val name = sym.name
+        // A wire-mapped type contributes no Dart class of its own — every
+        // reference to it emits the mapped target (a primitive or another
+        // emitted class). Its companion/subtypes are handled the same way.
+        if wireMappings.contains(sym.fullName.stripSuffix("$")) then return
         if hasNative(sym) then
           recordAnnotations(sym)
         else if name.endsWith("$package$") || name.endsWith("$package") then

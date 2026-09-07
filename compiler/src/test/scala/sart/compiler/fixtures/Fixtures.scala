@@ -479,3 +479,8 @@ class FxFlatOpt:
 class FxFlattenKinds:
   def opts(xs: List[Option[String]]): List[String] = xs.flatten
   def lists(xs: List[List[Int]]): List[Int] = xs.flatten
+
+// A wire-mapped type emits no Dart class of its own; references use the map.
+case class FxMappedAway(x: Int)
+class FxMappedUse:
+  def wrap(): FxMappedAway = FxMappedAway(1)
