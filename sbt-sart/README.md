@@ -30,6 +30,8 @@ Then:
 - `sbt sartEmit` — compile your Scala 3 code and emit Dart into `out/lib/`.
 - `sbt sartLinux` / `sartWeb` / `sartAndroid` / `sartMacOS` / `sartWindows` /
   `sartIOS` — scaffold the platform embedder and `flutter build` it.
+- `sbt sartTizen` / `sartWebOS` — build for Samsung Tizen and LG webOS
+  Smart TVs (see **Smart TV targets** below).
 - `sbt sartRun` — build the Linux binary and launch it.
 - `sbt sartGoldenVerify` / `sartGoldenAccept` — regression gates against
   a checked-in `sart-golden/` directory.
@@ -50,6 +52,33 @@ Then:
 | `sartLibraries`          | `Seq.empty`                    | Dependencies (`ModuleID`s) whose TASTy also compiles through to Dart. `dependsOn` projects are always included. |
 | `sartWireMappings`       | `Map.empty`                    | Wire-primitive foreign types (`"lightdb.id.Id" -> "String"`): mapped in type position, cast/delegated in the synthesized codecs. |
 | `sartStrict`             | `false`                        | Fail `sartEmit` on any untranslatable construct, reported at its Scala source location. |
+| `sartTizenCommand`       | `"flutter-tizen"`              | The `flutter-tizen` CLI used by `sartTizen`. |
+| `sartWebOSCommand`       | `"flutter-webos"`             | The `flutter-webos` CLI used by `sartWebOS`. |
+
+## Smart TV targets
+
+Flutter reaches Samsung and LG TVs through vendor forks of the Flutter
+CLI, each a drop-in `flutter` replacement that adds its own embedder
+folder and packaging step. Sart emits the same `lib/` + `pubspec.yaml`
+for these as for every other target — only the build command differs —
+so `sartTizen` and `sartWebOS` route the identical emitted app through
+the vendor CLI instead of `flutter`:
+
+- **`sartTizen`** → `flutter-tizen create --platforms=tizen …` then
+  `flutter-tizen build tpk -ptv`, producing a `.tpk` under
+  `out/build/tizen/tpk/`. Requires
+  [`flutter-tizen`](https://developer.samsung.com/smarttv/develop/native/flutter.html)
+  on `PATH` and the Tizen Studio SDK; targets Tizen 6.0+.
+- **`sartWebOS`** → `flutter-webos create --platforms=webos …` then
+  `flutter-webos build webos --release`, producing an `.ipk` under
+  `out/build/webos/`. Requires
+  [`flutter-webos`](https://github.com/lg-flutter-webos) and the webOS
+  NDK on `PATH`.
+
+Point `sartTizenCommand` / `sartWebOSCommand` at an absolute path if the
+CLI isn't on `PATH`. These toolchains are vendor-supplied and not bundled
+with Sart; without them installed the tasks compile and cross-publish but
+the build step needs the CLI (and a device or emulator to `run`).
 
 ## Implementation notes
 

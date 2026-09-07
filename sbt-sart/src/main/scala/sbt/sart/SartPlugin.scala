@@ -126,6 +126,10 @@ object SartPlugin extends AutoPlugin {
     @transient val sartLinux         = taskKey[File]("Build a native Linux bundle from the emitted Dart")
     @transient val sartWeb           = taskKey[File]("Build a Flutter web bundle from the emitted Dart")
     @transient val sartAndroid       = taskKey[File]("Build a Flutter Android debug APK from the emitted Dart")
+    @transient val sartTizen         = taskKey[File]("Build a Samsung Tizen TV .tpk from the emitted Dart (requires flutter-tizen)")
+    @transient val sartWebOS         = taskKey[File]("Build an LG webOS TV .ipk from the emitted Dart (requires flutter-webos)")
+    val sartTizenCommand = settingKey[String]("The flutter-tizen CLI command (default \"flutter-tizen\")")
+    val sartWebOSCommand = settingKey[String]("The flutter-webos CLI command (default \"flutter-webos\")")
     @transient val sartMacOS         = taskKey[File]("Build a Flutter macOS bundle (requires macOS host)")
     @transient val sartWindows       = taskKey[File]("Build a Flutter Windows bundle (requires Windows host)")
     @transient val sartIOS           = taskKey[File]("Build a Flutter iOS bundle — no-codesign (requires macOS + Xcode)")
@@ -146,6 +150,8 @@ object SartPlugin extends AutoPlugin {
     sartGoldenDir  := baseDirectory.value / "sart-golden",
     sartAssets     := Seq.empty,
     sartWebDir     := None,
+    sartTizenCommand := "flutter-tizen",
+    sartWebOSCommand := "flutter-webos",
     sartWireMappings := Map.empty,
     sartPubspecLock := None,
     sartLibraries  := Seq.empty,
@@ -311,6 +317,35 @@ object SartPlugin extends AutoPlugin {
       bundle
     },
 
+    sartTizen := {
+      // Samsung Smart TV. flutter-tizen is a drop-in flutter CLI; scaffolds
+      // a `tizen/` project and builds a `-ptv` .tpk. Ships the same emitted
+      // lib/ + pubspec as every other target.
+      val log    = streams.value.log
+      sartEmit.value
+      val outDir = sartOutDir.value
+      val cmd    = sartTizenCommand.value
+      sbtSartScaffold("tizen", outDir, normalizedName.value, log, cmd)
+      sbtSartBuild("tpk", Seq("-ptv"), outDir, log, cmd)
+      val tpkDir = outDir / "build" / "tizen" / "tpk"
+      log.info(s"sbt-sart: built Tizen .tpk under $tpkDir")
+      tpkDir
+    },
+
+    sartWebOS := {
+      // LG webOS TV. flutter-webos is a drop-in flutter CLI; scaffolds a
+      // `webos/` project (appinfo.json) and builds an .ipk.
+      val log    = streams.value.log
+      sartEmit.value
+      val outDir = sartOutDir.value
+      val cmd    = sartWebOSCommand.value
+      sbtSartScaffold("webos", outDir, normalizedName.value, log, cmd)
+      sbtSartBuild("webos", Seq("--release"), outDir, log, cmd)
+      val ipkDir = outDir / "build" / "webos"
+      log.info(s"sbt-sart: built webOS .ipk under $ipkDir")
+      ipkDir
+    },
+
     sartAndroid := {
       val log    = streams.value.log
       sartEmit.value
@@ -416,23 +451,20 @@ object SartPlugin extends AutoPlugin {
    *  keeps `flutter analyze .` quiet on Sart-generated projects.
    */
   private def sbtSartScaffold(
-    platform: String, outDir: File, projectName: String, log: Logger
+    platform: String, outDir: File, projectName: String, log: Logger,
+    cmd: String = SartPlugin.flutterCmd
   ): Unit = {
-    val platformDir = platform match {
-      case "linux" | "windows" | "macos" | "android" | "ios" => outDir / platform
-      case "web"   => outDir / "web"
-      case other   => outDir / other
-    }
+    val platformDir = outDir / platform
     if (!platformDir.exists()) {
-      log.info(s"sbt-sart: scaffolding Flutter $platform platform")
+      log.info(s"sbt-sart: scaffolding Flutter $platform platform via $cmd")
       val projName = projectName.replace('-', '_')
       val rc = sys.process.Process(
-        Seq(SartPlugin.flutterCmd, "create", s"--platforms=$platform",
+        Seq(cmd, "create", s"--platforms=$platform",
             "--project-name", projName,
-            "--org", "com.example", "--suppress-analytics", "."),
+            "--org", "com.example", "."),
         outDir
       ).!
-      if (rc != 0) sys.error(s"flutter create --platforms=$platform exited $rc")
+      if (rc != 0) sys.error(s"$cmd create --platforms=$platform exited $rc")
       val testFile = outDir / "test" / "widget_test.dart"
       if (testFile.exists()) IO.write(testFile, "void main() {}\n")
       val analysisFile = outDir / "analysis_options.yaml"
@@ -442,13 +474,14 @@ object SartPlugin extends AutoPlugin {
   }
 
   private def sbtSartBuild(
-    target: String, extraArgs: Seq[String], outDir: File, log: Logger
+    target: String, extraArgs: Seq[String], outDir: File, log: Logger,
+    cmd: String = SartPlugin.flutterCmd
   ): Unit = {
-    log.info(s"sbt-sart: flutter build $target ${extraArgs.mkString(" ")}")
+    log.info(s"sbt-sart: $cmd build $target ${extraArgs.mkString(" ")}")
     val rc = sys.process.Process(
-      Seq(SartPlugin.flutterCmd, "build", target, "--suppress-analytics") ++ extraArgs,
+      Seq(cmd, "build", target) ++ extraArgs,
       outDir
     ).!
-    if (rc != 0) sys.error(s"flutter build $target exited $rc")
+    if (rc != 0) sys.error(s"$cmd build $target exited $rc")
   }
 }
