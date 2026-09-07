@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 import 'platform/platform_name.dart';
 import 'sart_either.dart';
 import 'sart_option.dart';
@@ -61,6 +62,7 @@ class LauncherApp extends StatelessWidget {
 /// Source: example/src/main/scala/example/LauncherApp.scala:31
 class LauncherHome extends StatelessWidget {
   final List<Demo> demos = [
+    Demo('Player', 'Cross-platform video/audio', (ctx) => PlayerApp()),
     Demo('Showcase', 'Kitchen-sink feature demo', (ctx) => ShowcaseApp()),
     Demo('Counter', 'Classic Flutter counter', (ctx) => MyHomePage('Counter')),
     Demo('Todos', 'TextField + list + state', (ctx) => TodoApp()),
@@ -69,7 +71,7 @@ class LauncherHome extends StatelessWidget {
     Demo('Two-screen', 'Navigator.push demo', (ctx) => HomeScreen()),
   ];
 
-  /// Source: example/src/main/scala/example/LauncherApp.scala:41
+  /// Source: example/src/main/scala/example/LauncherApp.scala:42
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -415,6 +417,94 @@ class HomeScreen extends StatelessWidget {
           },
           child: Text('Go to detail'),
         ),
+      ),
+    );
+  }
+}
+
+/// Source: example/src/main/scala/example/apps/PlayerApp.scala:15
+class PlayerApp extends StatefulWidget {
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:16
+  @override
+  State<PlayerApp> createState() {
+    return PlayerAppState();
+  }
+}
+
+/// Source: example/src/main/scala/example/apps/PlayerApp.scala:18
+class PlayerAppState extends State<PlayerApp> {
+  late VideoPlayerController video;
+  late VideoPlayerController audio;
+  bool ready = false;
+
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:23
+  @override
+  void initState() async {
+    super.initState();
+    video = VideoPlayerController.networkUrl(Uri.parse('sample.mp4'));
+    audio = VideoPlayerController.networkUrl(Uri.parse('sample.mp3'));
+    (await video.initialize());
+    (await audio.initialize());
+    setState(() {
+      ready = true;
+    });
+  }
+
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:31
+  @override
+  void dispose() {
+    video.dispose();
+    audio.dispose();
+    super.dispose();
+  }
+
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:36
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Sart Player')),
+      body: Center(
+        child: (!ready
+            ? CircularProgressIndicator()
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 320.0,
+                    height: 240.0,
+                    child: VideoPlayer(video),
+                  ),
+                  SizedBox(height: 16.0),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => setState(() {
+                          video.play();
+                        }),
+                        icon: Icon(Icons.play_arrow),
+                        label: Text('Play video'),
+                      ),
+                      SizedBox(width: 12.0),
+                      ElevatedButton.icon(
+                        onPressed: () => setState(() {
+                          video.pause();
+                        }),
+                        icon: Icon(Icons.pause),
+                        label: Text('Pause'),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12.0),
+                  ElevatedButton.icon(
+                    onPressed: () => setState(() {
+                      audio.play();
+                    }),
+                    icon: Icon(Icons.music_note),
+                    label: Text('Play audio'),
+                  ),
+                ],
+              )),
       ),
     );
   }

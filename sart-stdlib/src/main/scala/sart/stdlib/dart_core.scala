@@ -33,3 +33,12 @@ object core:
 /** dart:core FormatException — positional message ctor. */
 @native
 class FormatException(message: String = native.value) extends RuntimeException
+
+/** dart:core Uri. Enough surface for URL-based APIs (video_player, http). */
+@native
+class Uri extends DartObject:
+  override def toString(): String = native.value
+
+@native
+object Uri:
+  def parse(uri: String): Uri = native.value
