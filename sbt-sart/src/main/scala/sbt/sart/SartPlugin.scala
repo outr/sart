@@ -133,6 +133,8 @@ object SartPlugin extends AutoPlugin {
     @transient val sartMacOS         = taskKey[File]("Build a Flutter macOS bundle (requires macOS host)")
     @transient val sartWindows       = taskKey[File]("Build a Flutter Windows bundle (requires Windows host)")
     @transient val sartIOS           = taskKey[File]("Build a Flutter iOS bundle — no-codesign (requires macOS + Xcode)")
+    @transient val sartTvOS          = taskKey[File]("Build an Apple TV (tvOS) bundle from the emitted Dart (requires flutter-tvos + macOS/Xcode)")
+    val sartTvOSCommand = settingKey[String]("The flutter-tvos CLI command (default \"flutter-tvos\")")
     @transient val sartRun           = taskKey[Unit]("Build and launch the generated Linux app")
     @transient val sartGoldenVerify  = taskKey[Unit]("Emit Dart and diff it against sartGoldenDir")
     @transient val sartGoldenAccept  = taskKey[Unit]("Emit Dart and overwrite sartGoldenDir with the new output")
@@ -152,6 +154,7 @@ object SartPlugin extends AutoPlugin {
     sartWebDir     := None,
     sartTizenCommand := "flutter-tizen",
     sartWebOSCommand := "flutter-webos",
+    sartTvOSCommand := "flutter-tvos",
     sartWireMappings := Map.empty,
     sartPubspecLock := None,
     sartLibraries  := Seq.empty,
@@ -393,6 +396,25 @@ object SartPlugin extends AutoPlugin {
       bundle
     },
 
+    sartTvOS := {
+      // Apple TV. Unlike flutter-tizen/webos (additive `--platforms`),
+      // flutter-tvos *substitutes* the flutter CLI and retargets iOS→tvOS:
+      // `flutter-tvos create` (no --platforms) scaffolds a `tvos/` folder,
+      // and the iOS build path produces the tvOS .app. Same emitted lib/ +
+      // pubspec as every other target.
+      val log    = streams.value.log
+      sartEmit.value
+      val outDir = sartOutDir.value
+      val cmd    = sartTvOSCommand.value
+      sbtSartScaffold("tvos", outDir, normalizedName.value, log, cmd, passPlatforms = false)
+      // `--no-codesign` builds the .app without Apple provisioning; for a
+      // signed build users run `flutter-tvos build ipa` with their signing.
+      sbtSartBuild("ios", Seq("--no-codesign"), outDir, log, cmd)
+      val bundle = outDir / "build" / "ios" / "iphoneos" / "Runner.app"
+      log.info(s"sbt-sart: built tvOS bundle at $bundle")
+      bundle
+    },
+
     sartRun := {
       val binary = sartLinux.value
       val rc = sys.process.Process(binary.getAbsolutePath).!
@@ -452,19 +474,23 @@ object SartPlugin extends AutoPlugin {
    */
   private def sbtSartScaffold(
     platform: String, outDir: File, projectName: String, log: Logger,
-    cmd: String = SartPlugin.flutterCmd
+    cmd: String = SartPlugin.flutterCmd, passPlatforms: Boolean = true
   ): Unit = {
     val platformDir = outDir / platform
     if (!platformDir.exists()) {
       log.info(s"sbt-sart: scaffolding Flutter $platform platform via $cmd")
       val projName = projectName.replace('-', '_')
+      // Additive CLIs (flutter, flutter-tizen, flutter-webos) take
+      // `--platforms=X` to graft one embedder onto the project. A CLI that
+      // *substitutes* flutter for a single target (flutter-tvos retargets
+      // iOS→tvOS) rejects that flag — it creates its own folder by default.
+      val platformsArg = if (passPlatforms) Seq(s"--platforms=$platform") else Seq.empty
       val rc = sys.process.Process(
-        Seq(cmd, "create", s"--platforms=$platform",
-            "--project-name", projName,
-            "--org", "com.example", "."),
+        Seq(cmd, "create") ++ platformsArg ++
+          Seq("--project-name", projName, "--org", "com.example", "."),
         outDir
       ).!
-      if (rc != 0) sys.error(s"$cmd create --platforms=$platform exited $rc")
+      if (rc != 0) sys.error(s"$cmd create for $platform exited $rc")
       val testFile = outDir / "test" / "widget_test.dart"
       if (testFile.exists()) IO.write(testFile, "void main() {}\n")
       val analysisFile = outDir / "analysis_options.yaml"

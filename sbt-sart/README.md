@@ -30,8 +30,8 @@ Then:
 - `sbt sartEmit` — compile your Scala 3 code and emit Dart into `out/lib/`.
 - `sbt sartLinux` / `sartWeb` / `sartAndroid` / `sartMacOS` / `sartWindows` /
   `sartIOS` — scaffold the platform embedder and `flutter build` it.
-- `sbt sartTizen` / `sartWebOS` — build for Samsung Tizen and LG webOS
-  Smart TVs (see **Smart TV targets** below).
+- `sbt sartTizen` / `sartWebOS` / `sartTvOS` — build for Samsung Tizen,
+  LG webOS, and Apple TV (see **Smart TV targets** below).
 - `sbt sartRun` — build the Linux binary and launch it.
 - `sbt sartGoldenVerify` / `sartGoldenAccept` — regression gates against
   a checked-in `sart-golden/` directory.
@@ -54,31 +54,43 @@ Then:
 | `sartStrict`             | `false`                        | Fail `sartEmit` on any untranslatable construct, reported at its Scala source location. |
 | `sartTizenCommand`       | `"flutter-tizen"`              | The `flutter-tizen` CLI used by `sartTizen`. |
 | `sartWebOSCommand`       | `"flutter-webos"`             | The `flutter-webos` CLI used by `sartWebOS`. |
+| `sartTvOSCommand`        | `"flutter-tvos"`              | The `flutter-tvos` CLI used by `sartTvOS`. |
 
-## Smart TV targets
+## TV targets
 
-Flutter reaches Samsung and LG TVs through vendor forks of the Flutter
-CLI, each a drop-in `flutter` replacement that adds its own embedder
-folder and packaging step. Sart emits the same `lib/` + `pubspec.yaml`
-for these as for every other target — only the build command differs —
-so `sartTizen` and `sartWebOS` route the identical emitted app through
-the vendor CLI instead of `flutter`:
+Flutter reaches TVs through community forks of the Flutter CLI. Sart emits
+the same `lib/` + `pubspec.yaml` for these as for every other target — only
+the build command differs — so each task routes the identical emitted app
+through the fork's CLI instead of `flutter`. The forks come in two shapes:
 
-- **`sartTizen`** → `flutter-tizen create --platforms=tizen …` then
-  `flutter-tizen build tpk -ptv`, producing a `.tpk` under
+**Additive** — grafts one more embedder onto the project via
+`create --platforms=X`, leaving `flutter` itself intact:
+
+- **`sartTizen`** (Samsung) → `flutter-tizen create --platforms=tizen …`
+  then `flutter-tizen build tpk -ptv`, producing a `.tpk` under
   `out/build/tizen/tpk/`. Requires
   [`flutter-tizen`](https://developer.samsung.com/smarttv/develop/native/flutter.html)
   on `PATH` and the Tizen Studio SDK; targets Tizen 6.0+.
-- **`sartWebOS`** → `flutter-webos create --platforms=webos …` then
+- **`sartWebOS`** (LG) → `flutter-webos create --platforms=webos …` then
   `flutter-webos build webos --release`, producing an `.ipk` under
   `out/build/webos/`. Requires
   [`flutter-webos`](https://github.com/lg-flutter-webos) and the webOS
   NDK on `PATH`.
 
-Point `sartTizenCommand` / `sartWebOSCommand` at an absolute path if the
-CLI isn't on `PATH`. These toolchains are vendor-supplied and not bundled
-with Sart; without them installed the tasks compile and cross-publish but
-the build step needs the CLI (and a device or emulator to `run`).
+**Substituting** — replaces the `flutter` CLI entirely for one target:
+
+- **`sartTvOS`** (Apple TV) → [`flutter-tvos`](https://github.com/fluttertv/flutter-tvos)
+  retargets iOS→tvOS, so `flutter-tvos create …` (no `--platforms`)
+  scaffolds a `tvos/` folder and the iOS build path yields the tvOS `.app`
+  under `out/build/ios/iphoneos/`. Requires `flutter-tvos` on `PATH` plus
+  macOS + Xcode; `--no-codesign` builds unsigned, `flutter-tvos build ipa`
+  with your signing for distribution.
+
+Point `sartTizenCommand` / `sartWebOSCommand` / `sartTvOSCommand` at an
+absolute path if the CLI isn't on `PATH`. These toolchains are
+community-supplied and not bundled with Sart; without them installed the
+tasks compile and cross-publish but the build step needs the CLI (and a
+device or simulator to `run`).
 
 ## Implementation notes
 
