@@ -9,8 +9,10 @@ environment:
 
 dependencies:
   audio_service: ^0.18.19
+  cached_network_image: ^3.4.1
   flutter:
     sdk: flutter
+  flutter_cache_manager: ^3.4.1
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
   web: ^1.1.0

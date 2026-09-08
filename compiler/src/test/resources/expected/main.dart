@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:audio_service/audio_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'platform/platform_name.dart';
 import 'platform/video_backend.dart';
@@ -68,6 +70,7 @@ class LauncherHome extends StatelessWidget {
   final List<Demo> demos = [
     Demo('Player', 'Cross-platform video/audio', (ctx) => PlayerApp()),
     Demo('YouTube', 'youtube_player_iframe backend', (ctx) => YtApp()),
+    Demo('Images', 'cached_network_image posters', (ctx) => ImageApp()),
     Demo('TV', 'Remote/D-pad, focus, lifecycle', (ctx) => TvApp()),
     Demo('Showcase', 'Kitchen-sink feature demo', (ctx) => ShowcaseApp()),
     Demo('Counter', 'Classic Flutter counter', (ctx) => MyHomePage('Counter')),
@@ -77,7 +80,7 @@ class LauncherHome extends StatelessWidget {
     Demo('Two-screen', 'Navigator.push demo', (ctx) => HomeScreen()),
   ];
 
-  /// Source: example/src/main/scala/example/LauncherApp.scala:44
+  /// Source: example/src/main/scala/example/LauncherApp.scala:45
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -422,6 +425,71 @@ class HomeScreen extends StatelessWidget {
             ).push(MaterialPageRoute<void>(builder: (ctx) => DetailScreen()));
           },
           child: Text('Go to detail'),
+        ),
+      ),
+    );
+  }
+}
+
+/// Source: example/src/main/scala/example/apps/ImageApp.scala:13
+class ImageApp extends StatelessWidget {
+  final CacheManager cache = CacheManager(
+    Config(
+      'sartDemoImages',
+      stalePeriod: Duration(days: 7),
+      maxNrOfCacheObjects: 200,
+    ),
+  );
+  final List<String> urls = [
+    237,
+    238,
+    239,
+    240,
+    241,
+    242,
+    243,
+    244,
+  ].map((id) => 'https://picsum.photos/id/${id}/300/450').toList();
+
+  /// Source: example/src/main/scala/example/apps/ImageApp.scala:32
+  Widget poster(String url) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8.0),
+      child: CachedNetworkImage(
+        imageUrl: url,
+        cacheManager: cache,
+        fit: BoxFit.cover,
+        width: 120.0,
+        height: 180.0,
+        fadeInDuration: Duration(milliseconds: 200),
+        memCacheWidth: 240,
+        placeholder: (_$1, _$2) => Container(
+          color: Colors.black12,
+          width: 120.0,
+          height: 180.0,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+        errorWidget: (_$3, _$4, _$5) => Container(
+          color: Colors.black12,
+          width: 120.0,
+          height: 180.0,
+          child: Icon(Icons.broken_image),
+        ),
+      ),
+    );
+  }
+
+  /// Source: example/src/main/scala/example/apps/ImageApp.scala:62
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Sart Cached Images')),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16.0),
+        child: Wrap(
+          spacing: 12.0,
+          runSpacing: 12.0,
+          children: urls.map((url) => poster(url)).toList(),
         ),
       ),
     );

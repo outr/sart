@@ -32,6 +32,7 @@ class LauncherHome extends StatelessWidget:
   private val demos: List[Demo] = List(
     Demo("Player",      "Cross-platform video/audio", ctx => PlayerApp()),
     Demo("YouTube",     "youtube_player_iframe backend", ctx => YtApp()),
+    Demo("Images",      "cached_network_image posters",  ctx => ImageApp()),
     Demo("TV",          "Remote/D-pad, focus, lifecycle", ctx => TvApp()),
     Demo("Showcase",    "Kitchen-sink feature demo",    ctx => ShowcaseApp()),
     Demo("Counter",     "Classic Flutter counter",      ctx => MyHomePage(title = "Counter")),

@@ -137,8 +137,19 @@ lazy val `sart-tv` = (project in file("sart-tv"))
 
 // The user program — the pure-Scala counter app. Its `.tasty` files are
 // the input to the Sart compiler.
+// Cached-network-image facades: the `cached_network_image` widget +
+// `flutter_cache_manager` store, for disk/memory-cached poster/backdrop
+// artwork. A reusable library like sart-player/sart-tv, kept in its own
+// module so its pub deps only reach apps that use it (no tree-shaking).
+lazy val `sart-image` = (project in file("sart-image"))
+  .dependsOn(`sart-dart`, `sart-stdlib`, `flutter-facades`)
+  .settings(
+    name := "sart-image",
+    Compile / scalacOptions ++= Seq("-Yretain-trees")
+  )
+
 lazy val example = (project in file("example"))
-  .dependsOn(`flutter-facades`, `sart-stdlib`, `sart-player`, `sart-tv`)
+  .dependsOn(`flutter-facades`, `sart-stdlib`, `sart-player`, `sart-tv`, `sart-image`)
   .settings(
     name := "sart-example",
     // Keep TASTy around so the compiler can read it.
@@ -182,7 +193,7 @@ lazy val `sart-facadegen` = (project in file("sart-facadegen"))
   )
 
 lazy val root = (project in file("."))
-  .aggregate(`sart-dart`, `sart-stdlib`, `flutter-facades`, `sart-player`, `sart-tv`, example, compiler, `sart-facadegen`)
+  .aggregate(`sart-dart`, `sart-stdlib`, `flutter-facades`, `sart-player`, `sart-tv`, `sart-image`, example, compiler, `sart-facadegen`)
   .settings(
     name := "sart",
 
@@ -220,9 +231,11 @@ lazy val root = (project in file("."))
       // for sartLibraries / dependsOn projects).
       val playerClasses = (`sart-player` / Compile / classDirectory).value
       val tvClasses     = (`sart-tv` / Compile / classDirectory).value
+      val imageClasses  = (`sart-image` / Compile / classDirectory).value
       val libArgs = Seq(
         s"--library=${playerClasses.getAbsolutePath}",
-        s"--library=${tvClasses.getAbsolutePath}"
+        s"--library=${tvClasses.getAbsolutePath}",
+        s"--library=${imageClasses.getAbsolutePath}"
       )
       val rc = sys.process.Process(Seq(
         "java", "-cp", runCp, "sart.compiler.Main"
@@ -514,6 +527,7 @@ lazy val root = (project in file("."))
       (`flutter-facades` / publishLocal).value
       (`sart-player` / publishLocal).value
       (`sart-tv` / publishLocal).value
+      (`sart-image` / publishLocal).value
       (compiler / publishLocal).value
 
       // sbt-sart/ is its own sbt build (cross-built: Scala 2.12 → sbt 1.x,
@@ -549,9 +563,11 @@ def runAnalyzeAndRemap(outDir: File, log: Logger): Unit = {
 
   val IssueRe =
     """^\s*(error|warning|info)\s*•\s*(.+?)\s*•\s*(lib/[^:]+):(\d+):(\d+)\s*•.*$""".r
+  var errorCount = 0
   rawOutput.toString.linesIterator.foreach { line =>
     line match {
       case IssueRe(sev, msg, dartPath, lineStr, _) =>
+        if (sev == "error") errorCount += 1
         val dartFile = outDir / dartPath
         val dartLine = lineStr.toInt
         mapToScala(dartFile, dartLine) match {
@@ -561,6 +577,12 @@ def runAnalyzeAndRemap(outDir: File, log: Logger): Unit = {
       case other => log.info(other)
     }
   }
+  // Fail the task on any error-severity issue so `sartAnalyze` is a real
+  // gate, not just a diagnostic printer — the emitted Dart must analyze
+  // clean. Warnings (e.g. the platform_name conditional-export stubs' unused
+  // imports) are logged but don't fail.
+  if (errorCount > 0)
+    sys.error(s"sartAnalyze: $errorCount analyzer error(s) in the emitted Dart (see above)")
 }
 
 // ─── Platform-build helpers ───────────────────────────────────────────────
