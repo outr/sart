@@ -8,6 +8,7 @@ environment:
   sdk: '>=3.12.0 <4.0.0'
 
 dependencies:
+  audio_service: ^0.18.19
   flutter:
     sdk: flutter
   video_player: ^2.9.2

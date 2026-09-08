@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -1008,24 +1009,25 @@ class TodoItem {
   Map<String, dynamic> toJson() => {'text': text, 'done': done};
 }
 
-/// Source: example/src/main/scala/example/apps/TvApp.scala:12
+/// Source: example/src/main/scala/example/apps/TvApp.scala:14
 class TvApp extends StatefulWidget {
-  /// Source: example/src/main/scala/example/apps/TvApp.scala:13
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:15
   @override
   State<TvApp> createState() {
     return TvAppState();
   }
 }
 
-/// Source: example/src/main/scala/example/apps/TvApp.scala:15
+/// Source: example/src/main/scala/example/apps/TvApp.scala:17
 class TvAppState extends State<TvApp> {
   String lastKey = '—';
   int selected = -1;
   late AppLifecycleListener lifecycle;
+  late SartAudioHandler session;
 
-  /// Source: example/src/main/scala/example/apps/TvApp.scala:20
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:23
   @override
-  void initState() {
+  void initState() async {
     super.initState();
     lifecycle = TvLifecycle.apply(
       () => null,
@@ -1034,16 +1036,37 @@ class TvAppState extends State<TvApp> {
       TvLifecycle.apply$default$4,
       TvLifecycle.apply$default$5,
     );
+    session = (await MediaSession.init(
+      MediaCallbacks(
+        onPlay: () => setState(() {
+          lastKey = 'OS: play';
+        }),
+        onPause: () => setState(() {
+          lastKey = 'OS: pause';
+        }),
+        onSkipToNext: () => setState(() {
+          lastKey = 'OS: next';
+        }),
+      ),
+      AudioServiceConfig(
+        androidNotificationChannelId: 'tv.sart.example.audio',
+        androidNotificationChannelName: 'Playback',
+      ),
+    ));
+    session.setNowPlaying(
+      MediaItem(id: 'demo', title: 'Sart TV demo', artist: 'sart-tv'),
+    );
+    session.setPlaying(false);
   }
 
-  /// Source: example/src/main/scala/example/apps/TvApp.scala:28
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:51
   @override
   void dispose() {
     lifecycle.dispose();
     super.dispose();
   }
 
-  /// Source: example/src/main/scala/example/apps/TvApp.scala:32
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:55
   bool onKey(TvKey key) {
     setState(() {
       lastKey = key.toJson();
@@ -1054,7 +1077,7 @@ class TvAppState extends State<TvApp> {
     return !directional;
   }
 
-  /// Source: example/src/main/scala/example/apps/TvApp.scala:40
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:63
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1084,12 +1107,12 @@ class TvAppState extends State<TvApp> {
     );
   }
 
-  /// Source: example/src/main/scala/example/apps/TvApp.scala:66
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:89
   Widget get gap {
     return SizedBox(width: 16.0);
   }
 
-  /// Source: example/src/main/scala/example/apps/TvApp.scala:68
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:91
   Widget card(int index) {
     return Focusable(
       () => setState(() {
@@ -2595,5 +2618,229 @@ enum TvPlatform {
         : (name == 'androidtv') || (name == 'android-tv')
         ? AndroidTV
         : Other;
+  }
+}
+
+/// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:11
+class MediaCallbacks {
+  final void Function()? onPlay;
+  final void Function()? onPause;
+  final void Function()? onStop;
+  final void Function(Duration)? onSeek;
+  final void Function()? onSkipToNext;
+  final void Function()? onSkipToPrevious;
+  final void Function()? onFastForward;
+  final void Function()? onRewind;
+  MediaCallbacks({
+    this.onPlay = null,
+    this.onPause = null,
+    this.onStop = null,
+    this.onSeek = null,
+    this.onSkipToNext = null,
+    this.onSkipToPrevious = null,
+    this.onFastForward = null,
+    this.onRewind = null,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MediaCallbacks &&
+          other.onPlay == onPlay &&
+          other.onPause == onPause &&
+          other.onStop == onStop &&
+          other.onSeek == onSeek &&
+          other.onSkipToNext == onSkipToNext &&
+          other.onSkipToPrevious == onSkipToPrevious &&
+          other.onFastForward == onFastForward &&
+          other.onRewind == onRewind;
+
+  @override
+  int get hashCode => Object.hash(
+    onPlay,
+    onPause,
+    onStop,
+    onSeek,
+    onSkipToNext,
+    onSkipToPrevious,
+    onFastForward,
+    onRewind,
+  );
+
+  @override
+  String toString() =>
+      'MediaCallbacks(onPlay: $onPlay, onPause: $onPause, onStop: $onStop, onSeek: $onSeek, onSkipToNext: $onSkipToNext, onSkipToPrevious: $onSkipToPrevious, onFastForward: $onFastForward, onRewind: $onRewind)';
+
+  MediaCallbacks copyWith({
+    void Function()? onPlay,
+    void Function()? onPause,
+    void Function()? onStop,
+    void Function(Duration)? onSeek,
+    void Function()? onSkipToNext,
+    void Function()? onSkipToPrevious,
+    void Function()? onFastForward,
+    void Function()? onRewind,
+  }) => MediaCallbacks(
+    onPlay: onPlay ?? this.onPlay,
+    onPause: onPause ?? this.onPause,
+    onStop: onStop ?? this.onStop,
+    onSeek: onSeek ?? this.onSeek,
+    onSkipToNext: onSkipToNext ?? this.onSkipToNext,
+    onSkipToPrevious: onSkipToPrevious ?? this.onSkipToPrevious,
+    onFastForward: onFastForward ?? this.onFastForward,
+    onRewind: onRewind ?? this.onRewind,
+  );
+}
+
+/// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:128
+class MediaSession {
+  MediaSession._();
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:130
+  static Future<SartAudioHandler> init(
+    MediaCallbacks callbacks,
+    AudioServiceConfig config,
+  ) {
+    return AudioService.init(
+      builder: () => SartAudioHandler(callbacks),
+      config: config,
+    );
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:132
+  static AudioServiceConfig get init$default$2 {
+    return AudioServiceConfig();
+  }
+}
+
+/// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:27
+class SartAudioHandler extends BaseAudioHandler {
+  final MediaCallbacks callbacks;
+  SartAudioHandler(this.callbacks);
+
+  bool playing = false;
+  Duration position = Duration();
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:33
+  @override
+  Future<void> play() {
+    final cb = callbacks.onPlay;
+    if (cb != null) {
+      cb();
+    }
+    playing = true;
+    broadcast();
+    return Future.value(null);
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:40
+  @override
+  Future<void> pause() {
+    final cb = callbacks.onPause;
+    if (cb != null) {
+      cb();
+    }
+    playing = false;
+    broadcast();
+    return Future.value(null);
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:47
+  @override
+  Future<void> stop() {
+    final cb = callbacks.onStop;
+    if (cb != null) {
+      cb();
+    }
+    playing = false;
+    broadcast();
+    return Future.value(null);
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:54
+  @override
+  Future<void> seek(Duration pos) {
+    final cb = callbacks.onSeek;
+    if (cb != null) {
+      cb(pos);
+    }
+    position = pos;
+    broadcast();
+    return Future.value(null);
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:61
+  @override
+  Future<void> skipToNext() {
+    final cb = callbacks.onSkipToNext;
+    if (cb != null) {
+      cb();
+    }
+    return Future.value(null);
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:66
+  @override
+  Future<void> skipToPrevious() {
+    final cb = callbacks.onSkipToPrevious;
+    if (cb != null) {
+      cb();
+    }
+    return Future.value(null);
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:71
+  @override
+  Future<void> fastForward() {
+    final cb = callbacks.onFastForward;
+    if (cb != null) {
+      cb();
+    }
+    return Future.value(null);
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:76
+  @override
+  Future<void> rewind() {
+    final cb = callbacks.onRewind;
+    if (cb != null) {
+      cb();
+    }
+    return Future.value(null);
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:82
+  void setNowPlaying(MediaItem item) {
+    mediaItem.add(item);
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:85
+  void setPlaying(bool isPlaying) {
+    playing = isPlaying;
+    broadcast();
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:90
+  void setPosition(Duration pos) {
+    position = pos;
+    broadcast();
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:94
+  void broadcast() {
+    playbackState.add(
+      PlaybackState(
+        processingState: AudioProcessingState.ready,
+        playing: playing,
+        controls: [
+          MediaControl.rewind,
+          playing ? MediaControl.pause : MediaControl.play,
+          MediaControl.stop,
+          MediaControl.fastForward,
+        ],
+        systemActions: ({MediaAction.seek}),
+        updatePosition: position,
+      ),
+    );
   }
 }

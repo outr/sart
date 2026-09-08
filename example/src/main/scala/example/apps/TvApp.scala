@@ -2,7 +2,9 @@ package example.apps
 
 import sart.dart.*
 import sart.tv.*
+import sart.tv.media.*
 import flutter.material.*
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /** Demo of the reusable `sart-tv` library: a `RemoteControl` decoding
  *  remote key presses into [[TvKey]] values, a row of [[Focusable]] cards
@@ -16,6 +18,7 @@ class TvAppState extends State[TvApp]:
   private var lastKey: String = "—"
   private var selected: Int = -1
   private var lifecycle: AppLifecycleListener = null
+  private var session: SartAudioHandler = null
 
   override def initState(): Unit =
     super.initState()
@@ -24,6 +27,26 @@ class TvAppState extends State[TvApp]:
       onPause = () => (),
       onResume = () => ()
     )
+    // OS media session: shows "now playing" on the lock screen / control
+    // centre and delivers transport commands (play/pause from a Bluetooth
+    // remote, CarPlay, etc.) back through the callbacks.
+    session = await(
+      MediaSession.init(
+        MediaCallbacks(
+          onPlay = () => setState(() => lastKey = "OS: play"),
+          onPause = () => setState(() => lastKey = "OS: pause"),
+          onSkipToNext = () => setState(() => lastKey = "OS: next")
+        ),
+        AudioServiceConfig(
+          androidNotificationChannelId = "tv.sart.example.audio",
+          androidNotificationChannelName = "Playback"
+        )
+      )
+    )
+    session.setNowPlaying(
+      MediaItem(id = "demo", title = "Sart TV demo", artist = "sart-tv")
+    )
+    session.setPlaying(false)
 
   override def dispose(): Unit =
     lifecycle.dispose()

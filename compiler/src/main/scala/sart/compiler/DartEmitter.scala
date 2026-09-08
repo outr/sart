@@ -361,7 +361,12 @@ class DartEmitter(
         b.append(s"  ${p.name}:\n")
         b.append(s"    sdk: ${p.sdk}\n")
       else if p.version.nonEmpty then
-        b.append(s"  ${p.name}: ${p.version}\n")
+        // A range constraint (`>=0.26.0 <0.29.0`) is not a valid YAML plain
+        // scalar — the space and leading `>` need quoting. Carets and exact
+        // versions are fine bare.
+        val v = if p.version.exists(c => c == ' ' || c == '<' || c == '>')
+                then s"'${p.version}'" else p.version
+        b.append(s"  ${p.name}: $v\n")
       else
         b.append(s"  ${p.name}: any\n")
     // Multiple annotations may each contribute a `flutter:` section
