@@ -117,7 +117,7 @@ lazy val `flutter-facades` = (project in file("flutter-facades"))
 // (or a project dependency). Extracted from the NaboTV player as a
 // reusable library — Nabo specifics removed.
 lazy val `sart-player` = (project in file("sart-player"))
-  .dependsOn(`sart-dart`, `sart-stdlib`, `flutter-facades`, `sart-tv`)
+  .dependsOn(`sart-dart`, `sart-stdlib`, `flutter-facades`)
   .settings(
     name := "sart-player",
     Compile / scalacOptions ++= Seq("-Yretain-trees")
