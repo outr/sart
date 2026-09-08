@@ -2,6 +2,7 @@ package example.apps
 
 import sart.dart.*
 import sart.player.*
+import sart.tv.media.MediaItem
 import flutter.material.*
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -17,12 +18,24 @@ class PlayerAppState extends State[PlayerApp]:
   private var audio: PlayerController = null
   private var ready: Boolean = false
 
+  // initState must stay synchronous (Flutter asserts it returns void, not
+  // a Future) — so the async setup runs in a separate fire-and-forget method.
   override def initState(): Unit =
     super.initState()
+    load()
+
+  private def load(): Unit =
     video = PlayerController(NetworkSource("sample.mp4"))
     audio = PlayerController(NetworkSource("sample.mp3"))
     await(video.initialize())
     await(audio.initialize())
+    // Publish the video to the OS media session — lock-screen / TV
+    // "now playing" and remote transport controls drive this player.
+    await(
+      video.bindMediaSession(
+        MediaItem(id = "sample", title = "Sample video", artist = "sart-player")
+      )
+    )
     setState(() => ready = true)
 
   override def dispose(): Unit =

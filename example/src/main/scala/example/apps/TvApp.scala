@@ -20,6 +20,8 @@ class TvAppState extends State[TvApp]:
   private var lifecycle: AppLifecycleListener = null
   private var session: SartAudioHandler = null
 
+  // initState must stay synchronous (Flutter asserts it returns void, not
+  // a Future) — the async media-session setup runs fire-and-forget.
   override def initState(): Unit =
     super.initState()
     // On a real TV, pause/resume would release and reacquire the player.
@@ -27,9 +29,12 @@ class TvAppState extends State[TvApp]:
       onPause = () => (),
       onResume = () => ()
     )
-    // OS media session: shows "now playing" on the lock screen / control
-    // centre and delivers transport commands (play/pause from a Bluetooth
-    // remote, CarPlay, etc.) back through the callbacks.
+    startSession()
+
+  // OS media session: shows "now playing" on the lock screen / control
+  // centre and delivers transport commands (play/pause from a Bluetooth
+  // remote, CarPlay, etc.) back through the callbacks.
+  private def startSession(): Unit =
     session = await(
       MediaSession.init(
         MediaCallbacks(

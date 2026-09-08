@@ -426,35 +426,47 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-/// Source: example/src/main/scala/example/apps/PlayerApp.scala:12
+/// Source: example/src/main/scala/example/apps/PlayerApp.scala:13
 class PlayerApp extends StatefulWidget {
-  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:13
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:14
   @override
   State<PlayerApp> createState() {
     return PlayerAppState();
   }
 }
 
-/// Source: example/src/main/scala/example/apps/PlayerApp.scala:15
+/// Source: example/src/main/scala/example/apps/PlayerApp.scala:16
 class PlayerAppState extends State<PlayerApp> {
   late PlayerController video;
   late PlayerController audio;
   bool ready = false;
 
-  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:20
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:23
   @override
-  void initState() async {
+  void initState() {
     super.initState();
+    load();
+  }
+
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:27
+  void load() async {
     video = PlayerController(NetworkSource('sample.mp4'));
     audio = PlayerController(NetworkSource('sample.mp3'));
     (await video.initialize());
     (await audio.initialize());
+    (await (() {
+      final $1$ = video;
+      return $1$.bindMediaSession(
+        MediaItem(id: 'sample', title: 'Sample video', artist: 'sart-player'),
+        $1$.bindMediaSession$default$2,
+      );
+    })());
     setState(() {
       ready = true;
     });
   }
 
-  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:28
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:41
   @override
   void dispose() {
     video.dispose();
@@ -462,7 +474,7 @@ class PlayerAppState extends State<PlayerApp> {
     super.dispose();
   }
 
-  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:33
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:46
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1025,9 +1037,9 @@ class TvAppState extends State<TvApp> {
   late AppLifecycleListener lifecycle;
   late SartAudioHandler session;
 
-  /// Source: example/src/main/scala/example/apps/TvApp.scala:23
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:25
   @override
-  void initState() async {
+  void initState() {
     super.initState();
     lifecycle = TvLifecycle.apply(
       () => null,
@@ -1036,6 +1048,11 @@ class TvAppState extends State<TvApp> {
       TvLifecycle.apply$default$4,
       TvLifecycle.apply$default$5,
     );
+    startSession();
+  }
+
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:37
+  void startSession() async {
     session = (await MediaSession.init(
       MediaCallbacks(
         onPlay: () => setState(() {
@@ -1059,14 +1076,14 @@ class TvAppState extends State<TvApp> {
     session.setPlaying(false);
   }
 
-  /// Source: example/src/main/scala/example/apps/TvApp.scala:51
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:56
   @override
   void dispose() {
     lifecycle.dispose();
     super.dispose();
   }
 
-  /// Source: example/src/main/scala/example/apps/TvApp.scala:55
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:60
   bool onKey(TvKey key) {
     setState(() {
       lastKey = key.toJson();
@@ -1077,7 +1094,7 @@ class TvAppState extends State<TvApp> {
     return !directional;
   }
 
-  /// Source: example/src/main/scala/example/apps/TvApp.scala:63
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:68
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1107,12 +1124,12 @@ class TvAppState extends State<TvApp> {
     );
   }
 
-  /// Source: example/src/main/scala/example/apps/TvApp.scala:89
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:94
   Widget get gap {
     return SizedBox(width: 16.0);
   }
 
-  /// Source: example/src/main/scala/example/apps/TvApp.scala:91
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:96
   Widget card(int index) {
     return Focusable(
       () => setState(() {
@@ -2175,7 +2192,7 @@ class Wrapping {
   }
 }
 
-/// Source: sart-player/src/main/scala/sart/player/Player.scala:12
+/// Source: sart-player/src/main/scala/sart/player/Player.scala:13
 class AssetSource extends MediaSource {
   final String name;
   AssetSource(this.name);
@@ -2198,7 +2215,7 @@ class AssetSource extends MediaSource {
   Map<String, dynamic> toJson() => {'name': name, 'type': 'AssetSource'};
 }
 
-/// Source: sart-player/src/main/scala/sart/player/Player.scala:10
+/// Source: sart-player/src/main/scala/sart/player/Player.scala:11
 sealed class MediaSource {
   static MediaSource fromJson(Map<String, dynamic> json) {
     final String t = json['type'] as String;
@@ -2210,7 +2227,7 @@ sealed class MediaSource {
   Map<String, dynamic> toJson();
 }
 
-/// Source: sart-player/src/main/scala/sart/player/Player.scala:11
+/// Source: sart-player/src/main/scala/sart/player/Player.scala:12
 class NetworkSource extends MediaSource {
   final String url;
   NetworkSource(this.url);
@@ -2233,7 +2250,7 @@ class NetworkSource extends MediaSource {
   Map<String, dynamic> toJson() => {'url': url, 'type': 'NetworkSource'};
 }
 
-/// Source: sart-player/src/main/scala/sart/player/Player.scala:20
+/// Source: sart-player/src/main/scala/sart/player/Player.scala:21
 class PlayerController {
   final MediaSource source;
   PlayerController(this.source);
@@ -2244,68 +2261,113 @@ class PlayerController {
     ),
     AssetSource(name: var name) => VideoPlayerController.asset(name),
   };
+  late SartAudioHandler media;
+  bool mediaBound = false;
 
-  /// Source: sart-player/src/main/scala/sart/player/Player.scala:26
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:37
+  Future<void> bindMediaSession(
+    MediaItem item,
+    AudioServiceConfig config,
+  ) async {
+    media = (await MediaSession.init(
+      MediaCallbacks(
+        onPlay: () {
+          play();
+        },
+        onPause: () {
+          pause();
+        },
+        onStop: () {
+          pause();
+        },
+        onSeek: (pos) {
+          seekTo(pos);
+        },
+      ),
+      config,
+    ));
+    mediaBound = true;
+    media.setNowPlaying(item);
+    media.setPosition(position);
+    media.setPlaying(isPlaying);
+    return Future.value(null);
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:39
+  AudioServiceConfig get bindMediaSession$default$2 {
+    return AudioServiceConfig();
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:59
   Future<void> initialize() {
     return backend.initialize();
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/Player.scala:27
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:60
   Future<void> play() {
+    if (mediaBound) {
+      media.setPlaying(true);
+    }
     return backend.play();
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/Player.scala:28
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:63
   Future<void> pause() {
+    if (mediaBound) {
+      media.setPlaying(false);
+    }
     return backend.pause();
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/Player.scala:29
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:66
   Future<void> seekTo(Duration position) {
+    if (mediaBound) {
+      media.setPosition(position);
+    }
     return backend.seekTo(position);
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/Player.scala:30
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:69
   Future<void> setLooping(bool looping) {
     return backend.setLooping(looping);
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/Player.scala:31
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:70
   Future<void> setVolume(double volume) {
     return backend.setVolume(volume);
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/Player.scala:32
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:71
   Future<void> dispose() {
     return backend.dispose();
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/Player.scala:34
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:73
   bool get isPlaying {
     return backend.value.isPlaying;
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/Player.scala:35
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:74
   bool get isInitialized {
     return backend.value.isInitialized;
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/Player.scala:36
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:75
   Duration get position {
     return backend.value.position;
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/Player.scala:37
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:76
   Duration get duration {
     return backend.value.duration;
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/Player.scala:38
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:77
   double get aspectRatio {
     return backend.value.aspectRatio;
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/Player.scala:42
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:81
   Widget get view {
     return VideoPlayer(backend);
   }
