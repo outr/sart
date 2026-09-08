@@ -5,6 +5,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'platform/platform_name.dart';
 import 'platform/video_backend.dart';
 import 'sart_either.dart';
@@ -66,6 +67,7 @@ class LauncherApp extends StatelessWidget {
 class LauncherHome extends StatelessWidget {
   final List<Demo> demos = [
     Demo('Player', 'Cross-platform video/audio', (ctx) => PlayerApp()),
+    Demo('YouTube', 'youtube_player_iframe backend', (ctx) => YtApp()),
     Demo('TV', 'Remote/D-pad, focus, lifecycle', (ctx) => TvApp()),
     Demo('Showcase', 'Kitchen-sink feature demo', (ctx) => ShowcaseApp()),
     Demo('Counter', 'Classic Flutter counter', (ctx) => MyHomePage('Counter')),
@@ -75,7 +77,7 @@ class LauncherHome extends StatelessWidget {
     Demo('Two-screen', 'Navigator.push demo', (ctx) => HomeScreen()),
   ];
 
-  /// Source: example/src/main/scala/example/LauncherApp.scala:43
+  /// Source: example/src/main/scala/example/LauncherApp.scala:44
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1126,6 +1128,79 @@ class TvAppState extends State<TvApp> {
         child: Center(child: Text('Card ${index}')),
       ),
       autofocus: (index == 0),
+    );
+  }
+}
+
+/// Source: example/src/main/scala/example/apps/YtApp.scala:12
+class YtApp extends StatefulWidget {
+  /// Source: example/src/main/scala/example/apps/YtApp.scala:13
+  @override
+  State<YtApp> createState() {
+    return YtAppState();
+  }
+}
+
+/// Source: example/src/main/scala/example/apps/YtApp.scala:15
+class YtAppState extends State<YtApp> {
+  late VideoPlayer player;
+  bool ready = false;
+
+  /// Source: example/src/main/scala/example/apps/YtApp.scala:19
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  /// Source: example/src/main/scala/example/apps/YtApp.scala:23
+  void load() async {
+    player = YouTubeVideo();
+    (await player.setSource('aqz-KE-bpKQ'));
+    setState(() {
+      ready = true;
+    });
+  }
+
+  /// Source: example/src/main/scala/example/apps/YtApp.scala:28
+  @override
+  void dispose() {
+    player.dispose();
+    super.dispose();
+  }
+
+  /// Source: example/src/main/scala/example/apps/YtApp.scala:32
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Sart YouTube')),
+      body: Center(
+        child: (!ready
+            ? CircularProgressIndicator()
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(width: 480.0, height: 270.0, child: player.view()),
+                  SizedBox(height: 16.0),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => player.play(),
+                        icon: Icon(Icons.play_arrow),
+                        label: Text('Play'),
+                      ),
+                      SizedBox(width: 12.0),
+                      ElevatedButton.icon(
+                        onPressed: () => player.pause(),
+                        icon: Icon(Icons.pause),
+                        label: Text('Pause'),
+                      ),
+                    ],
+                  ),
+                ],
+              )),
+      ),
     );
   }
 }
@@ -2514,6 +2589,284 @@ class VideoSize {
   );
 
   Map<String, dynamic> toJson() => {'width': width, 'height': height};
+}
+
+/// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:19
+class YouTubeVideo extends VideoPlayer {
+  YouTubeVideo({bool muted = false, bool captions = true}) {
+    controller = YoutubePlayerController(
+      params: YoutubePlayerParams(
+        showControls: false,
+        showFullscreenButton: false,
+        enableCaption: captions,
+        strictRelatedVideos: true,
+        mute: muted,
+      ),
+    );
+    stateSub = controller.stream.listen((v) {
+      pausedState = v.playerState != PlayerState.playing;
+      final dur = v.metaData.duration.inMilliseconds / 1000.0;
+      if (dur > 0) {
+        durationSec = dur;
+      }
+      if (v.playerState == PlayerState.ended) {
+        if (looping && (currentId != null)) {
+          final $1$ = controller;
+          $1$.loadVideoById(videoId: currentId!);
+        } else {
+          if (!endedFired) {
+            endedFired = true;
+            onEndedCb.foreach((cb) => cb());
+          }
+        }
+      }
+      if (v.error != YoutubeError.none) {
+        onErrorCb.foreach((cb) => cb());
+      }
+    });
+    videoStateSub = controller.videoStateStream.listen((s) {
+      positionSec = s.position.inMilliseconds / 1000.0;
+    });
+  }
+
+  late YoutubePlayerController controller;
+  void Function()? onEndedCb = null;
+  void Function()? onErrorCb = null;
+  bool endedFired = false;
+  bool looping = false;
+  String? currentId = null;
+  double positionSec = 0.0;
+  double durationSec = 0.0;
+  bool pausedState = true;
+  late StreamSubscription<YoutubePlayerValue> stateSub;
+  late StreamSubscription<YoutubeVideoState> videoStateSub;
+  final StreamController<void> idleCtrl = StreamController.broadcast();
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:60
+  @override
+  void setOnEnded(void Function() cb) {
+    onEndedCb = cb;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:61
+  @override
+  void setOnError(void Function() cb) {
+    onErrorCb = cb;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:63
+  @override
+  bool get rendersImageSubtitles {
+    return false;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:66
+  @override
+  Future<void> setSource(
+    String url, {
+    double startSeconds = 0.0,
+    List<SubtitleSource> sideloaded = const [],
+  }) async {
+    endedFired = false;
+    currentId = url;
+    (await controller.loadVideoById(videoId: url, startSeconds: startSeconds));
+    return Future.value(null);
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:68
+  double get setSource$default$2 {
+    return 0.0;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:69
+  List get setSource$default$3 {
+    return [];
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:76
+  @override
+  Future<void> addSubtitles(List<SubtitleSource> subs) {
+    return Future.value(null);
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:77
+  @override
+  List<SubtitleTrackInfo> get subtitleTracks {
+    return [];
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:78
+  @override
+  String? get currentSubtitleId {
+    return null;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:79
+  @override
+  Stream<void> get subtitleTracksStream {
+    return idleCtrl.stream;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:80
+  @override
+  void selectEmbeddedSubtitle(String id) {}
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:81
+  @override
+  void selectUriSubtitle(String url, String? label, String? language) {}
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:83
+  Object? get selectUriSubtitle$default$2 {
+    return null;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:84
+  Object? get selectUriSubtitle$default$3 {
+    return null;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:86
+  @override
+  void subtitlesOff() {}
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:88
+  @override
+  List<AudioTrackInfo> get audioTracks {
+    return [];
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:89
+  @override
+  String? get currentAudioId {
+    return null;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:90
+  @override
+  Stream<void> get audioTracksStream {
+    return idleCtrl.stream;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:91
+  @override
+  void selectAudioTrack(String id) {}
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:93
+  @override
+  void seek(double seconds) {
+    controller.seekTo(seconds: seconds);
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:94
+  @override
+  void setVolume(double v) {
+    controller.setVolume((v * 100).round());
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:96
+  @override
+  void setGain(double g) {
+    controller.setVolume((g * 100).round());
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:97
+  @override
+  void setRate(double v) {
+    controller.setPlaybackRate(v);
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:98
+  @override
+  void setLooping(bool v) {
+    looping = v;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:99
+  @override
+  void setCover(bool v) {}
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:100
+  @override
+  void setPreferredSubtitleId(String? id) {}
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:101
+  @override
+  void setAuthHeader(String? v) {}
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:102
+  @override
+  void setAudioFocus(bool v) {}
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:103
+  @override
+  void setAudioOnly(bool v) {}
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:104
+  @override
+  Stream<List<double>>? get audioBands {
+    return null;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:106
+  @override
+  void play() {
+    controller.playVideo();
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:107
+  @override
+  void pause() {
+    controller.pauseVideo();
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:109
+  @override
+  double get position {
+    return positionSec;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:110
+  @override
+  double get duration {
+    return durationSec;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:111
+  @override
+  bool get paused {
+    return pausedState;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:112
+  @override
+  bool get ended {
+    return endedFired;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:114
+  @override
+  VideoSize? get videoSize {
+    return null;
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:116
+  @override
+  void dispose() {
+    stateSub.cancel();
+    videoStateSub.cancel();
+    if (!idleCtrl.isClosed) {
+      idleCtrl.close();
+    }
+    (() {
+      controller.close();
+    })();
+  }
+
+  /// Source: sart-player/src/main/scala/sart/player/YouTubeVideo.scala:123
+  @override
+  Widget view() {
+    return YoutubePlayer(controller: controller, aspectRatio: 16.0 / 9.0);
+  }
 }
 
 /// Source: sart-tv/src/main/scala/sart/tv/Focusable.scala:20
