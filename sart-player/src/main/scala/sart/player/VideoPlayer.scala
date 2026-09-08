@@ -1,7 +1,6 @@
 package sart.player
 
 import sart.stdlib.Stream
-import sart.player.mediakit.MediaKit
 import flutter.material.Widget
 import scala.concurrent.Future
 
@@ -114,9 +113,7 @@ trait VideoPlayer:
   def view(): Widget
 
 object VideoPlayer:
-  /** The platform's video backend. media_kit on Android / iOS / desktop; the
-   *  hls.js `<video>` on web is selected by the `@DartVariants` conditional
-   *  export in a later phase. */
-  def create(): VideoPlayer =
-    MediaKit.ensureInitialized() // load libmpv before the first Player (idempotent)
-    MediaKitVideo()
+  /** The platform's video backend, selected by a `@DartVariants` conditional
+   *  export: media_kit (libmpv) on Android / iOS / desktop, the hls.js
+   *  `<video>` on web. */
+  def create(): VideoPlayer = VideoBackendFactory.create()

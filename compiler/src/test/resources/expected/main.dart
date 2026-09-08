@@ -5,9 +5,8 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:media_kit/media_kit.dart';
-import 'package:media_kit_video/media_kit_video.dart';
 import 'platform/platform_name.dart';
+import 'platform/video_backend.dart';
 import 'sart_either.dart';
 import 'sart_option.dart';
 import 'sart_try.dart';
@@ -2211,395 +2210,6 @@ class AudioTrackInfo {
   };
 }
 
-/// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:19
-class MediaKitVideo extends VideoPlayer {
-  MediaKitVideo() {
-    controller = VideoController(player);
-    player.stream.completed.listen((done) {
-      if (done && !endedFired) {
-        endedFired = true;
-        onEndedCb.foreach((cb) => cb());
-      }
-    });
-    player.stream.error.listen((_$1) => onErrorCb.foreach((cb) => cb()));
-  }
-
-  final Player player = Player(
-    configuration: PlayerConfiguration(logLevel: MPVLogLevel.info),
-  );
-  late VideoController controller;
-  void Function()? onEndedCb = null;
-  void Function()? onErrorCb = null;
-  bool endedFired = false;
-  bool disposed = false;
-  bool coverFit = false;
-  double volumeLevel = 1.0;
-  double gainLevel = 1.0;
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:42
-  void cmd(Future<void> Function() op) {
-    if (!disposed) {
-      op();
-    }
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:45
-  @override
-  void setOnEnded(void Function() cb) {
-    onEndedCb = cb;
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:46
-  @override
-  void setOnError(void Function() cb) {
-    onErrorCb = cb;
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:48
-  @override
-  VideoSize? get videoSize {
-    return (() {
-      final w = (player.state.width ?? (0));
-      final h = (player.state.height ?? (0));
-      return (w > 0) && (h > 0) ? VideoSize(w, h) : null;
-    })();
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:53
-  @override
-  bool get rendersImageSubtitles {
-    return false;
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:55
-  @override
-  Future<void> setSource(
-    String url, {
-    double startSeconds = 0.0,
-    List<SubtitleSource> sideloaded = const [],
-  }) async {
-    return disposed
-        ? Future.value(null)
-        : (await (() async {
-            endedFired = false;
-            try {
-              if (startSeconds > 0.5) {
-                (await player.open(Media(url), play: false));
-                (await seekWhenReady(startSeconds));
-                (await player.play());
-              } else {
-                (await player.open(Media(url)));
-              }
-              if (sideloaded.isNotEmpty) {
-                (await addSubtitles(sideloaded));
-              }
-            } on Object {
-              if (!disposed) {
-                null;
-              }
-            }
-            return Future.value(null);
-          })());
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:57
-  double get setSource$default$2 {
-    return 0.0;
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:58
-  List get setSource$default$3 {
-    return [];
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:75
-  Future<void> seekWhenReady(double seconds) async {
-    if (player.state.duration.inMilliseconds <= 0) {
-      (await player.stream.duration.firstWhere((d) => d.inMilliseconds > 0));
-    }
-    (await player.seek(Duration(milliseconds: (seconds * 1000).round())));
-    return Future.value(null);
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:81
-  @override
-  Future<void> addSubtitles(List<SubtitleSource> subs) async {
-    return (await (() async {
-      final defaults = subs.where((s) => s.isDefault).toList();
-      return defaults.isEmpty
-          ? Future.value(null)
-          : (await (() async {
-              final pick = defaults.first;
-              try {
-                (await player.setSubtitleTrack(
-                  SubtitleTrack.uri(
-                    pick.url,
-                    title: pick.label,
-                    language: pick.language,
-                  ),
-                ));
-              } on Object {
-                null;
-              }
-              return Future.value(null);
-            })());
-    })());
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:94
-  @override
-  List<SubtitleTrackInfo> get subtitleTracks {
-    return player.state.tracks.subtitle
-        .where((t) => (t.id != 'no') && (t.id != 'auto'))
-        .toList()
-        .map(
-          (t) => SubtitleTrackInfo(
-            t.id,
-            (t.title ??
-                ((t.language.map((l) => l.toUpperCase()) ?? ('Subtitles')))),
-            t.language,
-            t.codec,
-          ),
-        )
-        .toList();
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:106
-  @override
-  String? get currentSubtitleId {
-    return (() {
-      final s = player.state.track.subtitle;
-      return (s.id == 'no') || (s.id == 'auto') ? null : s.id;
-    })();
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:110
-  @override
-  Stream<void> get subtitleTracksStream {
-    return player.stream.tracks.map((_$2) => null);
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:112
-  @override
-  void selectEmbeddedSubtitle(String id) {
-    cmd(
-      () => player.setSubtitleTrack(
-        ((() {
-              final r = player.state.tracks.subtitle
-                  .where((s) => s.id == id)
-                  .toList();
-              return r.isEmpty ? null : r.first;
-            })() ??
-            (SubtitleTrack.no())),
-      ),
-    );
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:116
-  @override
-  void selectUriSubtitle(String url, String? label, String? language) {
-    cmd(
-      () => player.setSubtitleTrack(
-        SubtitleTrack.uri(url, title: label, language: language),
-      ),
-    );
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:118
-  Object? get selectUriSubtitle$default$2 {
-    return null;
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:119
-  Object? get selectUriSubtitle$default$3 {
-    return null;
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:123
-  @override
-  void subtitlesOff() {
-    cmd(() => player.setSubtitleTrack(SubtitleTrack.no()));
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:125
-  @override
-  List<AudioTrackInfo> get audioTracks {
-    return player.state.tracks.audio
-        .where((t) => (t.id != 'no') && (t.id != 'auto'))
-        .toList()
-        .map(
-          (t) => AudioTrackInfo(
-            t.id,
-            (t.title ??
-                ((t.language.map((l) => l.toUpperCase()) ?? ('Audio')))),
-            t.language,
-          ),
-        )
-        .toList();
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:136
-  @override
-  String? get currentAudioId {
-    return (() {
-      final a = player.state.track.audio;
-      return (a.id == 'no') || (a.id == 'auto') ? null : a.id;
-    })();
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:140
-  @override
-  Stream<void> get audioTracksStream {
-    return player.stream.tracks.map((_$3) => null);
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:142
-  @override
-  void selectAudioTrack(String id) {
-    cmd(
-      () => player.setAudioTrack(
-        ((() {
-              final r = player.state.tracks.audio
-                  .where((a) => a.id == id)
-                  .toList();
-              return r.isEmpty ? null : r.first;
-            })() ??
-            (AudioTrack.auto())),
-      ),
-    );
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:146
-  @override
-  void seek(double seconds) {
-    cmd(() => player.seek(Duration(milliseconds: (seconds * 1000).round())));
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:149
-  void applyVolume() {
-    cmd(
-      () =>
-          player.setVolume(((volumeLevel * gainLevel) * 100).clamp(0.0, 200.0)),
-    );
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:152
-  @override
-  void setVolume(double v) {
-    volumeLevel = v;
-    applyVolume();
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:153
-  @override
-  void setGain(double g) {
-    gainLevel = g;
-    applyVolume();
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:154
-  @override
-  void setLooping(bool v) {
-    cmd(
-      () => player.setPlaylistMode(v ? PlaylistMode.loop : PlaylistMode.none),
-    );
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:156
-  @override
-  void setCover(bool v) {
-    coverFit = v;
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:157
-  @override
-  void setPreferredSubtitleId(String? id) {}
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:158
-  @override
-  void setAuthHeader(String? v) {}
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:159
-  @override
-  void setAudioFocus(bool v) {}
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:160
-  @override
-  void setAudioOnly(bool v) {}
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:161
-  @override
-  Stream<List<double>>? get audioBands {
-    return null;
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:163
-  @override
-  void play() {
-    cmd(() => player.play());
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:164
-  @override
-  void pause() {
-    cmd(() => player.pause());
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:165
-  @override
-  void setRate(double v) {
-    cmd(() => player.setRate(v));
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:167
-  @override
-  double get position {
-    return player.state.position.inMilliseconds / 1000.0;
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:168
-  @override
-  double get duration {
-    return player.state.duration.inMilliseconds / 1000.0;
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:169
-  @override
-  bool get paused {
-    return !player.state.playing;
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:170
-  @override
-  bool get ended {
-    return (() {
-      final dms = player.state.duration.inMilliseconds;
-      return (dms > 0) && (player.state.position.inMilliseconds >= dms);
-    })();
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:174
-  @override
-  void dispose() {
-    if (!disposed) {
-      disposed = true;
-      (() {
-        player.dispose();
-      })();
-    }
-  }
-
-  /// Source: sart-player/src/main/scala/sart/player/MediaKitVideo.scala:179
-  @override
-  Widget view() {
-    return Video(
-      controller: controller,
-      controls: NoVideoControls,
-      fit: coverFit ? BoxFit.cover : BoxFit.contain,
-    );
-  }
-}
-
 /// Source: sart-player/src/main/scala/sart/player/SubtitleSource.scala:6
 class SubtitleSource {
   final String url;
@@ -2713,170 +2323,169 @@ class SubtitleTrackInfo {
   };
 }
 
-/// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:16
+/// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:15
 abstract mixin class VideoPlayer {
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:20
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:19
   void setTextureSurface(bool texture) {}
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:24
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:23
   void relayout() {}
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:28
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:27
   void setPreferredLanguages(String audio, String text) {}
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:32
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:31
   void setVideoAdjust(double brightness, double warmth) {}
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:34
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:33
   void setOnEnded(void Function() cb);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:35
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:34
   void setOnError(void Function() cb);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:39
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:38
   bool get ready {
     return (duration > 0) || (position > 0);
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:42
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:41
   String? get statusNote {
     return null;
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:45
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:44
   bool get buffering {
     return false;
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:48
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:47
   VideoSize? get videoSize {
     return null;
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:50
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:49
   Future<void> setSource(
     String url, {
     double startSeconds = 0.0,
     List<SubtitleSource> sideloaded = const [],
   });
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:52
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:51
   double get setSource$default$2 {
     return 0.0;
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:53
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:52
   List get setSource$default$3 {
     return [];
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:55
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:54
   Future<void> addSubtitles(List<SubtitleSource> subs);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:59
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:58
   bool get rendersImageSubtitles;
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:61
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:60
   List<SubtitleTrackInfo> get subtitleTracks;
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:62
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:61
   String? get currentSubtitleId;
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:63
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:62
   Stream<void> get subtitleTracksStream;
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:64
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:63
   void selectEmbeddedSubtitle(String id);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:65
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:64
   void selectUriSubtitle(String url, String? label, String? language);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:67
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:66
   Object? get selectUriSubtitle$default$2 {
     return null;
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:68
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:67
   Object? get selectUriSubtitle$default$3 {
     return null;
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:70
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:69
   void subtitlesOff();
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:72
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:71
   List<AudioTrackInfo> get audioTracks;
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:73
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:72
   String? get currentAudioId;
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:74
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:73
   Stream<void> get audioTracksStream;
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:75
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:74
   void selectAudioTrack(String id);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:77
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:76
   void seek(double seconds);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:78
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:77
   void play();
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:79
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:78
   void pause();
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:82
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:81
   void setRate(double v);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:84
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:83
   void setVolume(double v);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:87
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:86
   void setGain(double g);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:89
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:88
   void setLooping(bool v);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:91
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:90
   void setCover(bool v);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:93
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:92
   void setPreferredSubtitleId(String? id);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:96
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:95
   void setAuthHeader(String? v);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:99
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:98
   void setAudioFocus(bool v);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:102
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:101
   void setAudioOnly(bool v);
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:106
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:105
   Stream<List<double>>? get audioBands;
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:108
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:107
   double get position;
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:109
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:108
   double get duration;
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:110
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:109
   bool get paused;
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:111
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:110
   bool get ended;
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:113
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:112
   void dispose();
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:114
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:113
   Widget view();
 
-  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:120
+  /// Source: sart-player/src/main/scala/sart/player/VideoPlayer.scala:119
   static VideoPlayer create() {
-    MediaKit.ensureInitialized();
-    return MediaKitVideo();
+    return VideoBackendFactory.create();
   }
 }
 

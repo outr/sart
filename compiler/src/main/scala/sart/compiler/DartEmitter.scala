@@ -566,10 +566,17 @@ class DartEmitter(
           }
         case _ => None
 
-    private def recordAnnotations(sym: Symbol): Unit =
+    private def recordAnnotations(sym: Symbol, recordImport: Boolean = true): Unit =
       for a <- sym.annotations do
         annoFqn(a) match
-          case "sart.dart.DartImport" =>
+          // A facade's @DartImport belongs in the file that USES it (whose
+          // `currentLib` is active at the reference), not the one where the
+          // facade DECLARATION happens to be processed (always `main`). So
+          // declaration-time recording (recordImport=false) captures the
+          // package/pubspec/variants but leaves imports to the use sites —
+          // otherwise every facade a compiled-through library declares would
+          // dump its import into main.dart, even a `@DartLibrary`-routed one.
+          case "sart.dart.DartImport" if recordImport =>
             constArgs(a).collectFirst { case s: String => s }.foreach { path =>
               val alias = importAlias(sym)
               imports += alias.map(al => s"$path>>>$al").getOrElse(path)
@@ -815,6 +822,20 @@ class DartEmitter(
         try runTopClass(cd)
         finally currentLib = saved
       case cd: ClassDef => runTopClass(cd)
+      // A `@DartLibrary`-routed TOP-LEVEL def/val (e.g. a `@JsGlobal` external
+      // getter) must land in its library too — otherwise it emits into
+      // main.dart and drags a web-only import like dart:js_interop into
+      // every platform's bundle.
+      case dd: DefDef if dartLibraryOf(dd.symbol).isDefined =>
+        val saved = currentLib
+        currentLib = libraryTarget(dartLibraryOf(dd.symbol).get)
+        try runTopOther(dd)
+        finally currentLib = saved
+      case vd: ValDef if dartLibraryOf(vd.symbol).isDefined =>
+        val saved = currentLib
+        currentLib = libraryTarget(dartLibraryOf(vd.symbol).get)
+        try runTopOther(vd)
+        finally currentLib = saved
       case t => runTopOther(t)
 
     private def runTopClass(cd: ClassDef): Unit =
@@ -825,7 +846,7 @@ class DartEmitter(
         // emitted class). Its companion/subtypes are handled the same way.
         if wireMappings.contains(sym.fullName.stripSuffix("$")) then return
         if hasNative(sym) then
-          recordAnnotations(sym)
+          recordAnnotations(sym, recordImport = false)
         else if name.endsWith("$package$") || name.endsWith("$package") then
           // Scala 3 stores top-level defs inside a synthetic package class;
           // descend and treat its stats as top-level trees.
@@ -848,9 +869,9 @@ class DartEmitter(
           val moduleVal = sym.companionModule
           if hasNative(sym) || (moduleVal.exists && hasNative(moduleVal))
              || (companion.exists && hasNative(companion)) then
-            recordAnnotations(sym)
-            if moduleVal.exists then recordAnnotations(moduleVal)
-            if companion.exists then recordAnnotations(companion)
+            recordAnnotations(sym, recordImport = false)
+            if moduleVal.exists then recordAnnotations(moduleVal, recordImport = false)
+            if companion.exists then recordAnnotations(companion, recordImport = false)
           else if companion.exists && companion.flags.is(Flags.Enum) then
             emitEnumFromCompanion(cd, companion)
           else if companion.exists && companionModules.contains(companion) then
@@ -902,7 +923,7 @@ class DartEmitter(
           // (go_router's `context.go`) — record imports, emit nothing;
           // call sites emit `receiver.method(args)` and resolve against
           // the actual Dart extension.
-          if hasNative(dd.symbol) then recordAnnotations(dd.symbol)
+          if hasNative(dd.symbol) then recordAnnotations(dd.symbol, recordImport = false)
           else emitExtensionMethod(dd)
         else if dd.returnTpt.tpe.dealias.typeSymbol.fullName == "scala.Conversion" then ()
         else emitTopLevelDef(dd)
@@ -914,7 +935,7 @@ class DartEmitter(
           val c = tpeSym.companionClass
           c.exists && hasNative(c)
         }))
-        if nativeModule then recordAnnotations(vd.symbol)
+        if nativeModule then recordAnnotations(vd.symbol, recordImport = false)
         else if vd.tpt.tpe.dealias.typeSymbol.fullName == "scala.Conversion" then ()
         else emitTopLevelVal(vd)
       case _ =>

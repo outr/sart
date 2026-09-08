@@ -15,7 +15,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
  *  demux/decode and renders into a Flutter texture, so playback (incl. HEVC)
  *  isn't hostage to the platform's surface path — and, unlike video_player,
  *  it fills the box correctly on Android TV. Faithful port of NaboPlayer's
- *  `MediaKitVideo`, Nabo-specific coupling removed. */
+ *  `MediaKitVideo`, Nabo-specific coupling removed. Emitted into its own
+ *  `video_io.dart` library so its `media_kit` imports never reach the web bundle. */
+@DartLibrary("platform/video_io.dart")
 class MediaKitVideo extends VideoPlayer:
   private val player: Player =
     Player(configuration = PlayerConfiguration(logLevel = MPVLogLevel.info))
