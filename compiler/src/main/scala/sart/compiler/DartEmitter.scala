@@ -3257,7 +3257,11 @@ class DartEmitter(
       sym.exists && sym.flags.is(Flags.ExtensionMethod)
 
     private def extensionCallName(fn: Term): String =
-      dartSafeName(extensionSym(fn).name)
+      val sym = extensionSym(fn)
+      // `@DartName` lets a facade extension carry a Dart name that differs
+      // from its Scala name — needed when the Dart name (`toDart`) would
+      // otherwise force a Scala overload clash across receiver types.
+      annoString(relatedSyms(sym), "sart.dart.DartName").getOrElse(dartSafeName(sym.name))
 
     // ── Option-match lowering ──────────────────────────────────────────
 

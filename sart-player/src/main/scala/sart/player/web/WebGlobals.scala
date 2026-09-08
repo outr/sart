@@ -10,3 +10,4 @@ import sart.dart.*
 object WebGlobals:
   def document: Document = native.value
   def console: Console = native.value
+  def window: Window = native.value

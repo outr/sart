@@ -521,7 +521,7 @@ class FxStMatch:
     case FxSt.C(n) => n
 
 // dart:js_interop authoring: an extension type binding + external global.
-import sart.dart.{JsType, JsGlobal, JSObject, JSAny, JSString, JSNumber, toJS}
+import sart.dart.{JsType, JsGlobal, JSObject, JSAny, JSString, JSNumber, JSArray, toJS, toDartString}
 @JsType("Hls")
 class FxHls(config: JSObject) extends JSObject:
   def loadSource(url: String): Unit = native.value
@@ -555,3 +555,7 @@ class FxJsGaps:
   // leaked `…$package.callMethod$default$N` reference at the call site.
   def callm0(o: JSObject): JSAny = o.callMethod("m".toJS)
   def callm1(o: JSObject): JSAny = o.callMethod("m".toJS, "a".toJS)
+  // List→JSArray: a Scala List of JS values becomes a `JSArray` for JS APIs
+  // that take an array; and a `JSString` unwraps back to a Dart `String`.
+  def arr(): JSArray[JSAny] = List[JSAny]("x".toJS, "y".toJS).toJS
+  def unwrap(s: JSString): String = s.toDartString

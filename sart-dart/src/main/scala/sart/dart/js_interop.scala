@@ -62,5 +62,11 @@ extension (n: Int)     @native def toJS: JSNumber = native.value
 extension (d: Double)  @native def toJS: JSNumber = native.value
 extension (b: Boolean) @native def toJS: JSBoolean = native.value
 extension [T](f: T)    @native def toJS: JSFunction = native.value
+// `List(x, y).toJS` → a `JSArray<T>` (dart:js_interop's `ListToJSArray`),
+// for JS APIs that take an array (`Blob`'s parts, etc.).
+extension [T <: JSAny](l: List[T]) @native @DartImport("dart:js_interop") def toJS: JSArray[T] = native.value
 extension (a: JSAny)   @native def dartify(): Any = native.value
+// Emits `.toDart` (dart:js_interop's `JSStringToString`); a distinct Scala
+// name avoids clashing with `JSPromise.toDart` as an overload.
+extension (s: JSString) @native @DartName("toDart") def toDartString: String = native.value
 extension [T <: JSAny](p: JSPromise[T]) @native def toDart: Future[T] = native.value

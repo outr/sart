@@ -11,9 +11,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
  *  hls.js loaded on demand for HLS on browsers without native HLS. Faithful
  *  port of NaboPlayer's web `NaboVideo`, Nabo-specific coupling removed.
  *
- *  One remaining simplification: sideloaded subtitles are attached as a
- *  `<track src>` directly rather than fetched + SRT→VTT-converted into a
- *  `blob:` URL (that path needs List→JSArray interop; follow-up).
+ *  Sideloaded subtitles are fetched, converted SRT→VTT when needed, and
+ *  attached as a `blob:` `<track>` — a browser only renders WebVTT in a
+ *  `<track>`, and a `blob:` URL sidesteps the cross-origin `<track src>`
+ *  restriction that would otherwise drop the cue text.
  */
 @DartLibrary("platform/video_web.dart")
 class WebVideo private (val viewType: String, val element: HTMLVideoElement, ref: ElementRef)
@@ -68,10 +69,36 @@ class WebVideo private (val viewType: String, val element: HTMLVideoElement, ref
     element.src = url
     Future.successful(())
 
-  /** Attach each sideloaded subtitle as a `<track>` pointing at its URL. */
+  /** Fetch each sideloaded subtitle, convert SRT→VTT when needed, and attach
+   *  it as a `blob:` `<track>`. Sequential so cue order matches the input. */
   override def addSubtitles(subs: List[SubtitleSource]): Future[Unit] =
-    subs.foreach(s => attachTrack(s.url, s.label, s.language, s.isDefault, show = false))
+    var i = 0
+    while i < subs.size do
+      await(sideload(subs(i)))
+      i += 1
     Future.successful(())
+
+  private def sideload(s: SubtitleSource): Future[Unit] =
+    val resp = await(WebGlobals.window.fetch(s.url.toJS).toDart)
+    val body = await(resp.text().toDart).toDartString
+    // A VTT file already starts with the `WEBVTT` magic; anything else is
+    // treated as SRT and converted (WebVTT header + comma→period timestamps).
+    val vtt = if body.startsWith("WEBVTT") then body else srtToVtt(body)
+    val blob = Blob(List[JSAny](vtt.toJS).toJS, BlobPropertyBag(`type` = "text/vtt"))
+    attachTrack(URL.createObjectURL(blob), s.label, s.language, s.isDefault, show = false)
+    Future.successful(())
+
+  /** Minimal SRT→VTT: prepend the `WEBVTT` header and turn each timestamp
+   *  line's `,` millisecond separator into `.` (VTT uses a period). Only
+   *  cue-timing lines (those with `-->`) are touched, so dialogue commas
+   *  are left alone. */
+  private def srtToVtt(srt: String): String =
+    val fixed = srt
+      .split("\n")
+      .toList
+      .map(line => if line.contains("-->") then line.replace(",", ".") else line)
+      .mkString("\n")
+    "WEBVTT\n\n" + fixed
 
   override def subtitleTracks: List[SubtitleTrackInfo] =
     val tt = element.textTracks

@@ -856,4 +856,7 @@ class EmitterSuite extends FunSuite:
     assert(!g.contains("$default$"), g)
     assert(g.contains("o.callMethod('m'.toJS)"), g)
     assert(g.contains("o.callMethod('m'.toJS, 'a'.toJS)"), g)
+    // gap 5: List→JSArray (`[...].toJS`) and JSString→String (`s.toDart`)
+    assert(g.contains("['x'.toJS, 'y'.toJS].toJS"), g)
+    assert(g.contains("s.toDart"), g)
   }
