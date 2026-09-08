@@ -31,6 +31,7 @@ class LauncherApp extends StatelessWidget:
 class LauncherHome extends StatelessWidget:
   private val demos: List[Demo] = List(
     Demo("Player",      "Cross-platform video/audio", ctx => PlayerApp()),
+    Demo("TV",          "Remote/D-pad, focus, lifecycle", ctx => TvApp()),
     Demo("Showcase",    "Kitchen-sink feature demo",    ctx => ShowcaseApp()),
     Demo("Counter",     "Classic Flutter counter",      ctx => MyHomePage(title = "Counter")),
     Demo("Todos",       "TextField + list + state",     ctx => TodoApp()),

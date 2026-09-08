@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:video_player/video_player.dart';
 import 'platform/platform_name.dart';
 import 'sart_either.dart';
@@ -63,6 +65,7 @@ class LauncherApp extends StatelessWidget {
 class LauncherHome extends StatelessWidget {
   final List<Demo> demos = [
     Demo('Player', 'Cross-platform video/audio', (ctx) => PlayerApp()),
+    Demo('TV', 'Remote/D-pad, focus, lifecycle', (ctx) => TvApp()),
     Demo('Showcase', 'Kitchen-sink feature demo', (ctx) => ShowcaseApp()),
     Demo('Counter', 'Classic Flutter counter', (ctx) => MyHomePage('Counter')),
     Demo('Todos', 'TextField + list + state', (ctx) => TodoApp()),
@@ -71,7 +74,7 @@ class LauncherHome extends StatelessWidget {
     Demo('Two-screen', 'Navigator.push demo', (ctx) => HomeScreen()),
   ];
 
-  /// Source: example/src/main/scala/example/LauncherApp.scala:42
+  /// Source: example/src/main/scala/example/LauncherApp.scala:43
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1003,6 +1006,111 @@ class TodoItem {
       TodoItem((json['text'] as String), (json['done'] as bool));
 
   Map<String, dynamic> toJson() => {'text': text, 'done': done};
+}
+
+/// Source: example/src/main/scala/example/apps/TvApp.scala:12
+class TvApp extends StatefulWidget {
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:13
+  @override
+  State<TvApp> createState() {
+    return TvAppState();
+  }
+}
+
+/// Source: example/src/main/scala/example/apps/TvApp.scala:15
+class TvAppState extends State<TvApp> {
+  String lastKey = '—';
+  int selected = -1;
+  late AppLifecycleListener lifecycle;
+
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:20
+  @override
+  void initState() {
+    super.initState();
+    lifecycle = TvLifecycle.apply(
+      () => null,
+      () => null,
+      TvLifecycle.apply$default$3,
+      TvLifecycle.apply$default$4,
+      TvLifecycle.apply$default$5,
+    );
+  }
+
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:28
+  @override
+  void dispose() {
+    lifecycle.dispose();
+    super.dispose();
+  }
+
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:32
+  bool onKey(TvKey key) {
+    setState(() {
+      lastKey = key.toJson();
+    });
+    final directional =
+        (((key == TvKey.Up) || (key == TvKey.Down)) || (key == TvKey.Left)) ||
+        (key == TvKey.Right);
+    return !directional;
+  }
+
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:40
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Sart TV')),
+      body: RemoteControl(
+        (key) => onKey(key),
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Platform: ${TvPlatform.current}'),
+              SizedBox(height: 8.0),
+              Text('Last key: ${lastKey}'),
+              SizedBox(height: 24.0),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [card(0), gap, card(1), gap, card(2)],
+              ),
+              SizedBox(height: 24.0),
+              selected >= 0
+                  ? Text('Selected card ${selected}')
+                  : Text('Nothing selected'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:66
+  Widget get gap {
+    return SizedBox(width: 16.0);
+  }
+
+  /// Source: example/src/main/scala/example/apps/TvApp.scala:68
+  Widget card(int index) {
+    return Focusable(
+      () => setState(() {
+        selected = index;
+      }),
+      (focused) => Container(
+        decoration: BoxDecoration(
+          color: (focused ? Colors.blue : Colors.grey),
+          border: Border.all(
+            color: focused ? Colors.white : Colors.transparent,
+            width: 3.0,
+          ),
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        width: 120.0,
+        height: 120.0,
+        child: Center(child: Text('Card ${index}')),
+      ),
+      autofocus: (index == 0),
+    );
+  }
 }
 
 /// Source: example/src/main/scala/example/features/AsyncBuilders.scala:9
@@ -2177,5 +2285,315 @@ class PlayerController {
   /// Source: sart-player/src/main/scala/sart/player/Player.scala:42
   Widget get view {
     return VideoPlayer(backend);
+  }
+}
+
+/// Source: sart-tv/src/main/scala/sart/tv/Focusable.scala:20
+class Focusable extends StatefulWidget {
+  final void Function() onSelect;
+  final Widget Function(bool) builder;
+  final bool autofocus;
+  Focusable(this.onSelect, this.builder, {this.autofocus = false});
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Focusable.scala:25
+  @override
+  State<Focusable> createState() {
+    return FocusableState();
+  }
+}
+
+/// Source: sart-tv/src/main/scala/sart/tv/Focusable.scala:27
+class FocusableState extends State<Focusable> {
+  bool focused = false;
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Focusable.scala:30
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      child: widget.builder(focused),
+      autofocus: widget.autofocus,
+      onFocusChange: (f) => setState(() {
+        focused = f;
+      }),
+      onKeyEvent: (node, event) => handle(event),
+    );
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Focusable.scala:38
+  KeyEventResult handle(Object event) {
+    return !(event is KeyDownEvent)
+        ? KeyEventResult.ignored
+        : (() {
+            final decoded = TvKey.fromLogicalKey(
+              (event as KeyEvent).logicalKey,
+            );
+            return !(decoded == null) && (decoded! == TvKey.Select)
+                ? (() {
+                    widget.onSelect();
+                    return KeyEventResult.handled;
+                  })()
+                : KeyEventResult.ignored;
+          })();
+  }
+}
+
+/// Source: sart-tv/src/main/scala/sart/tv/Remote.scala:14
+class RemoteControl extends StatelessWidget {
+  final bool Function(TvKey) onKey;
+  final Widget child;
+  final bool autofocus;
+  RemoteControl(this.onKey, this.child, {this.autofocus = true});
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Remote.scala:19
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      child: child,
+      autofocus: autofocus,
+      onKeyEvent: (node, event) => handle(event),
+    );
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Remote.scala:26
+  KeyEventResult handle(Object event) {
+    return !((event is KeyDownEvent) || (event is KeyRepeatEvent))
+        ? KeyEventResult.ignored
+        : (() {
+            final decoded = TvKey.fromLogicalKey(
+              (event as KeyEvent).logicalKey,
+            );
+            return (decoded == null)
+                ? KeyEventResult.ignored
+                : onKey(decoded!)
+                ? KeyEventResult.handled
+                : KeyEventResult.ignored;
+          })();
+  }
+}
+
+/// Source: sart-tv/src/main/scala/sart/tv/TvKey.scala:16
+enum TvKey {
+  Up,
+  Down,
+  Left,
+  Right,
+  Select,
+  Back,
+  Home,
+  Menu,
+  PlayPause,
+  Play,
+  Pause,
+  Stop,
+  FastForward,
+  Rewind,
+  Next,
+  Previous,
+  ChannelUp,
+  ChannelDown,
+  Red,
+  Green,
+  Yellow,
+  Blue,
+  Digit0,
+  Digit1,
+  Digit2,
+  Digit3,
+  Digit4,
+  Digit5,
+  Digit6,
+  Digit7,
+  Digit8,
+  Digit9;
+
+  String toJson() => switch (this) {
+    TvKey.Up => 'TvKey.Up',
+    TvKey.Down => 'TvKey.Down',
+    TvKey.Left => 'TvKey.Left',
+    TvKey.Right => 'TvKey.Right',
+    TvKey.Select => 'TvKey.Select',
+    TvKey.Back => 'TvKey.Back',
+    TvKey.Home => 'TvKey.Home',
+    TvKey.Menu => 'TvKey.Menu',
+    TvKey.PlayPause => 'TvKey.PlayPause',
+    TvKey.Play => 'TvKey.Play',
+    TvKey.Pause => 'TvKey.Pause',
+    TvKey.Stop => 'TvKey.Stop',
+    TvKey.FastForward => 'TvKey.FastForward',
+    TvKey.Rewind => 'TvKey.Rewind',
+    TvKey.Next => 'TvKey.Next',
+    TvKey.Previous => 'TvKey.Previous',
+    TvKey.ChannelUp => 'TvKey.ChannelUp',
+    TvKey.ChannelDown => 'TvKey.ChannelDown',
+    TvKey.Red => 'TvKey.Red',
+    TvKey.Green => 'TvKey.Green',
+    TvKey.Yellow => 'TvKey.Yellow',
+    TvKey.Blue => 'TvKey.Blue',
+    TvKey.Digit0 => 'TvKey.Digit0',
+    TvKey.Digit1 => 'TvKey.Digit1',
+    TvKey.Digit2 => 'TvKey.Digit2',
+    TvKey.Digit3 => 'TvKey.Digit3',
+    TvKey.Digit4 => 'TvKey.Digit4',
+    TvKey.Digit5 => 'TvKey.Digit5',
+    TvKey.Digit6 => 'TvKey.Digit6',
+    TvKey.Digit7 => 'TvKey.Digit7',
+    TvKey.Digit8 => 'TvKey.Digit8',
+    TvKey.Digit9 => 'TvKey.Digit9',
+  };
+
+  static TvKey fromJson(dynamic json) {
+    final String s = (json as String).toLowerCase();
+    for (final v in values) {
+      if (v.toJson().toLowerCase() == s) return v;
+    }
+    throw Exception('Unsupported TvKey: ' + s);
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/TvKey.scala:32
+  static TvKey? fromLogicalKey(LogicalKeyboardKey key) {
+    return byId[key.keyId];
+  }
+
+  static late final Map<int, TvKey> byId = {
+    LogicalKeyboardKey.arrowUp.keyId: Up,
+    LogicalKeyboardKey.arrowDown.keyId: Down,
+    LogicalKeyboardKey.arrowLeft.keyId: Left,
+    LogicalKeyboardKey.arrowRight.keyId: Right,
+    LogicalKeyboardKey.select.keyId: Select,
+    LogicalKeyboardKey.enter.keyId: Select,
+    LogicalKeyboardKey.numpadEnter.keyId: Select,
+    LogicalKeyboardKey.gameButtonA.keyId: Select,
+    LogicalKeyboardKey.space.keyId: Select,
+    LogicalKeyboardKey.goBack.keyId: Back,
+    LogicalKeyboardKey.escape.keyId: Back,
+    LogicalKeyboardKey.browserBack.keyId: Back,
+    LogicalKeyboardKey.contextMenu.keyId: Menu,
+    LogicalKeyboardKey.home.keyId: Home,
+    LogicalKeyboardKey.mediaPlayPause.keyId: PlayPause,
+    LogicalKeyboardKey.mediaPlay.keyId: Play,
+    LogicalKeyboardKey.mediaPause.keyId: Pause,
+    LogicalKeyboardKey.mediaStop.keyId: Stop,
+    LogicalKeyboardKey.mediaFastForward.keyId: FastForward,
+    LogicalKeyboardKey.mediaRewind.keyId: Rewind,
+    LogicalKeyboardKey.mediaTrackNext.keyId: Next,
+    LogicalKeyboardKey.mediaTrackPrevious.keyId: Previous,
+    LogicalKeyboardKey.channelUp.keyId: ChannelUp,
+    LogicalKeyboardKey.channelDown.keyId: ChannelDown,
+    LogicalKeyboardKey.colorF0Red.keyId: Red,
+    LogicalKeyboardKey.colorF1Green.keyId: Green,
+    LogicalKeyboardKey.colorF2Yellow.keyId: Yellow,
+    LogicalKeyboardKey.colorF3Blue.keyId: Blue,
+    LogicalKeyboardKey.digit0.keyId: Digit0,
+    LogicalKeyboardKey.digit1.keyId: Digit1,
+    LogicalKeyboardKey.digit2.keyId: Digit2,
+    LogicalKeyboardKey.digit3.keyId: Digit3,
+    LogicalKeyboardKey.digit4.keyId: Digit4,
+    LogicalKeyboardKey.digit5.keyId: Digit5,
+    LogicalKeyboardKey.digit6.keyId: Digit6,
+    LogicalKeyboardKey.digit7.keyId: Digit7,
+    LogicalKeyboardKey.digit8.keyId: Digit8,
+    LogicalKeyboardKey.digit9.keyId: Digit9,
+  };
+}
+
+/// Source: sart-tv/src/main/scala/sart/tv/Lifecycle.scala:20
+class TvLifecycle {
+  TvLifecycle._();
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Lifecycle.scala:21
+  static void noop() {}
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Lifecycle.scala:26
+  static AppLifecycleListener apply(
+    void Function() onResume,
+    void Function() onPause,
+    void Function() onHide,
+    void Function() onInactive,
+    void Function() onDetach,
+  ) {
+    return AppLifecycleListener(
+      onResume: onResume,
+      onPause: onPause,
+      onInactive: onInactive,
+      onHide: onHide,
+      onDetach: onDetach,
+    );
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Lifecycle.scala:27
+  static void Function() get apply$default$1 {
+    return () => noop();
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Lifecycle.scala:28
+  static void Function() get apply$default$2 {
+    return () => noop();
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Lifecycle.scala:29
+  static void Function() get apply$default$3 {
+    return () => noop();
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Lifecycle.scala:30
+  static void Function() get apply$default$4 {
+    return () => noop();
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Lifecycle.scala:31
+  static void Function() get apply$default$5 {
+    return () => noop();
+  }
+}
+
+/// Source: sart-tv/src/main/scala/sart/tv/Platform.scala:16
+enum TvPlatform {
+  AppleTV,
+  Tizen,
+  WebOS,
+  AndroidTV,
+  Other;
+
+  String toJson() => switch (this) {
+    TvPlatform.AppleTV => 'TvPlatform.AppleTV',
+    TvPlatform.Tizen => 'TvPlatform.Tizen',
+    TvPlatform.WebOS => 'TvPlatform.WebOS',
+    TvPlatform.AndroidTV => 'TvPlatform.AndroidTV',
+    TvPlatform.Other => 'TvPlatform.Other',
+  };
+
+  static TvPlatform fromJson(dynamic json) {
+    final String s = (json as String).toLowerCase();
+    for (final v in values) {
+      if (v.toJson().toLowerCase() == s) return v;
+    }
+    throw Exception('Unsupported TvPlatform: ' + s);
+  }
+
+  static final String configured = const String.fromEnvironment(
+    'SART_TV_PLATFORM',
+  );
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Platform.scala:25
+  static TvPlatform get current {
+    return fromName(configured);
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Platform.scala:28
+  static bool get isTv {
+    return current != Other;
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/Platform.scala:32
+  static TvPlatform fromName(String name) {
+    return (name == 'appletv') || (name == 'tvos')
+        ? AppleTV
+        : (name == 'tizen') || (name == 'samsung')
+        ? Tizen
+        : (name == 'webos') || (name == 'lg')
+        ? WebOS
+        : (name == 'androidtv') || (name == 'android-tv')
+        ? AndroidTV
+        : Other;
   }
 }

@@ -123,10 +123,22 @@ lazy val `sart-player` = (project in file("sart-player"))
     Compile / scalacOptions ++= Seq("-Yretain-trees")
   )
 
+// TV support authored in Scala: a unified remote-key vocabulary, a
+// focusable/selectable primitive for D-pad navigation, an app-lifecycle
+// helper, and deterministic platform detection — one API across Apple TV,
+// Samsung Tizen, LG webOS and Android TV. Published like the other core
+// modules and consumed via `sartLibraries` (or a project dependency).
+lazy val `sart-tv` = (project in file("sart-tv"))
+  .dependsOn(`sart-dart`, `sart-stdlib`, `flutter-facades`)
+  .settings(
+    name := "sart-tv",
+    Compile / scalacOptions ++= Seq("-Yretain-trees")
+  )
+
 // The user program — the pure-Scala counter app. Its `.tasty` files are
 // the input to the Sart compiler.
 lazy val example = (project in file("example"))
-  .dependsOn(`flutter-facades`, `sart-stdlib`, `sart-player`)
+  .dependsOn(`flutter-facades`, `sart-stdlib`, `sart-player`, `sart-tv`)
   .settings(
     name := "sart-example",
     // Keep TASTy around so the compiler can read it.
@@ -170,7 +182,7 @@ lazy val `sart-facadegen` = (project in file("sart-facadegen"))
   )
 
 lazy val root = (project in file("."))
-  .aggregate(`sart-dart`, `sart-stdlib`, `flutter-facades`, `sart-player`, example, compiler, `sart-facadegen`)
+  .aggregate(`sart-dart`, `sart-stdlib`, `flutter-facades`, `sart-player`, `sart-tv`, example, compiler, `sart-facadegen`)
   .settings(
     name := "sart",
 
@@ -207,7 +219,11 @@ lazy val root = (project in file("."))
       // (the CLI --library= compile-through, as the sbt-sart plugin does
       // for sartLibraries / dependsOn projects).
       val playerClasses = (`sart-player` / Compile / classDirectory).value
-      val libArgs = Seq(s"--library=${playerClasses.getAbsolutePath}")
+      val tvClasses     = (`sart-tv` / Compile / classDirectory).value
+      val libArgs = Seq(
+        s"--library=${playerClasses.getAbsolutePath}",
+        s"--library=${tvClasses.getAbsolutePath}"
+      )
       val rc = sys.process.Process(Seq(
         "java", "-cp", runCp, "sart.compiler.Main"
       ) ++ libArgs ++ Seq(
@@ -497,6 +513,7 @@ lazy val root = (project in file("."))
       (`sart-stdlib` / publishLocal).value
       (`flutter-facades` / publishLocal).value
       (`sart-player` / publishLocal).value
+      (`sart-tv` / publishLocal).value
       (compiler / publishLocal).value
 
       // sbt-sart/ is its own sbt build (cross-built: Scala 2.12 → sbt 1.x,

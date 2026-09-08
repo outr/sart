@@ -329,7 +329,8 @@ object SartPlugin extends AutoPlugin {
       val outDir = sartOutDir.value
       val cmd    = sartTizenCommand.value
       sbtSartScaffold("tizen", outDir, normalizedName.value, log, cmd)
-      sbtSartBuild("tpk", Seq("-ptv"), outDir, log, cmd)
+      // Inject the platform so `sart.tv.TvPlatform.current` resolves.
+      sbtSartBuild("tpk", Seq("-ptv", "--dart-define=SART_TV_PLATFORM=tizen"), outDir, log, cmd)
       val tpkDir = outDir / "build" / "tizen" / "tpk"
       log.info(s"sbt-sart: built Tizen .tpk under $tpkDir")
       tpkDir
@@ -343,7 +344,8 @@ object SartPlugin extends AutoPlugin {
       val outDir = sartOutDir.value
       val cmd    = sartWebOSCommand.value
       sbtSartScaffold("webos", outDir, normalizedName.value, log, cmd)
-      sbtSartBuild("webos", Seq("--release"), outDir, log, cmd)
+      // Inject the platform so `sart.tv.TvPlatform.current` resolves.
+      sbtSartBuild("webos", Seq("--release", "--dart-define=SART_TV_PLATFORM=webos"), outDir, log, cmd)
       val ipkDir = outDir / "build" / "webos"
       log.info(s"sbt-sart: built webOS .ipk under $ipkDir")
       ipkDir
@@ -409,7 +411,8 @@ object SartPlugin extends AutoPlugin {
       sbtSartScaffold("tvos", outDir, normalizedName.value, log, cmd, passPlatforms = false)
       // `--no-codesign` builds the .app without Apple provisioning; for a
       // signed build users run `flutter-tvos build ipa` with their signing.
-      sbtSartBuild("ios", Seq("--no-codesign"), outDir, log, cmd)
+      // Inject the platform so `sart.tv.TvPlatform.current` resolves.
+      sbtSartBuild("ios", Seq("--no-codesign", "--dart-define=SART_TV_PLATFORM=appletv"), outDir, log, cmd)
       val bundle = outDir / "build" / "ios" / "iphoneos" / "Runner.app"
       log.info(s"sbt-sart: built tvOS bundle at $bundle")
       bundle

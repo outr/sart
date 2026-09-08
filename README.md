@@ -36,6 +36,7 @@ native binary
 | --------------------- | ----------------------------------------------------------------------- |
 | `sart-dart/`          | Annotation library: `@native`, `@DartImport`, `@DartAlias`, `@DartName`, `@DartPackage`, `@DartPubspec`, `@DartTopLevel`, the JSON-codec annotations (`@JsonModel`, `@JsonTag`, `@JsonField`), the `native.value` sentinel, the `Dyn` dynamic bridge, `Json`, `Completer`, `nn`/`cast`/`nullValue`, and direct-style `async {}` / `await(...)`. Analogous to `scalajs-library`. |
 | `sart-player/`        | General-purpose cross-platform video/audio player library (over `video_player`), authored in Scala. Published like the core modules; consumed via `sartLibraries`. Extracted from the NaboTV player. |
+| `sart-tv/`            | TV support library, authored in Scala: a unified remote-key vocabulary (`TvKey`), a focusable/selectable D-pad primitive (`Focusable`) and key dispatcher (`RemoteControl`), an app-lifecycle helper (`TvLifecycle`), and deterministic platform detection (`TvPlatform`, driven by the `--dart-define` the TV build tasks inject). One API across Apple TV, Samsung Tizen, LG webOS and Android TV. |
 | `sart-stdlib/`        | Hand-ported stdlib facades mapped to Dart: `Option`/`Try`/`Either` (Dart shims emitted alongside user code), `Duration`/`Timer`, `Stream`, `Regex`, `dart:math`, `dart:convert` (JSON/utf8/base64), `Uint8List`, `dart:core` statics (`int.parse`, `String.fromEnvironment`, `print`, `FormatException`), and `num`/`String` extension methods (`toStringAsFixed`, `clamp`, `padLeft`, `codeUnits`, …). |
 | `flutter-facades/`    | Facades for Flutter `material`, `services`, `gestures`, and `dart:ui` — ~360 declarations, ~320 of them generated from the SDK sources, the rest curated (`State[W]`, canvas/painting, `AsyncSnapshot`, `Autocomplete`, …). Each carries `@DartImport` + `@DartPackage` so the emitter auto-generates imports and pubspec. |
 | `example/`            | Sample Scala apps exercising the compiler — counter app, todo app, two-screen nav app, plus the feature fixtures under `compiler/src/test`. |
@@ -235,7 +236,8 @@ bundled assets, `@DartPubspec` YAML merging, and a generated
 `analysis_options.yaml` that silences only shim-noise diagnostics.
 
 **Published artifacts** (local Ivy): `sart-dart_3`, `sart-stdlib_3`,
-`flutter-facades_3`, `sart-compiler_3`, `sbt-sart` (all at `0.1.0-SNAPSHOT`).
+`flutter-facades_3`, `sart-player_3`, `sart-tv_3`, `sart-compiler_3`,
+`sbt-sart` (all at `0.1.0-SNAPSHOT`).
 
 ## Pixel-for-pixel verification
 

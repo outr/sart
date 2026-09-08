@@ -1068,6 +1068,22 @@ class DartEmitter(
         line(s"throw Exception('Unsupported $enumName: ' + s);")
         indent -= 1
         line("}")
+        // User-defined companion members — helper defs, lookup tables,
+        // factory methods — become `static` members of the Dart enum so
+        // `Enum.helper(...)` / `Enum.table` call sites resolve. The enum
+        // cases and the synthetic values/valueOf/fromOrdinal infra are
+        // already handled above, so exclude them.
+        val enumInfra = Set("values", "valueOf", "fromOrdinal")
+        val extraMembers = staticObjectMembers(companionCd).filterNot { stat =>
+          enumInfra.contains(stat.symbol.name) || (stat match
+            case vd: ValDef => vd.tpt.tpe.typeSymbol == enumCls
+            case _          => false)
+        }
+        for stat <- extraMembers if !skipJvmOnly(stat) do
+          blank()
+          stat match
+            case vd: ValDef => emitField(vd, static = true)
+            case dd: DefDef => emitMethod(dd, static = true)
         indent -= 1
         line("}")
         blank()
@@ -4937,12 +4953,26 @@ class DartEmitter(
             case _                                   => "Object?"
         // scala.Function0..FunctionN → Dart `R Function(T1, …, Tn)`.
         case fqn if fqn.matches("scala\\.Function\\d+") =>
-          return tpe match
-            case AppliedType(_, args) if args.nonEmpty =>
+          // A synthesised `$default$N` getter for a function-typed param
+          // can arrive as a BARE `Function0` ref (no visible type args) —
+          // `widen.dealias` recovers the applied form; failing that, the
+          // arity is known from the FunctionN name, so fall back to a
+          // fully-`dynamic` signature (assignable to any `R Function(...)`)
+          // rather than a bare `Function` (which is not).
+          val appliedArgs = tpe match
+            case AppliedType(_, args) if args.nonEmpty => Some(args)
+            case _ => tpe.widen.dealias match
+              case AppliedType(_, args) if args.nonEmpty => Some(args)
+              case _                                     => None
+          return appliedArgs match
+            case Some(args) =>
               val Ts = args.init.map { case t: TypeRepr => emitTypeRef(t) }.mkString(", ")
               val R  = emitTypeRef(args.last.asInstanceOf[TypeRepr])
               s"$R Function($Ts)"
-            case _ => "Function"
+            case None =>
+              val n  = fqn.stripPrefix("scala.Function").toInt
+              val Ts = List.fill(n)("dynamic").mkString(", ")
+              s"dynamic Function($Ts)"
         // scala.Tuple2..Tuple22 → Dart record types `(T1, T2, …)`.
         // Field access (`_1`, `_2`, …) is rewritten via the stdlib table
         // to Dart record positional getters (`$1`, `$2`, …).
