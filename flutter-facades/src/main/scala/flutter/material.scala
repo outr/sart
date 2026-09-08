@@ -246,6 +246,19 @@ object foundation:
   def kIsWeb: Boolean = native.value
   def kDebugMode: Boolean = native.value
 
+/** material's top-level dialog entry points (free functions in Dart). Dart's `showDialog` takes only
+ *  NAMED parameters, and the emitter makes a Scala param named exactly when it has a default - so every
+ *  param here defaults to `native.value`; call it with named args: `dialogs.showDialog(context = ctx,
+ *  builder = c => AlertDialog(...))` emits `showDialog(context: ctx, builder: ...)`. Dismiss with
+ *  `Navigator.of(ctx).pop()`. */
+@native
+@DartImport("package:flutter/material.dart")
+@DartTopLevel
+object dialogs:
+  def showDialog(context: BuildContext = native.value,
+                 builder: BuildContext => Widget = native.value,
+                 barrierDismissible: Boolean = native.value): scala.concurrent.Future[Any] = native.value
+
 /** dart:ui Shadow (re-exported through material) — `TextStyle.shadows`.
  *  Curated: the generator only collects BoxShadow, its box-specific
  *  subclass.
