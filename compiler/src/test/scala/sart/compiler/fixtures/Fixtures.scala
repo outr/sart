@@ -550,3 +550,8 @@ class FxJsGaps:
   def getp(o: JSObject): JSAny = o.getProperty("k".toJS)
   def setp(o: JSObject): Unit = o.setProperty("k".toJS, "v".toJS)
   def callm(o: JSObject): JSAny = o.callMethod("m".toJS, "a".toJS, "b".toJS)
+  // Omitting an extension method's defaulted args must strip cleanly (the
+  // real Dart `callMethod` carries optional-positional defaults) — no
+  // leaked `…$package.callMethod$default$N` reference at the call site.
+  def callm0(o: JSObject): JSAny = o.callMethod("m".toJS)
+  def callm1(o: JSObject): JSAny = o.callMethod("m".toJS, "a".toJS)

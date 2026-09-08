@@ -4352,7 +4352,11 @@ class DartEmitter(
      *  not part of the Scala/Java stdlib.
      */
     private def isUserCallable(sym: Symbol): Boolean =
-      sym.exists && {
+      // A `@native` member is a facade for a real Dart callable — its
+      // Dart-side signature carries the real defaults (a top-level
+      // extension method is native even though its enclosing package
+      // object is not), so it's never "user-emitted".
+      sym.exists && !hasNative(sym) && {
         val owner = sym.owner
         owner.exists && !hasNative(owner) &&
           !sym.fullName.startsWith("scala.") &&
@@ -4378,9 +4382,11 @@ class DartEmitter(
             case other          => other
           if isNamed then named += s"${dartFieldIdent(pOpt.get.maybeOwner.maybeOwner, pOpt.get.name)}: ${emitExpr(inner)}"
           else pos += emitExpr(inner)
-        else if !isNamed then
+        else if !isNamed && !isStrippableDefault(arg) then
           // A positional param's default — the Dart signature can't carry
           // it, so the call site references the emitted `$default$` getter.
+          // (A facade/native target carries a real Dart default, so its
+          // omitted default is strippable and simply goes unmentioned.)
           pos += emitDefaultRef(arg)
       }
       (pos.result() ++ named.result()).mkString(", ")

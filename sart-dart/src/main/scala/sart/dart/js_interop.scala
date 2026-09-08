@@ -26,12 +26,17 @@ extension (o: JSObject)
   def getProperty(name: JSAny): JSAny = native.value
   @native @DartImport("dart:js_interop_unsafe")
   def setProperty(name: JSAny, value: JSAny): Unit = native.value
-  // Fixed arity (name + two args) — Dart's `callMethod` has optional
-  // positional args, but Sart doesn't yet strip an EXTENSION method's
-  // omitted defaults at the call site (they leak a `…$default$N` ref), so
-  // the common two-arg shape is spelled explicitly.
+  // Dart's `callMethod` takes optional positional args; omitted ones are
+  // stripped at the call site (the real Dart extension carries the
+  // defaults), so callers can write `o.callMethod(name)` or add args.
   @native @DartImport("dart:js_interop_unsafe")
-  def callMethod(name: JSAny, arg1: JSAny, arg2: JSAny): JSAny = native.value
+  def callMethod(
+    name: JSAny,
+    arg1: JSAny = native.value,
+    arg2: JSAny = native.value,
+    arg3: JSAny = native.value,
+    arg4: JSAny = native.value
+  ): JSAny = native.value
 
 @native @DartImport("dart:js_interop")
 trait JSString extends JSAny

@@ -850,4 +850,10 @@ class EmitterSuite extends FunSuite:
     // gap 3: dart:js_interop_unsafe member access + its import
     assert(g.contains("o.getProperty(") && g.contains("o.setProperty(") && g.contains("o.callMethod("), g)
     assert(emittedMain.contains("import 'dart:js_interop_unsafe';"), "unsafe import")
+    // gap 4: an extension method's omitted defaults strip — no leaked
+    // `$default$` getter reference (`callMethod('m'.toJS)`, not
+    // `callMethod('m'.toJS, …callMethod$default$3…)`).
+    assert(!g.contains("$default$"), g)
+    assert(g.contains("o.callMethod('m'.toJS)"), g)
+    assert(g.contains("o.callMethod('m'.toJS, 'a'.toJS)"), g)
   }
