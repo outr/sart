@@ -840,3 +840,14 @@ class EmitterSuite extends FunSuite:
     assert(use.contains("'GET'.toJS"), use)
     assert(emittedMain.contains("import 'dart:js_interop';"), "import")
   }
+
+  test("js-interop gaps: index operator, typed toJS closure, js_interop_unsafe") {
+    val g = classBody("FxJsGaps")
+    // gap 2: @DartName("[]") → Dart index operator `x[i]`
+    assert(g.contains("x[i]"), g)
+    // gap 1: `.toJS` on a closure emits the param TYPE (else InvalidType)
+    assert(g.contains("(JSString s)") && g.contains(".toJS"), g)
+    // gap 3: dart:js_interop_unsafe member access + its import
+    assert(g.contains("o.getProperty(") && g.contains("o.setProperty(") && g.contains("o.callMethod("), g)
+    assert(emittedMain.contains("import 'dart:js_interop_unsafe';"), "unsafe import")
+  }

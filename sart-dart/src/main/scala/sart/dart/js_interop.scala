@@ -12,15 +12,26 @@ import scala.concurrent.Future
 @native @DartImport("dart:js_interop")
 trait JSAny extends DartObject
 @native @DartImport("dart:js_interop")
-trait JSObject extends JSAny:
-  // js_interop_unsafe dynamic member access.
-  def getProperty(name: JSAny): JSAny = native.value
-  def setProperty(name: JSAny, value: JSAny): Unit = native.value
-  def callMethod(name: JSAny, args: JSAny*): JSAny = native.value
+trait JSObject extends JSAny
 @native @DartImport("dart:js_interop")
 object JSObject:
   /** `JSObject()` — a fresh JS object. */
   def apply(): JSObject = native.value
+
+/** Dynamic member access on a JS object. These are `dart:js_interop_unsafe`
+ *  extension methods, so each carries that import — it's added to whichever
+ *  library actually uses them, not to `dart:js_interop`. */
+extension (o: JSObject)
+  @native @DartImport("dart:js_interop_unsafe")
+  def getProperty(name: JSAny): JSAny = native.value
+  @native @DartImport("dart:js_interop_unsafe")
+  def setProperty(name: JSAny, value: JSAny): Unit = native.value
+  // Fixed arity (name + two args) — Dart's `callMethod` has optional
+  // positional args, but Sart doesn't yet strip an EXTENSION method's
+  // omitted defaults at the call site (they leak a `…$default$N` ref), so
+  // the common two-arg shape is spelled explicitly.
+  @native @DartImport("dart:js_interop_unsafe")
+  def callMethod(name: JSAny, arg1: JSAny, arg2: JSAny): JSAny = native.value
 
 @native @DartImport("dart:js_interop")
 trait JSString extends JSAny

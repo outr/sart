@@ -534,3 +534,19 @@ class FxHlsUse:
   def make(cfg: JSObject): FxHls = FxHls(cfg)
   def load(h: FxHls, u: String): Unit = h.loadSource(u)
   def tag(): JSString = "GET".toJS
+
+// js-interop gaps closed: an index operator (@DartName("[]")), a typed
+// `.toJS` closure, and dart:js_interop_unsafe get/set/callMethod.
+import sart.dart.{DartObject as FxDartObject, JSFunction as FxJSFunction, getProperty, setProperty, callMethod}
+@native
+@DartImport("package:fx/fx.dart")
+class FxTrackList extends FxDartObject:
+  def length: Int = native.value
+  @DartName("[]") def apply(i: Int): String = native.value
+
+class FxJsGaps:
+  def at(x: FxTrackList, i: Int): String = x(i)
+  def cb(): FxJSFunction = ((s: JSString) => ()).toJS
+  def getp(o: JSObject): JSAny = o.getProperty("k".toJS)
+  def setp(o: JSObject): Unit = o.setProperty("k".toJS, "v".toJS)
+  def callm(o: JSObject): JSAny = o.callMethod("m".toJS, "a".toJS, "b".toJS)

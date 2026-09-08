@@ -11,12 +11,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
  *  hls.js loaded on demand for HLS on browsers without native HLS. Faithful
  *  port of NaboPlayer's web `NaboVideo`, Nabo-specific coupling removed.
  *
- *  Trimmed vs. the original, each pending a specific Sart js-interop gap
- *  (documented at the site): the `onEnded`/`onError` DOM event wiring
- *  (`.toJS` on typed callbacks), the embedded subtitle-track LISTING/selection
- *  (`TextTrackList` index operator), and the auth-header hls.js config
- *  (`dart:js_interop_unsafe`). Core playback + attaching sideloaded subtitle
- *  `<track>`s + basic hls.js are all live.
+ *  One remaining simplification: sideloaded subtitles are attached as a
+ *  `<track src>` directly rather than fetched + SRT→VTT-converted into a
+ *  `blob:` URL (that path needs List→JSArray interop; follow-up).
  */
 @DartLibrary("platform/video_web.dart")
 class WebVideo private (val viewType: String, val element: HTMLVideoElement, ref: ElementRef)
@@ -29,10 +26,10 @@ class WebVideo private (val viewType: String, val element: HTMLVideoElement, ref
   private var volumeLevel: Double = 1.0
   private var gainLevel: Double = 1.0
 
+  private[web] def fireEnded(): Unit = onEndedCb.foreach(cb => cb())
+  private[web] def fireError(): Unit = onErrorCb.foreach(cb => cb())
   private[web] def bump(): Unit = if !subCtrl.isClosed then subCtrl.add(())
 
-  // Callbacks are stored; wiring them to the <video> `ended`/`error` events
-  // needs `.toJS` on a typed callback (a js-interop-authoring gap) — follow-up.
   override def setOnEnded(cb: () => Unit): Unit = onEndedCb = Some(cb)
   override def setOnError(cb: () => Unit): Unit = onErrorCb = Some(cb)
 
@@ -43,23 +40,31 @@ class WebVideo private (val viewType: String, val element: HTMLVideoElement, ref
     startSeconds: Double = 0.0,
     sideloaded: List[SubtitleSource] = Nil
   ): Future[Unit] =
+    if startSeconds > 0.5 then
+      // Resume: set currentTime once metadata is in (a browser ignores it before).
+      element.addEventListener(
+        "loadedmetadata",
+        ((_: Event) => element.currentTime = startSeconds).toJS
+      )
     if sideloaded.nonEmpty then await(addSubtitles(sideloaded))
     val isHls = url.contains(".m3u8")
     val header = authHeaderVal
+    // Force hls.js (MSE) whenever an Authorization header is required: a native
+    // <video src> can play HLS on Safari but can never attach a custom header.
     val nativeHls = element.canPlayType("application/vnd.apple.mpegurl").nonEmpty
-    if isHls && !nativeHls then
+    if isHls && (header.isDefined || !nativeHls) then
       if await(WebVideo.ensureHls()) then
         hls.foreach(h => h.destroy())
-        // Auth-header HLS (the Emby/Jellyfin `xhrSetup` config) needs
-        // dart:js_interop_unsafe getProperty/setProperty — follow-up; for now
-        // hls.js runs with a default config (covers unauthenticated HLS).
-        val h = Hls(JSObject())
+        val cfg = header.map(h => hlsConfigWithAuth(h)).getOrElse(JSObject())
+        val h = Hls(cfg)
         h.loadSource(url)
         h.attachMedia(element)
         hls = Some(h)
         return Future.successful(())
       else if header.isDefined then
         WebGlobals.console.error("[sart-player] hls.js failed to load".toJS)
+        fireError()
+        return Future.successful(())
     element.src = url
     Future.successful(())
 
@@ -68,14 +73,43 @@ class WebVideo private (val viewType: String, val element: HTMLVideoElement, ref
     subs.foreach(s => attachTrack(s.url, s.label, s.language, s.isDefault, show = false))
     Future.successful(())
 
-  // Reading the <video>'s embedded TextTrack list needs the `TextTrackList`
-  // index operator (`tt[i]`), which Sart can't yet express on a facade —
-  // follow-up. Attaching tracks (below) works; listing/selecting them is stubbed.
-  override def subtitleTracks: List[SubtitleTrackInfo] = Nil
-  override def currentSubtitleId: Option[String] = None
+  override def subtitleTracks: List[SubtitleTrackInfo] =
+    val tt = element.textTracks
+    var out: List[SubtitleTrackInfo] = Nil
+    var i = 0
+    while i < tt.length do
+      val t = tt(i)
+      if t.kind == "subtitles" || t.kind == "captions" then
+        val label =
+          if t.label.nonEmpty then t.label
+          else if t.language.nonEmpty then t.language.toUpperCase
+          else "Subtitles"
+        val lang = if t.language.isEmpty then Option.empty else Option(t.language)
+        out = out ++ List(
+          SubtitleTrackInfo(id = i.toString, label = label, language = lang, codec = Option.empty)
+        )
+      i += 1
+    out
+
+  override def currentSubtitleId: Option[String] =
+    val tt = element.textTracks
+    var found: Option[String] = None
+    var i = 0
+    while i < tt.length do
+      if tt(i).mode == "showing" then found = Option(i.toString)
+      i += 1
+    found
+
   override def subtitleTracksStream: Stream[Unit] = subCtrl.stream
-  override def selectEmbeddedSubtitle(id: String): Unit = ()
-  override def subtitlesOff(): Unit = ()
+
+  override def selectEmbeddedSubtitle(id: String): Unit =
+    val idx = id.toIntOption.getOrElse(-1)
+    val tt = element.textTracks
+    var i = 0
+    while i < tt.length do
+      tt(i).mode = if i == idx then "showing" else "disabled"
+      i += 1
+    bump()
 
   override def selectUriSubtitle(
     url: String,
@@ -98,6 +132,14 @@ class WebVideo private (val viewType: String, val element: HTMLVideoElement, ref
     if isDefault then track.setAttribute("default", "")
     element.appendChild(track)
     if show then track.track.mode = "showing"
+    bump()
+
+  override def subtitlesOff(): Unit =
+    val tt = element.textTracks
+    var i = 0
+    while i < tt.length do
+      tt(i).mode = "disabled"
+      i += 1
     bump()
 
   // HTML5 <video> has no standard audio-track selection.
@@ -124,6 +166,21 @@ class WebVideo private (val viewType: String, val element: HTMLVideoElement, ref
   override def setAudioFocus(v: Boolean): Unit = ()  // the browser has no audio-focus concept
   override def setAudioOnly(v: Boolean): Unit = ()   // no PCM tap on <video>
   override def audioBands: Option[Stream[List[Double]]] = Option.empty
+
+  /** An hls.js config whose `xhrSetup` adds the Authorization header to every
+   *  request (Emby/Jellyfin HLS remux carries the token in the header). */
+  private def hlsConfigWithAuth(header: String): JSObject =
+    val cfg = JSObject()
+    cfg.setProperty(
+      "xhrSetup".toJS,
+      ((xhr: JSObject, url: JSAny) =>
+        val rs = xhr.getProperty("readyState".toJS)
+        if rs.asInstanceOf[JSNumber].toDartInt == 0 then
+          xhr.callMethod("open".toJS, "GET".toJS, url)
+        xhr.callMethod("setRequestHeader".toJS, "Authorization".toJS, header.toJS)
+      ).toJS
+    )
+    cfg
 
   override def play(): Unit = element.play() // fire-and-forget; autoplay rejection is benign
   override def pause(): Unit = element.pause()
@@ -172,7 +229,13 @@ object WebVideo:
       viewType,
       (_: Int) => ref.el.getOrElse(HTMLVideoElement())
     )
-    WebVideo(viewType, el, ref)
+    val v = WebVideo(viewType, el, ref)
+    el.addEventListener("ended", ((_: Event) => v.fireEnded()).toJS)
+    el.addEventListener("error", ((_: Event) => v.fireError()).toJS)
+    el.textTracks.addEventListener("addtrack", ((_: Event) => v.bump()).toJS)
+    el.textTracks.addEventListener("removetrack", ((_: Event) => v.bump()).toJS)
+    el.textTracks.addEventListener("change", ((_: Event) => v.bump()).toJS)
+    v
 
   /** Load hls.js (self-hosted at `/hls.min.js`) on demand; returns true once
    *  `window.Hls` is available. */

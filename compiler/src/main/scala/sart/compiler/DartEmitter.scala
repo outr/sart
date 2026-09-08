@@ -2785,6 +2785,14 @@ class DartEmitter(
         recordAnnotations(extensionSym(fn))
         s"${selectPrefix(recv)}${extensionCallName(fn)}(${emitUserCallArgs(extensionSym(fn), args, dropParams = 1)})"
 
+      // `closure.toJS` — Dart's `.toJS` needs the function's concrete type to
+      // marshal it into a JSFunction, so the closure's params are emitted with
+      // types (a bare `(_) => …` becomes `InvalidType Function(dynamic)`).
+      case Apply(fn, List(Block(List(dd: DefDef), _: Closure)))
+          if isExtensionRef(fn) && extensionCallName(fn) == "toJS" =>
+        recordAnnotations(extensionSym(fn))
+        s"(${emitClosure(dd, typedParams = true)}).toJS"
+
       // Parameterless extension defs (`s.codeUnits`) — the receiver clause
       // is the only argument list, and Dart-side these are getters.
       case Apply(fn, List(recv)) if isExtensionRef(fn)
@@ -3551,6 +3559,13 @@ class DartEmitter(
       if name == "update" && args.sizeIs == 2
          && fnSym.exists && hasNative(fnSym.owner) then
         return s"${emitExpr(qual)}[${emitExpr(args(0))}] = ${emitExpr(args(1))}"
+
+      // A facade method marked `@DartName("[]")` is Dart's index operator:
+      // `x(i)` → `x[i]`. Lets a facade bind a Dart type whose access is
+      // `operator [](…)` (e.g. package:web's TextTrackList).
+      if args.sizeIs == 1 && fnSym.exists
+         && annoString(relatedSyms(fnSym), "sart.dart.DartName").contains("[]") then
+        return s"${emitExpr(qual)}[${emitExpr(args(0))}]"
 
       // Future companion constructors: Dart spells them differently.
       if isFutureCompanion(qual) then
@@ -4566,9 +4581,14 @@ class DartEmitter(
     /** Emit the body of a lifted anonymous function as a Dart arrow or block
      *  expression. DefDef's `rhs` is the lambda body.
      */
-    private def emitClosure(dd: DefDef): String =
+    private def emitClosure(dd: DefDef, typedParams: Boolean = false): String =
       val params = dd.paramss.flatMap(_.params).collect { case vd: ValDef => vd }
-      val paramStr = params.map(p => p.name).mkString(", ")
+      // Param types are normally omitted (Dart infers them from the callback's
+      // context). `.toJS` has no such context — it needs a concrete function
+      // type to build the JS function — so typed params are emitted there.
+      val paramStr = params
+        .map(p => if typedParams then s"${emitTypeRef(p.tpt.tpe)} ${p.name}" else p.name)
+        .mkString(", ")
       // `() => async { body }` unwraps to an async closure over the body;
       // otherwise a body containing `await` still marks the closure async.
       val unwrapped = dd.rhs.flatMap(unwrapAsync)
