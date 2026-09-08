@@ -24,9 +24,13 @@ case class MediaCallbacks(
  *  sync. Apps rarely construct this directly — [[MediaSession.init]] does.
  *  Push now-playing metadata with [[setNowPlaying]] and playback state
  *  with [[setPlaying]] / [[setPosition]]. */
-class SartAudioHandler(private val callbacks: MediaCallbacks) extends BaseAudioHandler:
+class SartAudioHandler(private var callbacks: MediaCallbacks) extends BaseAudioHandler:
   private var playing: Boolean = false
   private var position: Duration = Duration()
+
+  /** Repoint the transport callbacks — used when a new screen adopts the
+   *  single app-wide session. */
+  def setCallbacks(cb: MediaCallbacks): Unit = callbacks = cb
 
   // Each callback is optional (null when the app didn't supply it); bind
   // to a local so Dart promotes it to non-null across the guard.
@@ -126,10 +130,27 @@ class SartAudioHandler(private val callbacks: MediaCallbacks) extends BaseAudioH
  *  `<service>`/`<receiver>` in the manifest; iOS/tvOS: the `audio`
  *  background mode) — see the package docs. */
 object MediaSession:
-  /** Initialise the media session once, before `runApp`. */
+  // `AudioService.init` is process-global — it may be called AT MOST ONCE
+  // per app run. So the first caller creates the single app-wide handler;
+  // every later caller reuses it, repointing the transport callbacks to
+  // whichever screen/media is now in charge. `started` is only flipped
+  // after the handler exists, so the guarded access never hits an
+  // uninitialised late field.
+  private var handler: SartAudioHandler = null
+  private var started: Boolean = false
+
+  /** Bind (or rebind) the single OS media session to these callbacks and
+   *  return its handler. Safe to call from any screen, any number of times. */
   def init(
     callbacks: MediaCallbacks,
     config: AudioServiceConfig = AudioServiceConfig()
   ): Future[SartAudioHandler] =
-    // audio_service's init takes named params.
-    AudioService.init(builder = () => SartAudioHandler(callbacks), config = config)
+    if started then
+      handler.setCallbacks(callbacks)
+      Future.successful(handler)
+    else
+      // audio_service's init takes named params.
+      val h = await(AudioService.init(builder = () => SartAudioHandler(callbacks), config = config))
+      handler = h
+      started = true
+      Future.successful(h)

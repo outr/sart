@@ -76,6 +76,8 @@ class PlayerController(val source: MediaSource):
   def duration: Duration = backend.value.duration
   def aspectRatio: Double = backend.value.aspectRatio
 
-  /** The render widget for this controller's video (audio-only sources
-   *  render nothing visible). */
-  def view: Widget = VideoPlayer(backend)
+  /** The render widget for this controller's video, sized to the video's
+   *  native aspect ratio so it fills its box without letterbox artifacts.
+   *  (Audio-only sources report a zero/one ratio and render nothing useful.) */
+  def view: Widget =
+    AspectRatio(aspectRatio = aspectRatio, child = VideoPlayer(backend))

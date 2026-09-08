@@ -485,7 +485,7 @@ class PlayerAppState extends State<PlayerApp> {
             : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(width: 320.0, height: 240.0, child: video.view),
+                  SizedBox(width: 320.0, child: video.view),
                   SizedBox(height: 16.0),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -2367,9 +2367,9 @@ class PlayerController {
     return backend.value.aspectRatio;
   }
 
-  /// Source: sart-player/src/main/scala/sart/player/Player.scala:81
+  /// Source: sart-player/src/main/scala/sart/player/Player.scala:82
   Widget get view {
-    return VideoPlayer(backend);
+    return AspectRatio(aspectRatio: aspectRatio, child: VideoPlayer(backend));
   }
 }
 
@@ -2422,24 +2422,23 @@ class FocusableState extends State<Focusable> {
   }
 }
 
-/// Source: sart-tv/src/main/scala/sart/tv/Remote.scala:14
+/// Source: sart-tv/src/main/scala/sart/tv/Remote.scala:18
 class RemoteControl extends StatelessWidget {
   final bool Function(TvKey) onKey;
   final Widget child;
-  final bool autofocus;
-  RemoteControl(this.onKey, this.child, {this.autofocus = true});
+  RemoteControl(this.onKey, this.child);
 
-  /// Source: sart-tv/src/main/scala/sart/tv/Remote.scala:19
+  /// Source: sart-tv/src/main/scala/sart/tv/Remote.scala:22
   @override
   Widget build(BuildContext context) {
     return Focus(
       child: child,
-      autofocus: autofocus,
       onKeyEvent: (node, event) => handle(event),
+      canRequestFocus: false,
     );
   }
 
-  /// Source: sart-tv/src/main/scala/sart/tv/Remote.scala:26
+  /// Source: sart-tv/src/main/scala/sart/tv/Remote.scala:29
   KeyEventResult handle(Object event) {
     return !((event is KeyDownEvent) || (event is KeyRepeatEvent))
         ? KeyEventResult.ignored
@@ -2754,22 +2753,35 @@ class MediaCallbacks {
   );
 }
 
-/// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:128
+/// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:132
 class MediaSession {
   MediaSession._();
 
-  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:130
+  static late SartAudioHandler handler;
+  static bool started = false;
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:144
   static Future<SartAudioHandler> init(
     MediaCallbacks callbacks,
     AudioServiceConfig config,
-  ) {
-    return AudioService.init(
-      builder: () => SartAudioHandler(callbacks),
-      config: config,
-    );
+  ) async {
+    return started
+        ? (() {
+            handler.setCallbacks(callbacks);
+            return Future.value(handler);
+          })()
+        : (await (() async {
+            final h = (await AudioService.init(
+              builder: () => SartAudioHandler(callbacks),
+              config: config,
+            ));
+            handler = h;
+            started = true;
+            return Future.value(h);
+          })());
   }
 
-  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:132
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:146
   static AudioServiceConfig get init$default$2 {
     return AudioServiceConfig();
   }
@@ -2777,13 +2789,18 @@ class MediaSession {
 
 /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:27
 class SartAudioHandler extends BaseAudioHandler {
-  final MediaCallbacks callbacks;
+  MediaCallbacks callbacks;
   SartAudioHandler(this.callbacks);
 
   bool playing = false;
   Duration position = Duration();
 
   /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:33
+  void setCallbacks(MediaCallbacks cb) {
+    callbacks = cb;
+  }
+
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:37
   @override
   Future<void> play() {
     final cb = callbacks.onPlay;
@@ -2795,7 +2812,7 @@ class SartAudioHandler extends BaseAudioHandler {
     return Future.value(null);
   }
 
-  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:40
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:44
   @override
   Future<void> pause() {
     final cb = callbacks.onPause;
@@ -2807,7 +2824,7 @@ class SartAudioHandler extends BaseAudioHandler {
     return Future.value(null);
   }
 
-  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:47
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:51
   @override
   Future<void> stop() {
     final cb = callbacks.onStop;
@@ -2819,7 +2836,7 @@ class SartAudioHandler extends BaseAudioHandler {
     return Future.value(null);
   }
 
-  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:54
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:58
   @override
   Future<void> seek(Duration pos) {
     final cb = callbacks.onSeek;
@@ -2831,7 +2848,7 @@ class SartAudioHandler extends BaseAudioHandler {
     return Future.value(null);
   }
 
-  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:61
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:65
   @override
   Future<void> skipToNext() {
     final cb = callbacks.onSkipToNext;
@@ -2841,7 +2858,7 @@ class SartAudioHandler extends BaseAudioHandler {
     return Future.value(null);
   }
 
-  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:66
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:70
   @override
   Future<void> skipToPrevious() {
     final cb = callbacks.onSkipToPrevious;
@@ -2851,7 +2868,7 @@ class SartAudioHandler extends BaseAudioHandler {
     return Future.value(null);
   }
 
-  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:71
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:75
   @override
   Future<void> fastForward() {
     final cb = callbacks.onFastForward;
@@ -2861,7 +2878,7 @@ class SartAudioHandler extends BaseAudioHandler {
     return Future.value(null);
   }
 
-  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:76
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:80
   @override
   Future<void> rewind() {
     final cb = callbacks.onRewind;
@@ -2871,24 +2888,24 @@ class SartAudioHandler extends BaseAudioHandler {
     return Future.value(null);
   }
 
-  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:82
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:86
   void setNowPlaying(MediaItem item) {
     mediaItem.add(item);
   }
 
-  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:85
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:89
   void setPlaying(bool isPlaying) {
     playing = isPlaying;
     broadcast();
   }
 
-  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:90
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:94
   void setPosition(Duration pos) {
     position = pos;
     broadcast();
   }
 
-  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:94
+  /// Source: sart-tv/src/main/scala/sart/tv/media/MediaSession.scala:98
   void broadcast() {
     playbackState.add(
       PlaybackState(

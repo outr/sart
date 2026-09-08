@@ -51,7 +51,7 @@ class PlayerAppState extends State[PlayerApp]:
         else Column(
           mainAxisAlignment = MainAxisAlignment.center,
           children = List(
-            SizedBox(width = 320.0, height = 240.0, child = video.view),
+            SizedBox(width = 320.0, child = video.view),
             SizedBox(height = 16.0),
             Row(
               mainAxisAlignment = MainAxisAlignment.center,

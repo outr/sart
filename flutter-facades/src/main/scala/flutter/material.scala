@@ -34,6 +34,16 @@ abstract class Widget extends DartObject
 abstract class StatelessWidget extends Widget:
   def build(context: BuildContext): Widget = native.value
 
+// Sizes its child to a given width:height ratio — the idiomatic way to
+// display a video at its native aspect without letterbox artifacts.
+@native
+@DartImport("package:flutter/material.dart")
+class AspectRatio(
+  val aspectRatio: Double,
+  val child: Widget = native.value,
+  val key: Key = native.value
+) extends Widget
+
 @native
 @DartImport("package:flutter/material.dart")
 abstract class StatefulWidget extends Widget:
