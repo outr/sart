@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sart: Flutter Web vs web-lite</title>
+<style>
+  :root { color-scheme: light dark; --bg:#f6f4fb; --panel:#fff; --ink:#1d1b20; --muted:#5b5566; --accent:#6750a4; --border:#e0dbeb; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#141218; --panel:#1d1b22; --ink:#e8e0ef; --muted:#a79fb2; --accent:#d0bcff; --border:#2c2833; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { display: flex; flex-direction: column; font-family: Roboto, system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  header { flex: 0 0 auto; padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  h1 { font-size: 17px; font-weight: 600; margin: 0; }
+  .seg { display: inline-flex; border: 1px solid var(--accent); border-radius: 999px; overflow: hidden; }
+  .seg button { border: none; background: transparent; color: var(--accent); font: inherit; font-size: 14px; padding: 6px 16px; cursor: pointer; }
+  .seg button.on { background: var(--accent); color: var(--panel); }
+  .sizes { margin-left: auto; display: flex; gap: 18px; font-size: 13px; color: var(--muted); }
+  .sizes b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .ratio { color: var(--accent); font-weight: 600; }
+  main { flex: 1 1 auto; display: flex; min-height: 0; }
+  .pane { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border); }
+  .pane:last-child { border-right: none; }
+  .pane.hidden { display: none; }
+  .pane > .label { flex: 0 0 auto; padding: 6px 12px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); background: var(--panel); border-bottom: 1px solid var(--border); }
+  .pane iframe { flex: 1 1 auto; width: 100%; border: none; background: #fff; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sart &middot; Flutter Web vs web-lite</h1>
+  <div class="seg" id="seg">
+    <button data-view="both" class="on">Both</button>
+    <button data-view="flutter">Flutter Web</button>
+    <button data-view="lite">web-lite</button>
+  </div>
+  <div class="sizes" id="sizes"><span>measuring bundle sizes&hellip;</span></div>
+</header>
+<main>
+  <section class="pane" id="pane-flutter">
+    <div class="label">Flutter Web &mdash; /flutter/</div>
+    <iframe src="/flutter/" title="Flutter Web"></iframe>
+  </section>
+  <section class="pane" id="pane-lite">
+    <div class="label">Sart web-lite &mdash; /lite/</div>
+    <iframe src="/lite/" title="web-lite"></iframe>
+  </section>
+</main>
+<script>
+  // Toggle which pane(s) are visible.
+  var seg = document.getElementById('seg');
+  var pf = document.getElementById('pane-flutter');
+  var pl = document.getElementById('pane-lite');
+  seg.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button') : e.target;
+    if (!b || !b.dataset.view) return;
+    var v = b.dataset.view;
+    var btns = seg.querySelectorAll('button');
+    for (var i = 0; i < btns.length; i++) btns[i].className = (btns[i] === b ? 'on' : '');
+    pf.className = 'pane' + (v === 'lite' ? ' hidden' : '');
+    pl.className = 'pane' + (v === 'flutter' ? ' hidden' : '');
+  });
+
+  // Live bundle-size contrast — the headline difference.
+  function fmt(n) {
+    if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB';
+    if (n >= 1024) return (n / 1024).toFixed(0) + ' KB';
+    return n + ' B';
+  }
+  fetch('/sizes.json').then(function (r) { return r.json(); }).then(function (s) {
+    var el = document.getElementById('sizes');
+    var ratio = s.lite > 0 ? Math.round(s.flutter / s.lite) : 0;
+    el.innerHTML =
+      'Flutter Web: <b>' + fmt(s.flutter) + '</b>' +
+      '<span>web-lite: <b>' + fmt(s.lite) + '</b></span>' +
+      (ratio > 1 ? '<span class="ratio">web-lite is ~' + ratio + '× smaller</span>' : '');
+  }).catch(function () {
+    document.getElementById('sizes').textContent = 'size info unavailable';
+  });
+</script>
+</body>
+</html>

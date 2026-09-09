@@ -42,6 +42,7 @@ ThisBuild / publishMavenStyle := true
 // they're usable from both the root project and the command line.
 @transient val sartEmit          = taskKey[Unit]("Compile the example and emit Dart into out/")
 @transient val sartEmitJs        = taskKey[Unit]("Compile web-example and emit lean ES5 JS into out-js/ (web-lite backend)")
+@transient val sartCompare       = taskKey[Unit]("Build both the Flutter Web and web-lite bundles for the side-by-side compare page (tools/compare)")
 @transient val sartLinux         = taskKey[File]("Build a native Linux bundle from the emitted Dart")
 @transient val sartRun           = taskKey[Unit]("Build and launch the generated Linux app")
 @transient val sartGoldenVerify  = taskKey[Unit]("Emit Dart and diff it against the checked-in golden files")
@@ -388,6 +389,16 @@ lazy val root = (project in file("."))
       val bundle = outDir / "build" / "web"
       log.info(s"sart: built web bundle at $bundle")
       bundle
+    },
+
+    // Build BOTH the Flutter Web bundle and the web-lite bundle, then point at
+    // the side-by-side compare page. Run `node tools/compare/serve.js` after.
+    sartCompare := {
+      val log = streams.value.log
+      sartWeb.value
+      sartEmitJs.value
+      log.info("sart: Flutter Web (out/build/web) + web-lite (out-js) built.")
+      log.info("sart: compare them — run:  node tools/compare/serve.js  then open http://localhost:8099/")
     },
 
     sartAndroid := {
