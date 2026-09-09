@@ -18,6 +18,7 @@ dependencies:
   media_kit_video: ^2.0.1
   qr_flutter: ^4.1.0
   web: ^1.1.0
+  webview_flutter: ^4.14.0
   youtube_player_iframe: ^5.2.0
 
 flutter:

@@ -168,8 +168,19 @@ lazy val `sart-lottie` = (project in file("sart-lottie"))
     Compile / scalacOptions ++= Seq("-Yretain-trees")
   )
 
+// WebView facade: webview_flutter's WebViewController/WebViewWidget +
+// NavigationDelegate/JavaScriptMode/JavaScriptMessage — the cross-platform
+// core for embedding web content (modules, game controllers, IFrame video).
+// Own module (no tree-shaking) so webview_flutter only reaches apps using it.
+lazy val `sart-webview` = (project in file("sart-webview"))
+  .dependsOn(`sart-dart`, `sart-stdlib`, `flutter-facades`)
+  .settings(
+    name := "sart-webview",
+    Compile / scalacOptions ++= Seq("-Yretain-trees")
+  )
+
 lazy val example = (project in file("example"))
-  .dependsOn(`flutter-facades`, `sart-stdlib`, `sart-player`, `sart-tv`, `sart-image`, `sart-qr`, `sart-lottie`)
+  .dependsOn(`flutter-facades`, `sart-stdlib`, `sart-player`, `sart-tv`, `sart-image`, `sart-qr`, `sart-lottie`, `sart-webview`)
   .settings(
     name := "sart-example",
     // Keep TASTy around so the compiler can read it.
@@ -213,7 +224,7 @@ lazy val `sart-facadegen` = (project in file("sart-facadegen"))
   )
 
 lazy val root = (project in file("."))
-  .aggregate(`sart-dart`, `sart-stdlib`, `flutter-facades`, `sart-player`, `sart-tv`, `sart-image`, `sart-qr`, `sart-lottie`, example, compiler, `sart-facadegen`)
+  .aggregate(`sart-dart`, `sart-stdlib`, `flutter-facades`, `sart-player`, `sart-tv`, `sart-image`, `sart-qr`, `sart-lottie`, `sart-webview`, example, compiler, `sart-facadegen`)
   .settings(
     name := "sart",
 
@@ -254,12 +265,14 @@ lazy val root = (project in file("."))
       val imageClasses  = (`sart-image` / Compile / classDirectory).value
       val qrClasses     = (`sart-qr` / Compile / classDirectory).value
       val lottieClasses = (`sart-lottie` / Compile / classDirectory).value
+      val webviewClasses = (`sart-webview` / Compile / classDirectory).value
       val libArgs = Seq(
         s"--library=${playerClasses.getAbsolutePath}",
         s"--library=${tvClasses.getAbsolutePath}",
         s"--library=${imageClasses.getAbsolutePath}",
         s"--library=${qrClasses.getAbsolutePath}",
-        s"--library=${lottieClasses.getAbsolutePath}"
+        s"--library=${lottieClasses.getAbsolutePath}",
+        s"--library=${webviewClasses.getAbsolutePath}"
       )
       val rc = sys.process.Process(Seq(
         "java", "-cp", runCp, "sart.compiler.Main"
@@ -554,6 +567,7 @@ lazy val root = (project in file("."))
       (`sart-image` / publishLocal).value
       (`sart-qr` / publishLocal).value
       (`sart-lottie` / publishLocal).value
+      (`sart-webview` / publishLocal).value
       (compiler / publishLocal).value
 
       // sbt-sart/ is its own sbt build (cross-built: Scala 2.12 → sbt 1.x,

@@ -35,6 +35,7 @@ class LauncherHome extends StatelessWidget:
     Demo("Images",      "cached_network_image posters",  ctx => ImageApp()),
     Demo("QR",          "qr_flutter pairing code",       ctx => QrApp()),
     Demo("Lottie",      "lottie vector animation",       ctx => LottieApp()),
+    Demo("WebView",     "webview_flutter embedded page",  ctx => WebViewApp()),
     Demo("TV",          "Remote/D-pad, focus, lifecycle", ctx => TvApp()),
     Demo("Showcase",    "Kitchen-sink feature demo",    ctx => ShowcaseApp()),
     Demo("Counter",     "Classic Flutter counter",      ctx => MyHomePage(title = "Counter")),
