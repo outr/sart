@@ -32,6 +32,9 @@ class Lite extends Component:
     if e.keyCode == 39 && focus < cards.size - 1 then focus = focus + 1
     else if e.keyCode == 37 && focus > 0 then focus = focus - 1
     setState()
+    // The full re-render rebuilds the row (resetting its scroll), so scroll the
+    // newly-focused poster back into view — a D-pad rail must follow focus.
+    Viewport.centerById("poster-focus")
 
   override def render(): Element =
     val rail = document.createElement("div")
@@ -51,6 +54,7 @@ class Lite extends Component:
       val cell = document.createElement("div")
       cell.className = if i == focus then "poster focused" else "poster"
       cell.setAttribute("data-id", card.id.toString)
+      if i == focus then cell.setAttribute("id", "poster-focus")
       val img = document.createElement("img")
       img.setAttribute("src", "https://picsum.photos/id/" + card.posterPath + "/180/260")
       cell.appendChild(img)

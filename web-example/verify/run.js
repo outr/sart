@@ -27,11 +27,28 @@ Object.defineProperty(El.prototype, 'innerHTML', {
 });
 
 const roots = {};
+const docListeners = {};
 const document = {
-  getElementById: function(id) { if (!roots[id]) roots[id] = new El('#' + id); return roots[id]; },
+  getElementById: function(id) { return findById(document, id) || (roots[id] = roots[id] || new El('#' + id)); },
   createElement: function(t) { return new El(t); },
-  createTextNode: function(t) { var e = new El('#text'); e._text = String(t); return e; }
+  createTextNode: function(t) { var e = new El('#text'); e._text = String(t); return e; },
+  addEventListener: function(ev, fn) { (docListeners[ev] = docListeners[ev] || []).push(fn); }
 };
+// Find a node by its `id` attribute anywhere under `roots` (the mounted trees).
+function findById(node, id) {
+  if (node && node.attrs && node.attrs.id === id) return node;
+  var kids = (node && node.children) || [];
+  for (var i = 0; i < kids.length; i++) { var r = findById(kids[i], id); if (r) return r; }
+  return null;
+}
+document.getElementById = function(id) {
+  for (var k in roots) { var r = findById(roots[k], id); if (r) return r; }
+  if (roots[id]) return roots[id];
+  roots[id] = new El('#' + id); return roots[id];
+};
+function fireKey(code) { (docListeners['keydown'] || []).forEach(function(f) { f({ keyCode: code }); }); }
+// Viewport spy — records the last id centered into view.
+const Viewport = { lastId: null, centerById: function(id) { this.lastId = id; } };
 const store = {};
 const localStorage = { getItem: function(k) { return k in store ? store[k] : null; }, setItem: function(k, v) { store[k] = String(v); } };
 
@@ -54,7 +71,7 @@ const Xhr = { get: function(url) { order.push(url); var d = new Deferred(); setT
 
 // Launcher reads location.hash at load (deep-link routing); stub it empty.
 const location = { hash: '' };
-const sandbox = { document, localStorage, Xhr, Deferred, Timer, Random, location, String, Math, XMLHttpRequest: function() {}, setTimeout, console };
+const sandbox = { document, localStorage, Xhr, Deferred, Timer, Random, Viewport, location, String, Math, XMLHttpRequest: function() {}, setTimeout, console };
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(process.argv[2]), 'utf8'), sandbox);
 
@@ -143,6 +160,23 @@ group = 'Two-screen';
   click(findById(app, 'back'));
   check(text(findById(app, 'title')) === 'Home', 'back to A');
 })();
+
+// ── Media (Lite Component): D-pad focus follows + scrolls into view ──────────
+group = 'Media';
+roots['media'] = new El('#media-root');
+docListeners['keydown'] = [];
+var media = new sandbox.Lite();
+media.mountInto(roots['media']);
+check(findById(roots['media'], 'poster-focus') !== null, 'a poster is focused on mount');
+check(findById(roots['media'], 'poster-focus').attrs['data-id'] === '1', 'focus starts on card 1');
+Viewport.lastId = null;
+fireKey(39); // right
+check(findById(roots['media'], 'poster-focus').attrs['data-id'] === '2', 'right → focus card 2');
+check(Viewport.lastId === 'poster-focus', 'right → focused poster scrolled into view');
+fireKey(39); // right
+check(findById(roots['media'], 'poster-focus').attrs['data-id'] === '3', 'right → focus card 3');
+fireKey(37); // left
+check(findById(roots['media'], 'poster-focus').attrs['data-id'] === '2', 'left → focus card 2');
 
 // ── Lite async smoke test (CPS await chain) ──────────────────────────────────
 group = 'Lite-async';

@@ -536,6 +536,9 @@ class JsEmitter(
       |} };
       |var Random = { nextInt: function(bound) { return Math.floor(Math.random() * bound); } };
       |var Timer = { periodic: function(ms, cb) { var t = { id: setInterval(cb, ms) }; t.cancel = function() { clearInterval(t.id); }; return t; } };
+      |// Bring the element with this id into view within its scroll container —
+      |// centered horizontally, no vertical jump. For D-pad focus on TV rails.
+      |var Viewport = { centerById: function(id) { var e = document.getElementById(id); if (e && e.scrollIntoView) { e.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); } } };
       |""".stripMargin
 
   /** Fallback host page (used when the app supplies no `web/` overlay). Links
