@@ -28,7 +28,7 @@ class WebViewAppState extends State[WebViewApp]:
         onPageFinished = (url: String) => setState(() => loaded = true)
       )
     )
-    c.loadRequest(Uri.parse("https://flutter.dev"))
+    c.loadRequest(Uri.parse("https://example.com"))
     controller = c
 
   override def build(context: BuildContext): Widget =

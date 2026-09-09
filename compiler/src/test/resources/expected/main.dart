@@ -517,7 +517,7 @@ class LottieApp extends StatelessWidget {
               width: 240.0,
               height: 240.0,
               child: Lottie.network(
-                'https://lottie.host/2c8e8b3c-0b3f-4a3e-8e2a-9f7c0d6c1a5b/q2Y9m3Xk7d.json',
+                'sample-lottie.json',
                 repeat: true,
                 fit: BoxFit.contain,
                 errorBuilder: (_$1, _$2, _$3) => Icon(Icons.cloud, size: 96.0),
@@ -1296,7 +1296,7 @@ class WebViewAppState extends State<WebViewApp> {
         }),
       ),
     );
-    c.loadRequest(Uri.parse('https://flutter.dev'));
+    c.loadRequest(Uri.parse('https://example.com'));
     controller = c;
   }
 

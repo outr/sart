@@ -54,6 +54,10 @@ class JsEmitter(
       case Block(Nil, e)           => isUnit(e)
       case _                       => false
 
+    def isSuper(t: Term): Boolean = t match
+      case Super(_, _) => true
+      case _           => false
+
     def jsStr(s: String): String =
       "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
 
@@ -319,6 +323,28 @@ class JsEmitter(
       else if pos.isEmpty then "{" + named.mkString(", ") + "}"
       else pos.mkString(", ") + ", {" + named.mkString(", ") + "}"
 
+    // Facade WIDGET construction → an options object keyed by PARAMETER NAME.
+    // Scala passes in-declaration-order named args positionally (no NamedArg),
+    // so relying on NamedArg alone would emit `Foo(a, b)` and the runtime
+    // widget (which reads `o.onKey`/`o.child`) would get the wrong shape. Map
+    // each arg to its ctor param name so `RemoteControl(onKey=f, child=c)`
+    // always becomes `RemoteControl({onKey: f, child: c})`.
+    def emitFacadeCtorArgs(ctor: Symbol, args: List[Term]): String =
+      val params = if ctor.exists then ctor.paramSymss.flatten.filter(_.isTerm) else Nil
+      val parts = mutable.ListBuffer[String]()
+      var i = 0
+      args.foreach { a =>
+        if !isDefaultArg(a) then
+          a match
+            case NamedArg(n, v) => parts += s"$n: ${emitArgVal(v)}"
+            case other =>
+              params.lift(i) match
+                case Some(p) => parts += s"${p.name}: ${emitArgVal(other)}"
+                case None    => parts += emitArgVal(other)
+        i += 1
+      }
+      "{" + parts.mkString(", ") + "}"
+
     def isFacadeCall(fn: Term): Boolean =
       val s = fn.symbol
       s.exists && (hasNative(s) || hasNative(s.owner))
@@ -390,12 +416,16 @@ class JsEmitter(
           caseApply(t.tpe) match
             case Some(fields) if isCaseCtor(fn, t.tpe) =>
               val flat = flattenVarargs(args).filterNot(isDefaultArg)
-              return "{" + fields.zip(flat).map((f, a) => s"$f: ${emitArgVal(a)}").mkString(", ") + "}"
+              // A `_tag` (the class name) lets `match` dispatch on the case
+              // type at runtime (object literals otherwise carry no type).
+              val tag = "_tag: " + jsStr(t.tpe.typeSymbol.name)
+              val fs = fields.zip(flat).map((f, a) => s"$f: ${emitArgVal(a)}")
+              return "{" + (tag :: fs).mkString(", ") + "}"
             case _ =>
           fn match
             // Widget / facade construction → runtime call with an options object.
             case Select(New(tpt), _) if hasNative(tpt.tpe.typeSymbol) =>
-              s"${tpt.tpe.typeSymbol.name}(${emitFacadeArgs(args)})"
+              s"${tpt.tpe.typeSymbol.name}(${emitFacadeCtorArgs(tpt.tpe.typeSymbol.primaryConstructor, args)})"
             case Select(New(tpt), _) if isUserClassSym(tpt.tpe.typeSymbol) =>
               s"new ${tpt.tpe.typeSymbol.name}(${emitArgs(args)})"
             // Any other construction (a builtin/unknown type in a dormant
@@ -436,19 +466,91 @@ class JsEmitter(
             case _                     => s"${emitTerm(fn)}(${emitArgs(args)})"
         case _ => emitTerm(t)
 
+    // The case class a pattern matches, for its `_tag` + field names.
+    def patternClass(p: Tree): Symbol = p match
+      case Unapply(fun, _, _) =>
+        val s = fun.symbol
+        if s.exists && s.owner.exists && s.owner.companionClass.exists then s.owner.companionClass
+        else p.asInstanceOf[Term].tpe.typeSymbol
+      case TypedOrTest(_, tpt) => tpt.tpe.typeSymbol
+      case Typed(_, tpt)       => tpt.tpe.typeSymbol
+      case _                   => Symbol.noSymbol
+
+    // (testExpr, bindStatements) for matching `subj` against pattern `p`.
+    def patternTest(p: Tree, subj: String): (String, String) = p match
+      case Wildcard()      => ("true", "")
+      case Ident("_")      => ("true", "")
+      case Bind(name, inner) =>
+        val (t, b) = patternTest(inner, subj)
+        (t, s"var ${jsSafe(name)} = $subj; " + b)
+      case Literal(c)      => (s"($subj === ${emitConst(c)})", "")
+      case Typed(inner, _) => patternTest(inner, subj) // typed pattern (e: Exception) — bind, accept
+      case TypedOrTest(inner, tpt) =>
+        val ts = tpt.tpe.typeSymbol
+        val tag = if ts.exists && ts.flags.is(Flags.Case) then s"($subj != null && $subj._tag === ${jsStr(ts.name)})" else "true"
+        val (it, ib) = patternTest(inner, subj)
+        ((if it == "true" then tag else if tag == "true" then it else s"$tag && $it"), ib)
+      case u @ Unapply(_, _, subs) =>
+        val cls = patternClass(u)
+        val fields = if cls.exists then cls.caseFields.map(_.name) else Nil
+        val tag = if cls.exists then s"($subj != null && $subj._tag === ${jsStr(cls.name)})" else "true"
+        val subT = subs.zipWithIndex.map { case (sp, i) => patternTest(sp, s"$subj.${fields.lift(i).getOrElse("_" + i)}") }
+        val test = (tag :: subT.map(_._1)).filter(_ != "true").mkString(" && ")
+        ((if test.isEmpty then "true" else test), subT.map(_._2).mkString(""))
+      case _ => ("true", "")
+
+    // `expr match { case … }` → an IIFE of an if/else chain (value position).
+    def emitMatch(scrut: Term, cases: List[CaseDef]): String =
+      val m = "_m"
+      val branches = cases.map { cd =>
+        val (test, binds) = patternTest(cd.pattern, m)
+        val guard = cd.guard.map(g => " && (" + emitTerm(g) + ")").getOrElse("")
+        s"if ($test$guard) { $binds${emitBody(cd.rhs, true)} }"
+      }
+      s"(function($m) { ${branches.mkString(" else ")} })(${emitTerm(scrut)})"
+
+    // `try body catch { cases } finally fin` → an IIFE with JS try/catch.
+    def emitTryTerm(body: Term, cases: List[CaseDef], fin: Option[Term]): String =
+      val bodyJs = emitBody(body, true)
+      val catchJs =
+        if cases.isEmpty then "throw _e;"
+        else cases.map { cd =>
+          val (t, b) = patternTest(cd.pattern, "_e")
+          s"if ($t) { $b${emitBody(cd.rhs, true)} }"
+        }.mkString(" else ") + " else { throw _e; }"
+      val finJs = fin.map(f => s" finally { ${emitBody(f, false)} }").getOrElse("")
+      s"(function() { try { $bodyJs } catch (_e) { $catchJs }$finJs })()"
+
     def emitTerm(t0: Term): String =
       unwrap(t0) match
         // Widget / facade construction → runtime call with an options object.
         case Apply(Select(New(tpt), _), args) if hasNative(tpt.tpe.typeSymbol) =>
-          s"${tpt.tpe.typeSymbol.name}(${emitFacadeArgs(args)})"
+          s"${tpt.tpe.typeSymbol.name}(${emitFacadeCtorArgs(tpt.tpe.typeSymbol.primaryConstructor, args)})"
         case Apply(TypeApply(Select(New(tpt), _), _), args) if hasNative(tpt.tpe.typeSymbol) =>
-          s"${tpt.tpe.typeSymbol.name}(${emitFacadeArgs(args)})"
+          s"${tpt.tpe.typeSymbol.name}(${emitFacadeCtorArgs(tpt.tpe.typeSymbol.primaryConstructor, args)})"
         // `new UserClass(args)` (incl. creator-application `Foo()` and the
         // zero-arg form) — matched before the generic Apply cases below.
         case Apply(Select(New(tpt), _), args) if isUserClassSym(tpt.tpe.typeSymbol) =>
           s"new ${tpt.tpe.typeSymbol.name}(${emitArgs(args)})"
         case Apply(TypeApply(Select(New(tpt), _), _), args) if isUserClassSym(tpt.tpe.typeSymbol) =>
           s"new ${tpt.tpe.typeSymbol.name}(${emitArgs(args)})"
+        // `super.m(args)` — call the parent prototype with `this`; a super call
+        // into a `@native` base (e.g. State.initState) is a no-op. Matched
+        // BEFORE the generic `Apply(Select,Nil)` case, which would otherwise
+        // emit `undefined()` (a crash).
+        case Apply(sel @ Select(spr, name), args) if isSuper(spr) =>
+          if isUserClassSym(sel.symbol.owner) then
+            val a = flattenVarargs(args).filterNot(isDefaultArg).map(emitArgVal)
+            s"${sel.symbol.owner.name}.prototype.$name.call(${(selfRef :: a).mkString(", ")})"
+          else "undefined"
+        case Apply(TypeApply(sel @ Select(spr, name), _), args) if isSuper(spr) =>
+          if isUserClassSym(sel.symbol.owner) then
+            val a = flattenVarargs(args).filterNot(isDefaultArg).map(emitArgVal)
+            s"${sel.symbol.owner.name}.prototype.$name.call(${(selfRef :: a).mkString(", ")})"
+          else "undefined"
+        case sel @ Select(spr, name) if isSuper(spr) =>
+          if isUserClassSym(sel.symbol.owner) then s"${sel.symbol.owner.name}.prototype.$name"
+          else "undefined"
         case Literal(c)            => emitConst(c)
         case This(_)               =>
           if currentClass.exists then selfRef else moduleNames.getOrElse(currentModule, "this")
@@ -479,17 +581,21 @@ class JsEmitter(
         case sel @ Select(q, name) =>
           // A paren-less USER method (getter like `latestRoll`) is emitted as a
           // zero-arg prototype function, so a paren-less reference must invoke
-          // it (`self.latestRoll()`); a plain field/val stays bare.
+          // it (`self.latestRoll()`); a plain field/val stays bare. A method
+          // with an (even empty) TERM clause like `load()` is NOT paren-less —
+          // its call site already applies it, so adding `()` here double-calls.
           val s = sel.symbol
           val parenlessCall =
             s.exists && s.isDefDef && s.flags.is(Flags.Method) && !s.flags.is(Flags.FieldAccessor)
-              && s.paramSymss.flatten.forall(_.isType) && isUserClassSym(s.owner)
+              && s.paramSymss.forall(c => c.nonEmpty && c.forall(_.isType)) && isUserClassSym(s.owner)
           val call = if parenlessCall then "()" else ""
           if inCurrentClass(sel.symbol.owner) then s"$selfRef.$name$call"
           else moduleNames.get(sel.symbol.owner) match
             case Some(m) => s"$m.$name$call"
             case None    => s"${emitTerm(q)}.$name$call"
         case If(c, a, b)  => s"(${emitTerm(c)} ? ${emitTerm(a)} : ${emitTerm(b)})"
+        case Match(scrut, cases) => emitMatch(scrut, cases)
+        case Try(body, cases, fin) => emitTryTerm(body, cases, fin)
         // A closure/lambda in value position → a JS function expression.
         case Block(List(dd: DefDef), _: Closure) => emitClosure(dd)
         // Expression-position arg-hoist block (a nested widget's args) — inline.
@@ -513,6 +619,9 @@ class JsEmitter(
     def emitTrailing(expr: Term, wantRet: Boolean): String =
       unwrap(expr) match
         case e @ Block(_, _)  => emitBody(e, wantRet)
+        // A value-returning `if` in return position: each branch returns.
+        case If(c, a, b) if wantRet && !isUnit(a) =>
+          s"if (${emitTerm(c)}) { ${emitBody(a, true)} } else { ${emitBody(b, true)} }"
         case If(c, a, b)      => emitIfStat(c, a, b)
         case Assign(lhs, rhs) => s"${emitTerm(lhs)} = ${emitTerm(rhs)};"
         case e if isUnit(e)   => ""
@@ -767,6 +876,9 @@ class JsEmitter(
       |var Random = function() { return { nextInt: function(b) { return Math.floor(Math.random() * b); } }; };
       |var Duration = function(o) { o = o || {}; return { ms: (o.days||0)*864e5 + (o.hours||0)*36e5 + (o.minutes||0)*6e4 + (o.seconds||0)*1e3 + (o.milliseconds||0) }; };
       |var Timer = { periodic: function(dur, cb) { var t = {}; t.id = setInterval(function() { cb(t); }, (dur && dur.ms) || 1000); t.cancel = function() { clearInterval(t.id); }; return t; } };
+      |var Regex = function(o) { var p = (o != null && typeof o === "object" && "pattern" in o) ? o.pattern : o; var re = null; try { re = new RegExp(p); } catch (e) {} return { pattern: p, hasMatch: function(s) { return re ? re.test(s) : false; } }; };
+      |function Exception(msg) { return new Error(msg == null ? "" : msg); }
+      |function throw_(e) { throw e; }
       |
       |// ── DOM helpers ──
       |function _el(tag, cls) { var e = document.createElement(tag); if (cls) e.className = cls; return e; }
@@ -789,6 +901,7 @@ class JsEmitter(
       |  st.widget = w;
       |  var host = _el("div", "sw-host");
       |  st.setState = function(fn) { if (fn) fn(); _clear(host); host.appendChild(_r(st.build(_ctx))); };
+      |  if (typeof st.initState === "function") { try { st.initState(); } catch (e) {} }
       |  host.appendChild(_r(st.build(_ctx)));
       |  return host;
       |}
@@ -823,13 +936,14 @@ class JsEmitter(
       |  if (o.backgroundColor) bar.style.background = o.backgroundColor;
       |  if (_navStack.length > 0) { var b = _el("button", "appbar-back"); b.appendChild(_txt("←")); b.onclick = function() { _navPop(); }; bar.appendChild(b); }
       |  var t = _el("div", "appbar-title"); if (o.title) t.appendChild(_r(o.title)); bar.appendChild(t);
+      |  if (o.actions && o.actions.length) { var a = _el("div", "appbar-actions"); a.appendChild(_kids(o.actions)); bar.appendChild(a); }
       |  return bar;
       |}
       |function Center(o) { var d = _el("div", "center"); if (o && o.child) d.appendChild(_r(o.child)); return d; }
       |function Column(o) { o = o || {}; var d = _el("div", "column"); if (o.mainAxisAlignment) d.style.justifyContent = o.mainAxisAlignment; if (o.crossAxisAlignment) d.style.alignItems = o.crossAxisAlignment; d.appendChild(_kids(o.children)); return d; }
       |function Row(o) { o = o || {}; var d = _el("div", "row"); if (o.mainAxisAlignment) d.style.justifyContent = o.mainAxisAlignment; if (o.crossAxisAlignment) d.style.alignItems = o.crossAxisAlignment; d.appendChild(_kids(o.children)); return d; }
-      |function Text(data, o) { var s = _el("span", "text"); if (o && o.style) s.className += " " + o.style; s.appendChild(_txt(data)); return s; }
-      |function Icon(icon) { var s = _el("span", "icon"); s.appendChild(_txt(icon)); return s; }
+      |function Text(o) { o = (o == null) ? {} : (typeof o === "object" ? o : { data: o }); var s = _el("span", "text"); if (o.style) s.className += " " + o.style; s.appendChild(_txt(o.data)); return s; }
+      |function Icon(o) { var g = (o != null && typeof o === "object") ? (o.icon != null ? o.icon : "") : o; var s = _el("span", "icon"); if (o && typeof o === "object" && o.size != null) s.style.fontSize = o.size + "px"; s.appendChild(_txt(g)); return s; }
       |function SizedBox(o) { o = o || {}; var d = _el("div", "sizedbox"); if (o.width != null) d.style.width = o.width + "px"; if (o.height != null) d.style.height = o.height + "px"; if (o.child) d.appendChild(_r(o.child)); return d; }
       |function Padding(o) { o = o || {}; var d = _el("div"); if (o.padding != null) d.style.padding = o.padding; if (o.child) d.appendChild(_r(o.child)); return d; }
       |function Card(o) { var d = _el("div", "card"); if (o && o.child) d.appendChild(_r(o.child)); return d; }
@@ -841,7 +955,7 @@ class JsEmitter(
       |  if (o.height != null) d.style.height = o.height + "px";
       |  if (o.color) d.style.background = o.color;
       |  if (o.padding != null) d.style.padding = o.padding;
-      |  if (o.decoration) { var dec = o.decoration; if (dec.color) d.style.background = dec.color; if (dec.borderRadius != null) d.style.borderRadius = dec.borderRadius; if (dec.boxShadow) d.style.boxShadow = dec.boxShadow; }
+      |  if (o.decoration) { var dec = o.decoration; if (dec.color) d.style.background = dec.color; if (dec.borderRadius != null) d.style.borderRadius = dec.borderRadius; if (dec.boxShadow) d.style.boxShadow = dec.boxShadow; if (dec.border) d.style.border = dec.border.width + "px solid " + dec.border.color; }
       |  if (o.alignment === "center") { d.style.display = "flex"; d.style.alignItems = "center"; d.style.justifyContent = "center"; }
       |  if (o.child) d.appendChild(_r(o.child));
       |  return d;
@@ -849,7 +963,9 @@ class JsEmitter(
       |var EdgeInsets = { all: function(v) { return v + "px"; }, symmetric: function(o) { o = o || {}; return (o.vertical || 0) + "px " + (o.horizontal || 0) + "px"; }, only: function(o) { o = o || {}; return (o.top||0)+"px "+(o.right||0)+"px "+(o.bottom||0)+"px "+(o.left||0)+"px"; } };
       |var BorderRadius = { circular: function(v) { return v + "px"; } };
       |var BoxShadow = function(o) { o = o || {}; return "0 " + ((o.blurRadius||4)/2) + "px " + (o.blurRadius||4) + "px " + (o.color || "rgba(0,0,0,.2)"); };
-      |var BoxDecoration = function(o) { o = o || {}; var bs = o.boxShadow; if (bs && bs.length) bs = bs[0]; return { color: o.color, borderRadius: o.borderRadius, boxShadow: bs }; };
+      |var BoxDecoration = function(o) { o = o || {}; var bs = o.boxShadow; if (bs && bs.length) bs = bs[0]; return { color: o.color, borderRadius: o.borderRadius, boxShadow: bs, border: o.border }; };
+      |var Border = { all: function(o) { o = o || {}; return { width: (o.width || 1), color: (o.color || "transparent") }; } };
+      |var BoxFit = { cover: "cover", contain: "contain", fill: "fill", fitWidth: "cover", fitHeight: "cover", none: "none", scaleDown: "scale-down" };
       |var InputDecoration = function(o) { return o || {}; };
       |var TextEditingController = function() { return { text: "" }; };
       |function TextField(o) {
@@ -864,7 +980,8 @@ class JsEmitter(
       |function TextButton(o) { o = o || {}; var b = _el("button", "btn btn-text"); if (o.child) b.appendChild(_r(o.child)); if (o.onPressed) b.onclick = function() { o.onPressed(); }; return b; }
       |function IconButton(o) { o = o || {}; var b = _el("button", "icon-btn"); if (o.icon) b.appendChild(_r(o.icon)); if (o.onPressed) b.onclick = function() { o.onPressed(); }; return b; }
       |function FloatingActionButton(o) { o = o || {}; var b = _el("button", "fab"); if (o.tooltip) b.title = o.tooltip; if (o.child) b.appendChild(_r(o.child)); if (o.onPressed) b.onclick = function() { o.onPressed(); }; return b; }
-      |var ListView = { builder: function(o) { o = o || {}; var d = _el("div", "listview"); var n = o.itemCount || 0; for (var i = 0; i < n; i++) { var w = o.itemBuilder(_ctx, i); if (w != null) d.appendChild(_r(w)); } return d; } };
+      |function ListView(o) { o = o || {}; var d = _el("div", "listview"); if (o.padding != null) d.style.padding = o.padding; d.appendChild(_kids(o.children)); return d; }
+      |ListView.builder = function(o) { o = o || {}; var d = _el("div", "listview"); if (o.padding != null) d.style.padding = o.padding; var n = o.itemCount || 0; for (var i = 0; i < n; i++) { var w = o.itemBuilder(_ctx, i); if (w != null) d.appendChild(_r(w)); } return d; };
       |function ListTile(o) {
       |  o = o || {};
       |  var t = _el("div", "list-tile");
@@ -885,6 +1002,86 @@ class JsEmitter(
       |var Navigator = { of: function(ctx) { return { push: function(route) { _navPush(route.builder); }, pop: function() { _navPop(); } }; }, pop: function() { _navPop(); } };
       |// Platform label (the @native PlatformName facade resolves here on web-lite).
       |var PlatformName = { describe: function() { return "web (web-lite)"; } };
+      |
+      |// ── extra common widgets ──
+      |Icons.broken_image = "▧"; Icons.cloud = "☁"; Icons.check_circle = "✔"; Icons.hourglass_empty = "⌛"; Icons.check = "✓"; Icons.play_arrow = "▶"; Icons.pause = "⏸";
+      |function CircularProgressIndicator(o) { return _el("div", "spinner"); }
+      |function ClipRRect(o) { o = o || {}; var d = _el("div", "cliprrect"); d.style.overflow = "hidden"; if (o.borderRadius != null) d.style.borderRadius = o.borderRadius; if (o.child) d.appendChild(_r(o.child)); return d; }
+      |function SingleChildScrollView(o) { o = o || {}; var d = _el("div", "scroll"); d.style.overflow = "auto"; if (o.padding != null) d.style.padding = o.padding; if (o.child) d.appendChild(_r(o.child)); return d; }
+      |function Wrap(o) { o = o || {}; var d = _el("div", "wrap"); d.style.display = "flex"; d.style.flexWrap = "wrap"; var g = (o.spacing != null ? o.spacing : 8); d.style.gap = g + "px"; d.appendChild(_kids(o.children)); return d; }
+      |var Uri = { parse: function(s) { return { href: s, toString: function() { return s; } }; }, file: function(s) { return { href: "file://" + s, toString: function() { return "file://" + s; } }; } };
+      |
+      |// ── sart-image (cached_network_image) ──
+      |function CachedNetworkImage(o) { o = o || {}; var i = _el("img", "cni"); i.src = o.imageUrl; if (o.width != null) i.style.width = o.width + "px"; if (o.height != null) i.style.height = o.height + "px"; i.style.objectFit = o.fit || "cover"; i.style.display = "block"; i.style.background = "rgba(0,0,0,.06)"; return i; }
+      |function CachedNetworkImageProvider(url, o) { return { url: url }; }
+      |var CacheManager = function(c) { return {}; };
+      |var Config = function(k, o) { return {}; };
+      |
+      |// ── sart-qr (qr_flutter) — real QR via a public generator, no bundled lib ──
+      |function QrImageView(o) { o = o || {}; var s = o.size || 200; var i = _el("img", "qr"); i.width = s; i.height = s; i.style.width = s + "px"; i.style.height = s + "px"; i.style.background = o.backgroundColor || "#fff"; i.src = "https://api.qrserver.com/v1/create-qr-code/?size=" + s + "x" + s + "&data=" + encodeURIComponent(o.data || ""); return i; }
+      |
+      |// ── sart-lottie (lottie) — via lottie-web loaded in index.html ──
+      |var Lottie = { network: function(url, o) { return _lottie(url, o); }, asset: function(name, o) { return _lottie(name, o); } };
+      |function _lottie(path, o) { o = o || {}; var d = _el("div", "lottie"); d.style.width = "100%"; d.style.height = "100%"; setTimeout(function() { try { if (window.lottie) window.lottie.loadAnimation({ container: d, renderer: "svg", loop: (o.repeat !== false), autoplay: true, path: path }); else { d.appendChild(Icon("☁")); } } catch (e) { d.appendChild(Icon("☁")); } }, 30); return d; }
+      |
+      |// ── sart-webview (webview_flutter) ──
+      |function WebViewController() { return {
+      |  _url: null, _nav: null,
+      |  setJavaScriptMode: function() { return this; }, setBackgroundColor: function() { return this; },
+      |  setNavigationDelegate: function(d) { this._nav = d; return this; }, addJavaScriptChannel: function() { return this; },
+      |  setUserAgent: function() { return new Deferred(); }, enableZoom: function() { return new Deferred(); },
+      |  runJavaScript: function() { var d = new Deferred(); d.resolve(undefined); return d; },
+      |  runJavaScriptReturningResult: function() { var d = new Deferred(); d.resolve(""); return d; },
+      |  loadRequest: function(u) { this._url = (u && u.href) || String(u); var self = this; setTimeout(function() { if (self._nav && self._nav.onPageFinished) self._nav.onPageFinished(self._url); }, 400); var d = new Deferred(); d.resolve(undefined); return d; },
+      |  loadHtmlString: function() { return new Deferred(); }, loadFlutterAsset: function() { return new Deferred(); }, loadFile: function() { return new Deferred(); },
+      |  goBack: function() { return new Deferred(); }, goForward: function() { return new Deferred(); }, reload: function() { return new Deferred(); },
+      |  clearCache: function() { return new Deferred(); }, clearLocalStorage: function() { return new Deferred(); }, removeJavaScriptChannel: function() { return new Deferred(); }
+      |}; }
+      |function WebViewWidget(o) { o = o || {}; var f = _el("iframe", "webview"); f.style.width = "100%"; f.style.height = "100%"; f.style.minHeight = "420px"; f.style.border = "0"; if (o.controller && o.controller._url) f.src = o.controller._url; return f; }
+      |var NavigationDelegate = function(o) { return o || {}; };
+      |var JavaScriptMode = { unrestricted: "unrestricted", disabled: "disabled" };
+      |var JavaScriptMessage = function(o) { return o || {}; };
+      |
+      |// ── sart-player (VideoPlayer over <video>; YouTube over <iframe>) ──
+      |function _mkVideoPlayer() {
+      |  var v = _el("video", "video"); v.controls = true; v.setAttribute("playsinline", ""); v.style.width = "100%"; v.style.height = "100%"; v.style.background = "#000";
+      |  return {
+      |    _v: v,
+      |    setSource: function(url, a, b) { v.src = (url && url.indexOf("http") === 0) ? url : "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"; var d = new Deferred(); d.resolve(undefined); return d; },
+      |    view: function() { return v; }, play: function() { try { v.play(); } catch (e) {} }, pause: function() { v.pause(); },
+      |    seek: function(s) { v.currentTime = s; }, setVolume: function(x) { v.volume = x; }, setLooping: function(x) { v.loop = x; },
+      |    position: function() { return v.currentTime; }, duration: function() { return v.duration || 0; }, paused: function() { return v.paused; },
+      |    dispose: function() { try { v.pause(); v.removeAttribute("src"); v.load(); } catch (e) {} }
+      |  };
+      |}
+      |var VideoPlayer = { create: function() { return _mkVideoPlayer(); } };
+      |var VideoBackendFactory = { create: function() { return _mkVideoPlayer(); } };
+      |function YouTubeVideo() {
+      |  var wrap = _el("div"); wrap.style.width = "100%"; wrap.style.height = "100%";
+      |  var f = _el("iframe"); f.style.width = "100%"; f.style.height = "100%"; f.style.border = "0"; f.setAttribute("allow", "autoplay; encrypted-media; picture-in-picture"); f.setAttribute("allowfullscreen", ""); wrap.appendChild(f);
+      |  return {
+      |    setSource: function(id, a, b) { f.src = "https://www.youtube.com/embed/" + id; var d = new Deferred(); d.resolve(undefined); return d; },
+      |    view: function() { return wrap; }, play: function() {}, pause: function() {}, dispose: function() { f.src = "about:blank"; }
+      |  };
+      |}
+      |
+      |// ── sart-tv (focus / remote / lifecycle / media session) ──
+      |var TvKey = { Up: "Up", Down: "Down", Left: "Left", Right: "Right", Select: "Select", Back: "Back", PlayPause: "PlayPause" };
+      |var TvPlatform = { current: "web", AppleTV: "AppleTV", Tizen: "Tizen", WebOS: "WebOS", AndroidTV: "AndroidTV", Other: "Other" };
+      |// sart-tv widgets are real Scala classes (not @native), emitted as
+      |// `new RemoteControl(onKey, child)` / `new Focusable(onSelect, builder,
+      |// autofocus)` — POSITIONAL, in Scala declaration order. These runtime
+      |// functions are their web-lite implementation.
+      |var TvLifecycle = function(onPause, onResume) { return { dispose: function() {} }; };
+      |TvLifecycle.apply = function(onPause, onResume) { return { dispose: function() {} }; };
+      |function RemoteControl(onKey, child) { var d = _el("div", "remote"); d.tabIndex = 0; d.style.outline = "none"; if (child) d.appendChild(_r(child)); var map = { 38: "Up", 40: "Down", 37: "Left", 39: "Right", 13: "Select", 32: "Select", 8: "Back", 27: "Back" }; d.addEventListener("keydown", function(e) { var k = map[e.keyCode]; if (k && onKey) { var consumed = onKey(k); if (consumed) e.preventDefault(); } }); setTimeout(function() { try { d.focus(); } catch (e) {} }, 0); return d; }
+      |function Focusable(onSelect, builder, autofocus) { var wrap = _el("div", "focusable"); wrap.tabIndex = 0; function render(f) { _clear(wrap); if (builder) wrap.appendChild(_r(builder(f))); } render(false); wrap.addEventListener("focus", function() { render(true); }); wrap.addEventListener("blur", function() { render(false); }); wrap.addEventListener("keydown", function(e) { if ((e.keyCode === 13 || e.keyCode === 32) && onSelect) { onSelect(); e.preventDefault(); } }); wrap.addEventListener("click", function() { try { wrap.focus(); } catch (e) {} if (onSelect) onSelect(); }); if (autofocus) setTimeout(function() { try { wrap.focus(); } catch (e) {} }, 0); return wrap; }
+      |var MediaCallbacks = function(o) { return o || {}; };
+      |var AudioServiceConfig = function(o) { return o || {}; };
+      |var MediaItem = function(o) { return o || {}; };
+      |function _mkAudioHandler(cb) { return { _cb: cb, setNowPlaying: function() {}, setPlaying: function() {}, setCallbacks: function(c) { this._cb = c; } }; }
+      |var MediaSession = { init: function(cb, cfg) { var d = new Deferred(); d.resolve(_mkAudioHandler(cb)); return d; } };
+      |var AudioService = { init: function(o) { var d = new Deferred(); d.resolve(_mkAudioHandler(o)); return d; } };
       |""".stripMargin
 
   /** Fallback host page (used when the app supplies no `web/` overlay). Links

@@ -101,3 +101,16 @@ body {
 .textfield:focus { border-color: var(--primary); border-width: 2px; padding: 11px 13px; }
 
 .sw-host { display: block; }
+
+/* ── web-lite native-demo widgets ───────────────────────────────────────── */
+.spinner { width: 40px; height: 40px; border: 4px solid var(--surface-variant, #e7e0ec); border-top-color: var(--primary, #6750a4); border-radius: 50%; animation: sart-spin 0.9s linear infinite; margin: 24px auto; }
+@keyframes sart-spin { to { transform: rotate(360deg); } }
+.video { border-radius: 8px; }
+.webview { display: block; border-radius: 8px; background: #fff; }
+.cni { border-radius: 8px; }
+.qr { display: block; border-radius: 4px; }
+.lottie { display: flex; align-items: center; justify-content: center; }
+.appbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; padding-right: 4px; }
+.focusable { outline: none; cursor: pointer; }
+.remote { outline: none; }
+.wrap { align-content: flex-start; }
