@@ -15,6 +15,7 @@ dependencies:
   flutter_cache_manager: ^3.4.1
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
+  qr_flutter: ^4.1.0
   web: ^1.1.0
   youtube_player_iframe: ^5.2.0
 

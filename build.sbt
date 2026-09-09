@@ -148,8 +148,18 @@ lazy val `sart-image` = (project in file("sart-image"))
     Compile / scalacOptions ++= Seq("-Yretain-trees")
   )
 
+// QR-code widget facade: the `qr_flutter` QrImageView, for TV device-pairing
+// / deep-link codes a phone scans. Its own module (no tree-shaking) so
+// qr_flutter only reaches apps that use it.
+lazy val `sart-qr` = (project in file("sart-qr"))
+  .dependsOn(`sart-dart`, `sart-stdlib`, `flutter-facades`)
+  .settings(
+    name := "sart-qr",
+    Compile / scalacOptions ++= Seq("-Yretain-trees")
+  )
+
 lazy val example = (project in file("example"))
-  .dependsOn(`flutter-facades`, `sart-stdlib`, `sart-player`, `sart-tv`, `sart-image`)
+  .dependsOn(`flutter-facades`, `sart-stdlib`, `sart-player`, `sart-tv`, `sart-image`, `sart-qr`)
   .settings(
     name := "sart-example",
     // Keep TASTy around so the compiler can read it.
@@ -193,7 +203,7 @@ lazy val `sart-facadegen` = (project in file("sart-facadegen"))
   )
 
 lazy val root = (project in file("."))
-  .aggregate(`sart-dart`, `sart-stdlib`, `flutter-facades`, `sart-player`, `sart-tv`, `sart-image`, example, compiler, `sart-facadegen`)
+  .aggregate(`sart-dart`, `sart-stdlib`, `flutter-facades`, `sart-player`, `sart-tv`, `sart-image`, `sart-qr`, example, compiler, `sart-facadegen`)
   .settings(
     name := "sart",
 
@@ -232,10 +242,12 @@ lazy val root = (project in file("."))
       val playerClasses = (`sart-player` / Compile / classDirectory).value
       val tvClasses     = (`sart-tv` / Compile / classDirectory).value
       val imageClasses  = (`sart-image` / Compile / classDirectory).value
+      val qrClasses     = (`sart-qr` / Compile / classDirectory).value
       val libArgs = Seq(
         s"--library=${playerClasses.getAbsolutePath}",
         s"--library=${tvClasses.getAbsolutePath}",
-        s"--library=${imageClasses.getAbsolutePath}"
+        s"--library=${imageClasses.getAbsolutePath}",
+        s"--library=${qrClasses.getAbsolutePath}"
       )
       val rc = sys.process.Process(Seq(
         "java", "-cp", runCp, "sart.compiler.Main"
@@ -528,6 +540,7 @@ lazy val root = (project in file("."))
       (`sart-player` / publishLocal).value
       (`sart-tv` / publishLocal).value
       (`sart-image` / publishLocal).value
+      (`sart-qr` / publishLocal).value
       (compiler / publishLocal).value
 
       // sbt-sart/ is its own sbt build (cross-built: Scala 2.12 → sbt 1.x,

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'platform/platform_name.dart';
 import 'platform/video_backend.dart';
@@ -71,6 +72,7 @@ class LauncherHome extends StatelessWidget {
     Demo('Player', 'Cross-platform video/audio', (ctx) => PlayerApp()),
     Demo('YouTube', 'youtube_player_iframe backend', (ctx) => YtApp()),
     Demo('Images', 'cached_network_image posters', (ctx) => ImageApp()),
+    Demo('QR', 'qr_flutter pairing code', (ctx) => QrApp()),
     Demo('TV', 'Remote/D-pad, focus, lifecycle', (ctx) => TvApp()),
     Demo('Showcase', 'Kitchen-sink feature demo', (ctx) => ShowcaseApp()),
     Demo('Counter', 'Classic Flutter counter', (ctx) => MyHomePage('Counter')),
@@ -80,7 +82,7 @@ class LauncherHome extends StatelessWidget {
     Demo('Two-screen', 'Navigator.push demo', (ctx) => HomeScreen()),
   ];
 
-  /// Source: example/src/main/scala/example/LauncherApp.scala:45
+  /// Source: example/src/main/scala/example/LauncherApp.scala:46
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -564,6 +566,39 @@ class PlayerAppState extends State<PlayerApp> {
                   ),
                 ],
               )),
+      ),
+    );
+  }
+}
+
+/// Source: example/src/main/scala/example/apps/QrApp.scala:9
+class QrApp extends StatelessWidget {
+  /// Source: example/src/main/scala/example/apps/QrApp.scala:10
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Sart QR Pairing')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18.0),
+              ),
+              child: QrImageView(
+                data: 'https://nabo.tv/link?code=DEMO42',
+                size: 220.0,
+                backgroundColor: Colors.white,
+                padding: EdgeInsets.zero,
+              ),
+            ),
+            SizedBox(height: 20.0),
+            Text('Scan to pair this device'),
+          ],
+        ),
       ),
     );
   }
