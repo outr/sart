@@ -62,7 +62,3 @@ object Lite:
     )
     renderRail("Continue Watching", cards)
   }
-
-@main def main(): Unit =
-  Lite.start()
-  ()

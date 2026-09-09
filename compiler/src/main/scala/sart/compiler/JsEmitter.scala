@@ -79,6 +79,16 @@ class JsEmitter(
     val moduleNames = mutable.LinkedHashMap[Symbol, String]()
     var currentModule: Symbol = Symbol.noSymbol
 
+    // Class-emission context: the class whose instance method we're emitting,
+    // and the name used for member access. We capture `this` into a local
+    // `self` at each function's top and refer to members through it — ES5
+    // `function(){}` does NOT lexically capture `this`, so an event-handler
+    // closure built inside render() would otherwise lose the instance.
+    var currentClass: Symbol = Symbol.noSymbol
+    var selfRef: String = "this"
+    def inCurrentClass(owner: Symbol): Boolean =
+      currentClass.exists && owner.exists && currentClass.typeRef.baseClasses.contains(owner)
+
     def isBuiltin(s: Symbol): Boolean =
       s.exists && (s.fullName.startsWith("scala.") || s.fullName.startsWith("java."))
 
@@ -95,6 +105,21 @@ class JsEmitter(
     def userMember(s: Symbol): Boolean =
       s.exists && !s.flags.is(Flags.Synthetic) && !s.flags.is(Flags.Artifact)
 
+    // A user-authored class (not an object/module, case class, trait, facade,
+    // or stdlib type) — emitted as an ES5 constructor + prototype.
+    def isUserClassSym(s: Symbol): Boolean =
+      s.exists && s.isClassDef && !s.flags.is(Flags.Module) && !s.flags.is(Flags.Case)
+        && !s.flags.is(Flags.Trait) && !hasNative(s) && !isBuiltin(s)
+    def isUserClass(cd: ClassDef): Boolean = isUserClassSym(cd.symbol)
+
+    // The user superclass (if any) plus its constructor args, for the
+    // `Base.call(this, …)` + `Object.create(Base.prototype)` wiring.
+    def parentInfo(cd: ClassDef): Option[(Symbol, List[Term])] =
+      cd.parents.collectFirst {
+        case Apply(Select(New(tpt), _), args) if isUserClassSym(tpt.tpe.typeSymbol) => (tpt.tpe.typeSymbol, args)
+        case tt: TypeTree if isUserClassSym(tt.tpe.typeSymbol)                      => (tt.tpe.typeSymbol, Nil)
+      }
+
     def isFacade(s: Symbol): Boolean =
       s.exists && (hasNative(s) || hasNative(s.owner))
 
@@ -102,12 +127,18 @@ class JsEmitter(
       case Repeated(es, _) => es
       case _               => Nil
 
+    // Option-typed so an EMPTY varargs (`List()`) is distinguishable from a
+    // non-varargs argument — otherwise the empty SeqLiteral leaks through.
+    def repeatedElemsOpt(t: Term): Option[List[Term]] = unwrap(t) match
+      case Repeated(es, _) => Some(es)
+      case _               => None
+
     def stripTypeApply(f: Term): Term = f match
       case TypeApply(inner, _) => stripTypeApply(inner)
       case _                   => f
 
     def flattenVarargs(args: List[Term]): List[Term] =
-      args.flatMap(a => repeatedElems(a) match { case Nil => List(a); case es => es })
+      args.flatMap(a => repeatedElemsOpt(a).getOrElse(List(a)))
 
     // Fields (ctor order) if `resultTpe` is a user case class.
     def caseApply(resultTpe: TypeRepr): Option[List[String]] =
@@ -178,6 +209,7 @@ class JsEmitter(
     def emitRef(sym: Symbol, name: String): String =
       if name == "Nil" then "[]"
       else if isFacade(sym) then name
+      else if inCurrentClass(sym.owner) then s"$selfRef.$name"
       else moduleNames.get(sym.owner) match
         case Some(m) => s"$m.$name"
         case None    => name
@@ -239,6 +271,14 @@ class JsEmitter(
               return "{" + fields.zip(flat).map((f, a) => s"$f: ${emitTerm(a)}").mkString(", ") + "}"
             case _ =>
           fn match
+            case Select(New(tpt), _) if isUserClassSym(tpt.tpe.typeSymbol) =>
+              s"new ${tpt.tpe.typeSymbol.name}(${emitArgs(args)})"
+            // A `var` setter (`x.prop_=(v)`) → a plain JS assignment.
+            case Select(recv, setter) if setter.endsWith("_=") && args.length == 1 =>
+              s"${emitTerm(recv)}.${setter.dropRight(2)} = ${emitTerm(args.head)}"
+            // List append (`xs :+ x`) → `xs.concat([x])` (immutable, like Scala).
+            case Select(recv, ":+" | "$colon$plus") =>
+              s"${emitTerm(recv)}.concat([${emitTerm(args.head)}])"
             case Select(recv, op) if binOps.contains(op) && args.length == 1 =>
               s"(${emitTerm(recv)} ${binOps(op)} ${emitTerm(args.head)})"
             case Select(recv, "foreach") =>
@@ -251,17 +291,27 @@ class JsEmitter(
 
     def emitTerm(t0: Term): String =
       unwrap(t0) match
+        // `new UserClass(args)` (incl. creator-application `Foo()` and the
+        // zero-arg form) — matched before the generic Apply cases below.
+        case Apply(Select(New(tpt), _), args) if isUserClassSym(tpt.tpe.typeSymbol) =>
+          s"new ${tpt.tpe.typeSymbol.name}(${emitArgs(args)})"
+        case Apply(TypeApply(Select(New(tpt), _), _), args) if isUserClassSym(tpt.tpe.typeSymbol) =>
+          s"new ${tpt.tpe.typeSymbol.name}(${emitArgs(args)})"
         case Literal(c)            => emitConst(c)
-        case This(_)               => moduleNames.getOrElse(currentModule, "this")
+        case This(_)               =>
+          if currentClass.exists then selfRef else moduleNames.getOrElse(currentModule, "this")
         case id @ Ident(n)         => emitRef(id.symbol, n)
         case Select(q, "toString")           => s"String(${emitTerm(q)})"
         case Apply(Select(q, "toString"), Nil) => s"String(${emitTerm(q)})"
+        // `xs.size` → JS `.length` (Scala collections; a property, not a call).
+        case Select(q, "size")               => s"${emitTerm(q)}.length"
         case Apply(sel @ Select(_, _), Nil)  => s"${emitTerm(sel)}()"
         case Apply(id @ Ident(_), Nil)       => s"${emitTerm(id)}()"
         case a: Apply                        => emitApply(a)
         case TypeApply(fn, _)                => emitTerm(fn)
         case sel @ Select(q, name) =>
-          moduleNames.get(sel.symbol.owner) match
+          if inCurrentClass(sel.symbol.owner) then s"$selfRef.$name"
+          else moduleNames.get(sel.symbol.owner) match
             case Some(m) => s"$m.$name"
             case None    => s"${emitTerm(q)}.$name"
         case If(c, a, b)  => s"(${emitTerm(c)} ? ${emitTerm(a)} : ${emitTerm(b)})"
@@ -364,6 +414,59 @@ class JsEmitter(
       }
       currentModule = Symbol.noSymbol
 
+    // ── class (→ ES5 constructor + prototype) ────────────────────────────────
+    def emitClassMethod(cn: String, dd: DefDef): Unit =
+      val name    = dd.name
+      val params  = termParamNames(dd.paramss)
+      val rhs     = dd.rhs.get
+      val asyncBody = unwrapAsync(rhs)
+      if asyncBody.isDefined || containsAwait(rhs) then
+        val d   = freshDeferred()
+        val cps = emitCps(asyncBody.getOrElse(rhs), Some(d))
+        out.append(s"$cn.prototype.$name = function(${params.mkString(", ")}) { var $selfRef = this; var $d = new Deferred(); $cps return $d; };\n")
+      else
+        val wantRet = !(dd.returnTpt.tpe =:= TypeRepr.of[Unit])
+        out.append(s"$cn.prototype.$name = function(${params.mkString(", ")}) { var $selfRef = this; ${emitBody(rhs, wantRet)} };\n")
+
+    def emitClass(cd: ClassDef): Unit =
+      val sym    = cd.symbol
+      val cn     = sym.name
+      val parent = parentInfo(cd)
+      currentClass = sym
+      selfRef = "self"
+
+      // constructor: super call, capture `self`, then fields + init in body order
+      val ctorParams = termParamNames(cd.constructor.paramss)
+      val cb = new StringBuilder
+      parent.foreach { case (p, args) =>
+        val extra = if args.isEmpty then "" else ", " + emitArgs(args)
+        cb.append(s"${p.name}.call(this$extra); ")
+      }
+      cb.append(s"var $selfRef = this; ")
+      cd.body.foreach {
+        case vd @ ValDef(name, _, Some(rhs)) if userMember(vd.symbol) =>
+          if vd.symbol.flags.is(Flags.ParamAccessor) then cb.append(s"$selfRef.$name = $name; ")
+          else cb.append(s"$selfRef.$name = ${emitTerm(rhs)}; ")
+        case t: Term =>
+          val st = emitStat(t); if st.nonEmpty then cb.append(s"$st ")
+        case _ => ()
+      }
+      out.append(s"function $cn(${ctorParams.mkString(", ")}) { ${cb.toString.trim} }\n")
+      parent.foreach { case (p, _) =>
+        out.append(s"$cn.prototype = Object.create(${p.name}.prototype);\n")
+        out.append(s"$cn.prototype.constructor = $cn;\n")
+      }
+
+      // methods (abstract defs — no rhs — are provided by subclasses; skip)
+      cd.body.foreach {
+        case dd @ DefDef(name, pcs, _, Some(_))
+            if userMember(dd.symbol) && name != "<init>" && !name.endsWith("_=") && hasTermClause(pcs) =>
+          emitClassMethod(cn, dd)
+        case _ => ()
+      }
+      currentClass = Symbol.noSymbol
+      selfRef = "this"
+
     // ── walk ─────────────────────────────────────────────────────────────
     def eachClassDef(tree: Tree)(f: ClassDef => Unit): Unit = tree match
       case pc: PackageClause => pc.stats.foreach(s => eachClassDef(s)(f))
@@ -377,16 +480,24 @@ class JsEmitter(
       case dd: DefDef if isMain(dd.symbol) => mains += dd
       case _                 => ()
 
-    // 1. register module namespaces (so cross-module refs resolve)
+    // 1. collect @main defs first — Scala 3 also generates a runnable wrapper
+    //    *class* of the same name, which must NOT be emitted as a user class.
+    for tasty <- tastys do collectMains(tasty.ast)
+    val mainNames = mains.map(_.name).toSet
+    // 2. register module namespaces (so cross-module refs resolve)
     for tasty <- tastys do
       eachClassDef(tasty.ast) { cd =>
         if isUserModule(cd) then moduleNames.getOrElseUpdate(cd.symbol, cd.symbol.name.stripSuffix("$"))
       }
-    // 2. emit each module
+    // 3. emit each user class (constructor+prototype) and module (namespace).
+    //    Constructor `function` declarations hoist and `Object.create` reads a
+    //    live prototype, so inheritance is order-independent; @main runs last.
     for tasty <- tastys do
-      eachClassDef(tasty.ast) { cd => if isUserModule(cd) then emitModule(cd) }
-    // 3. emit the @main entry call(s) last
-    for tasty <- tastys do collectMains(tasty.ast)
+      eachClassDef(tasty.ast) { cd =>
+        if isUserClass(cd) && !mainNames.contains(cd.symbol.name) then emitClass(cd)
+        else if isUserModule(cd) then emitModule(cd)
+      }
+    // 4. emit the @main entry call(s) last
     for dd <- mains; body <- dd.rhs do
       val asyncBody = unwrapAsync(body)
       // A `@main` needs no return value, so an async entry is fire-and-forget
@@ -429,6 +540,8 @@ class JsEmitter(
        |  } catch (e) { d.resolve(""); }
        |  return d;
        |} };
+       |var Random = { nextInt: function(bound) { return Math.floor(Math.random() * bound); } };
+       |var Timer = { periodic: function(ms, cb) { var t = { id: setInterval(cb, ms) }; t.cancel = function() { clearInterval(t.id); }; return t; } };
        |</script>
        |<script src="app.js"></script>
        |</body>

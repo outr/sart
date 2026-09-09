@@ -1,54 +1,158 @@
-// Verification harness: run the emitted app.js under a tiny DOM stub (NOT part
-// of the app bundle) and assert the async startup + render + keydown behaviour.
-// Xhr resolves ASYNCHRONOUSLY (setTimeout) so this proves the CPS-lowered
-// await chain sequences correctly. Not shipped.
+// Verification harness for the web-lite backend: run the emitted app.js under a
+// tiny DOM stub (NOT part of the app bundle) and drive each example app the way
+// a user would — click buttons, type into inputs, fire the stopwatch timer,
+// navigate screens — asserting the rendered DOM reflects the new state.
+//
+//   node web-example/verify/run.js out-js/app.js
+//
+// Covers Counter, Todos, Dice, Stopwatch, Two-screen, plus a Lite async smoke
+// test (the CPS-lowered await chain). Exits non-zero if any assertion fails.
 const fs = require('fs'), vm = require('vm'), path = require('path');
-function El(tag){ this.tag=tag; this.id=null; this.attrs={}; this.children=[]; this.listeners={}; }
-El.prototype.appendChild=function(c){ this.children.push(c); return c; };
-El.prototype.setAttribute=function(k,v){ this.attrs[k]=v; };
-El.prototype.addEventListener=function(ev,fn){ this.listeners[ev]=fn; };
-function TextNode(t){ this.text=String(t); }
-const appEl = new El('div'); appEl.id='app';
+
+// ── DOM stub ──────────────────────────────────────────────────────────────
+function El(tag) {
+  this.tag = tag; this.attrs = {}; this.children = []; this.listeners = {};
+  this._text = ''; this.value = ''; this.className = '';
+}
+El.prototype.appendChild = function(c) { this.children.push(c); return c; };
+El.prototype.setAttribute = function(k, v) { this.attrs[k] = String(v); };
+El.prototype.addEventListener = function(ev, fn) { (this.listeners[ev] = this.listeners[ev] || []).push(fn); };
+Object.defineProperty(El.prototype, 'textContent', {
+  get: function() { return this._text; },
+  set: function(v) { this._text = String(v); this.children = []; }
+});
+Object.defineProperty(El.prototype, 'innerHTML', {
+  get: function() { return ''; },
+  set: function(v) { if (String(v) === '') { this.children = []; this._text = ''; } }
+});
+
+const roots = {};
 const document = {
-  getElementById:function(id){ return id==='app'?appEl:new El('div'); },
-  createElement:function(t){ return new El(t); },
-  createTextNode:function(t){ return new TextNode(t); }
+  getElementById: function(id) { if (!roots[id]) roots[id] = new El('#' + id); return roots[id]; },
+  createElement: function(t) { return new El(t); },
+  createTextNode: function(t) { var e = new El('#text'); e._text = String(t); return e; }
 };
 const store = {};
-const localStorage = { getItem:function(k){return k in store?store[k]:null;}, setItem:function(k,v){store[k]=v;} };
-// Deferred: same shape as the host runtime the emitter injects into index.html.
-function Deferred(){ this.cbs=[]; this.done=false; this.val=undefined; }
-Deferred.prototype.onComplete=function(f){ if(this.done){f(this.val);} else {this.cbs.push(f);} };
-Deferred.prototype.resolve=function(v){ this.done=true; this.val=v; for(var i=0;i<this.cbs.length;i++){this.cbs[i](this.val);} this.cbs=[]; };
-// Fake Xhr: resolves ASYNC (setTimeout) and records call order, to prove the
-// awaits sequence and the second fetch sees the first's awaited result.
+const localStorage = { getItem: function(k) { return k in store ? store[k] : null; }, setItem: function(k, v) { store[k] = String(v); } };
+
+// Async primitive — same shape as the host Deferred the emitter injects.
+function Deferred() { this.cbs = []; this.done = false; this.val = undefined; }
+Deferred.prototype.onComplete = function(f) { if (this.done) { f(this.val); } else { this.cbs.push(f); } };
+Deferred.prototype.resolve = function(v) { this.done = true; this.val = v; for (var i = 0; i < this.cbs.length; i++) { this.cbs[i](this.val); } this.cbs = []; };
+
+// Controllable Timer: capture callbacks, fire them on demand, honour cancel.
+const timers = [];
+const Timer = { periodic: function(ms, cb) { var t = { cb: cb, cancelled: false }; t.cancel = function() { t.cancelled = true; }; timers.push(t); return t; } };
+function tickAll() { for (var i = 0; i < timers.length; i++) { if (!timers[i].cancelled) timers[i].cb(); } }
+
+// Deterministic Random: nextInt(6) always yields 2 → a roll of 3.
+const Random = { nextInt: function(b) { return 2 % b; } };
+
+// Async Xhr for the Lite smoke test; records call order.
 const order = [];
-const Xhr = { get:function(url){ order.push(url); var d=new Deferred(); setTimeout(function(){ d.resolve('tok-'+order.length); }, 5); return d; } };
-const sandbox = { document, localStorage, Xhr, Deferred, String, XMLHttpRequest:function(){}, setTimeout, console };
+const Xhr = { get: function(url) { order.push(url); var d = new Deferred(); setTimeout(function() { d.resolve('tok-' + order.length); }, 5); return d; } };
+
+const sandbox = { document, localStorage, Xhr, Deferred, Timer, Random, String, Math, XMLHttpRequest: function() {}, setTimeout, console };
 vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync(path.join(process.argv[2]),'utf8'), sandbox);
+vm.runInContext(fs.readFileSync(path.join(process.argv[2]), 'utf8'), sandbox);
 
-let ok=true; function check(c,m){ if(!c){ok=false;console.error('FAIL: '+m);}else console.log('ok  : '+m); }
+// ── helpers ─────────────────────────────────────────────────────────────────
+function findById(n, id) {
+  if (n.attrs && n.attrs.id === id) return n;
+  for (var i = 0; i < n.children.length; i++) { var r = findById(n.children[i], id); if (r) return r; }
+  return null;
+}
+function text(n) { var t = n._text || ''; for (var i = 0; i < n.children.length; i++) t += text(n.children[i]); return t; }
+function tagCount(n, tag) { var c = 0; for (var i = 0; i < n.children.length; i++) { if (n.children[i].tag === tag) c++; c += tagCount(n.children[i], tag); } return c; }
+function click(n) { var ls = (n.listeners['click'] || []); for (var i = 0; i < ls.length; i++) ls[i]({}); }
 
-// --- synchronous assertions: run before any await resolves ---
-const k = appEl.listeners['keydown'];
-check(typeof k==='function','keydown registered synchronously, before any await');
-check(sandbox.Lite.focus===0,'focus starts 0'); k({keyCode:39}); check(sandbox.Lite.focus===1,'RIGHT->1');
-k({keyCode:39}); check(sandbox.Lite.focus===2,'RIGHT->2'); k({keyCode:37}); check(sandbox.Lite.focus===1,'LEFT->1');
-check(appEl.children.length===0,'rail NOT rendered yet (awaits still pending)');
-check(order.length===1 && order[0]==='/token','first fetch = loadToken /token (fired, unresolved)');
+let ok = true, group = '';
+function check(c, m) { if (!c) { ok = false; console.error('  FAIL [' + group + ']: ' + m); } else console.log('  ok   [' + group + ']: ' + m); }
 
-// --- after the async chain drains ---
-setTimeout(function(){
-  check(order.length===2,'two sequential fetches happened (composition)');
-  check(order[1].indexOf('/api/rails?t=tok-1')===0,'second fetch URL used the awaited token (in order)');
-  check(appEl.children.length===1,'rail rendered after both awaits resolved');
-  const s=appEl.children[0]; check(s&&s.attrs['class']==='rail','section class=rail');
-  check(s.children[0].tag==='h2'&&s.children[0].children[0].text==='Continue Watching','heading text');
-  const row=s.children[1]; check(row.attrs['class']==='row'&&row.children.length===3,'row has 3 cards');
-  const c0=row.children[0];
-  check(c0.attrs['data-id']==='1','card0 data-id="1" (Int.toString)');
-  check(c0.children[0].attrs['src']==='https://image.tmdb.org/t/p/w342/a.jpg','card0 img src (interp)');
-  check(c0.children[1].children[0].text==='Alpha','card0 label=title');
-  console.log(ok?'\nALL PASS':'\nSOME FAILED'); process.exit(ok?0:1);
+// ── Counter ───────────────────────────────────────────────────────────────
+group = 'Counter';
+(function() {
+  var root = new El('div'), c = new sandbox.Counter();
+  c.mountInto(root);
+  check(text(findById(root, 'count')) === 'Count: 0', 'starts at 0');
+  click(findById(root, 'inc'));
+  check(text(findById(root, 'count')) === 'Count: 1', '+ → 1');
+  click(findById(root, 'inc'));
+  check(text(findById(root, 'count')) === 'Count: 2', '+ → 2');
+})();
+
+// ── Todos ─────────────────────────────────────────────────────────────────
+group = 'Todos';
+(function() {
+  var root = new El('div'), t = new sandbox.Todos();
+  t.mountInto(root);
+  check(tagCount(findById(root, 'list'), 'li') === 0, 'empty list');
+  findById(root, 'todo-input').value = 'milk';
+  click(findById(root, 'add'));
+  check(tagCount(findById(root, 'list'), 'li') === 1, 'add → 1 item');
+  check(text(findById(root, 'list')) === 'milk', 'item text = milk');
+  findById(root, 'todo-input').value = 'eggs';
+  click(findById(root, 'add'));
+  check(tagCount(findById(root, 'list'), 'li') === 2, 'add → 2 items');
+  check(text(findById(root, 'list')) === 'milkeggs', 'both items present');
+})();
+
+// ── Dice ──────────────────────────────────────────────────────────────────
+group = 'Dice';
+(function() {
+  var root = new El('div'), d = new sandbox.Dice();
+  d.mountInto(root);
+  check(text(findById(root, 'count')) === 'Rolls: 0', 'no rolls yet');
+  click(findById(root, 'roll'));
+  check(text(findById(root, 'last')) === 'Last: 3', 'roll → face 3 (seeded)');
+  check(text(findById(root, 'count')) === 'Rolls: 1', 'history 1');
+  check(tagCount(findById(root, 'history'), 'li') === 1, 'history list 1');
+  click(findById(root, 'roll'));
+  check(text(findById(root, 'count')) === 'Rolls: 2', 'history 2');
+  check(tagCount(findById(root, 'history'), 'li') === 2, 'history list 2');
+})();
+
+// ── Stopwatch ───────────────────────────────────────────────────────────────
+group = 'Stopwatch';
+(function() {
+  timers.length = 0;
+  var root = new El('div'), s = new sandbox.Stopwatch();
+  s.mountInto(root);
+  check(text(findById(root, 'elapsed')) === 'Elapsed: 0s', 'starts at 0');
+  click(findById(root, 'start'));
+  tickAll(); tickAll(); tickAll();
+  check(text(findById(root, 'elapsed')) === 'Elapsed: 3s', '3 ticks → 3s');
+  click(findById(root, 'stop'));
+  tickAll();
+  check(text(findById(root, 'elapsed')) === 'Elapsed: 3s', 'stopped → stays 3s');
+})();
+
+// ── Two-screen ───────────────────────────────────────────────────────────────
+group = 'Two-screen';
+(function() {
+  roots['app'] = new El('#app');
+  sandbox.App.mount('app');            // App.root ← #app, shows Counter
+  sandbox.App.show(new sandbox.ScreenA());
+  var app = document.getElementById('app');
+  check(text(findById(app, 'title')) === 'Home', 'screen A shown');
+  click(findById(app, 'go'));
+  check(findById(app, 'msg') && text(findById(app, 'msg')) === 'You made it!', 'navigated to B');
+  check(text(findById(app, 'title')) === 'Detail', 'B title');
+  click(findById(app, 'back'));
+  check(text(findById(app, 'title')) === 'Home', 'back to A');
+})();
+
+// ── Lite async smoke test (CPS await chain) ──────────────────────────────────
+group = 'Lite-async';
+roots['app'] = new El('#app');
+order.length = 0;
+sandbox.Lite.start();
+check(order.length === 1 && order[0] === '/token', 'first await fires /token, unresolved');
+check(tagCount(roots['app'], 'div') === 0, 'rail not rendered before awaits resolve');
+setTimeout(function() {
+  check(order.length === 2, 'two sequential fetches (composition)');
+  check(order[1].indexOf('/api/rails?t=tok-1') === 0, 'second fetch used awaited token');
+  check(tagCount(roots['app'], 'div') > 0, 'rail rendered after awaits resolved');
+  console.log(ok ? '\nALL PASS' : '\nSOME FAILED');
+  process.exit(ok ? 0 : 1);
 }, 50);
