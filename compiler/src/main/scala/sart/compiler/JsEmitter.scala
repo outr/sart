@@ -57,6 +57,18 @@ class JsEmitter(
     def jsStr(s: String): String =
       "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
 
+    // JS reserved words a Scala identifier might collide with when used as a
+    // binding (param/local/ref). Member access (`x.default`) is fine in ES5.1,
+    // so only binding names need this; a reserved name gets a trailing `_`.
+    val jsReserved = Set(
+      "default", "new", "var", "function", "this", "class", "return", "typeof",
+      "in", "instanceof", "delete", "void", "with", "switch", "case", "for",
+      "while", "do", "if", "else", "try", "catch", "finally", "throw", "break",
+      "continue", "const", "let", "enum", "export", "import", "super", "extends",
+      "null", "true", "false", "arguments", "eval", "yield", "await", "debugger"
+    )
+    def jsSafe(name: String): String = if jsReserved(name) then name + "_" else name
+
     def emitConst(c: Constant): String = c match
       case IntConstant(i)     => i.toString
       case LongConstant(l)    => l.toString
@@ -69,10 +81,13 @@ class JsEmitter(
       case UnitConstant()     => "undefined"
       case other              => other.value.toString
 
+    // Unhandled tree → a VALID JS placeholder (`null`), so a dormant/
+    // unsupported construct (in a native-package demo that never mounts)
+    // can't break `node --check` of the whole bundle. Tracked for the report.
     def todo(t: Tree): String =
       val label = t.getClass.getSimpleName
       todos += s"unsupported: $label"
-      s"/*?$label*/"
+      "null"
 
     // User-authored `object`s become JS namespaces; this maps each such
     // module symbol to its namespace name so cross-module refs resolve.
@@ -92,10 +107,17 @@ class JsEmitter(
     def isBuiltin(s: Symbol): Boolean =
       s.exists && (s.fullName.startsWith("scala.") || s.fullName.startsWith("java."))
 
+    // Scala 3 enums emit as class+companion with `$new`/`values` — unsupported
+    // (and they collide on the JS name); skip them (dormant in the demos).
+    def isEnumLike(s: Symbol): Boolean =
+      s.exists && (s.flags.is(Flags.Enum)
+        || (s.companionClass.exists && s.companionClass.flags.is(Flags.Enum))
+        || (s.companionModule.exists && s.companionModule.flags.is(Flags.Enum)))
+
     def isUserModule(cd: ClassDef): Boolean =
       val s = cd.symbol
       s.exists && s.flags.is(Flags.Module)
-        && !s.flags.is(Flags.Case) && !hasNative(s)
+        && !s.flags.is(Flags.Case) && !hasNative(s) && !isEnumLike(s)
         // the synthetic top-level holder is `<file>$package` (module class
         // name carries a trailing `$`) — never a user namespace.
         && !s.name.stripSuffix("$").endsWith("$package") && !isBuiltin(s)
@@ -109,7 +131,7 @@ class JsEmitter(
     // or stdlib type) — emitted as an ES5 constructor + prototype.
     def isUserClassSym(s: Symbol): Boolean =
       s.exists && s.isClassDef && !s.flags.is(Flags.Module) && !s.flags.is(Flags.Case)
-        && !s.flags.is(Flags.Trait) && !hasNative(s) && !isBuiltin(s)
+        && !s.flags.is(Flags.Trait) && !s.flags.is(Flags.Enum) && !hasNative(s) && !isBuiltin(s)
     def isUserClass(cd: ClassDef): Boolean = isUserClassSym(cd.symbol)
 
     // The user superclass (if any) plus its constructor args, for the
@@ -147,6 +169,16 @@ class JsEmitter(
       then Some(ts.caseFields.map(_.name))
       else None
 
+    // True only for actual case-class CONSTRUCTION (`Foo(...)` / `new Foo`),
+    // not any `.apply` that happens to return a case type — e.g. `xs(i)` on a
+    // `List[Demo]` returns a Demo but is index access, not construction.
+    def isCaseCtor(fn: Term, resultTpe: TypeRepr): Boolean = fn match
+      case Select(New(_), _) => true
+      case Select(q, "apply") =>
+        val comp = resultTpe.typeSymbol.companionModule
+        comp.exists && q.symbol.exists && q.symbol == comp
+      case _ => false
+
     // List.apply is inherited from SeqFactory, so its owner isn't "List" —
     // detect via the receiver instead.
     def isListApply(fn: Term): Boolean = fn match
@@ -155,7 +187,7 @@ class JsEmitter(
       case _ => false
 
     def termParamNames(pcs: List[ParamClause]): List[String] =
-      pcs.collect { case c: TermParamClause => c }.flatMap(_.params).map(_.name)
+      pcs.collect { case c: TermParamClause => c }.flatMap(_.params).map(p => jsSafe(p.name))
 
     def hasTermClause(pcs: List[ParamClause]): Boolean =
       pcs.exists { case _: TermParamClause => true; case _ => false }
@@ -208,11 +240,12 @@ class JsEmitter(
     // ── expression emission ────────────────────────────────────────────────
     def emitRef(sym: Symbol, name: String): String =
       if name == "Nil" then "[]"
+      else if name == "None" && sym.exists && sym.fullName.endsWith(".None") then "null"
       else if isFacade(sym) then name
       else if inCurrentClass(sym.owner) then s"$selfRef.$name"
       else moduleNames.get(sym.owner) match
         case Some(m) => s"$m.$name"
-        case None    => name
+        case None    => jsSafe(name)
 
     def emitStringInterp(outer: Term): Option[String] = unwrap(outer) match
       case Apply(Select(inner, "s"), List(argsArg)) =>
@@ -246,17 +279,73 @@ class JsEmitter(
       val body    = dd.rhs.map(b => emitBody(b, wantRet)).getOrElse("")
       s"function(${params.mkString(", ")}) { $body }"
 
+    // Positional arg emission (user-class ctors, plain calls). Named args are
+    // unwrapped to their value in Scala's declaration order (a user JS ctor is
+    // positional); default-arg refs are dropped.
     def emitArgs(args: List[Term]): String =
-      flattenVarargs(args).map(a => asClosure(a) match
-        case Some(dd) => emitClosure(dd)
-        case None     => emitTerm(a)
-      ).mkString(", ")
+      flattenVarargs(args).filterNot(isDefaultArg).map {
+        case NamedArg(_, v) => emitArgVal(v)
+        case a              => emitArgVal(a)
+      }.mkString(", ")
+
+    // A reference to a synthesised default-argument getter (`Foo$default$3`)
+    // — Scala fills omitted defaulted params with these at the call site; a
+    // facade's real (JS-runtime) default takes over, so we drop them.
+    def isDefaultArg(t: Term): Boolean = unwrap(t) match
+      case Select(_, n) if n.contains("$default$") => true
+      case Ident(n) if n.contains("$default$")     => true
+      case Apply(f, _)                             => isDefaultArg(f)
+      case TypeApply(f, _)                         => isDefaultArg(f)
+      case NamedArg(_, v)                          => isDefaultArg(v)
+      case _                                       => false
+
+    def emitArgVal(t: Term): String = asClosure(t) match
+      case Some(dd) => emitClosure(dd)
+      case None     => emitTerm(t)
+
+    // Facade / widget calling convention: positional args stay positional; the
+    // named args collapse into ONE trailing options object — `Scaffold(appBar =
+    // a, body = b)` → `Scaffold({appBar: a, body: b})`, matching the widget
+    // runtime. Omitted defaults are dropped.
+    def emitFacadeArgs(args: List[Term]): String =
+      val kept = args.filterNot(isDefaultArg)
+      val pos   = mutable.ListBuffer[String]()
+      val named = mutable.ListBuffer[String]()
+      kept.foreach {
+        case NamedArg(n, v) => named += s"$n: ${emitArgVal(v)}"
+        case other          => pos += emitArgVal(other)
+      }
+      if named.isEmpty then pos.mkString(", ")
+      else if pos.isEmpty then "{" + named.mkString(", ") + "}"
+      else pos.mkString(", ") + ", {" + named.mkString(", ") + "}"
+
+    def isFacadeCall(fn: Term): Boolean =
+      val s = fn.symbol
+      s.exists && (hasNative(s) || hasNative(s.owner))
+
+    // A Scala collection value (List/Seq/…) — its `apply(i)` is index access.
+    def isCollType(t: Term): Boolean =
+      val s = t.tpe.dealias.typeSymbol
+      s.exists && s.fullName.startsWith("scala.collection.")
+
+    // `Some(x)` → `x` (nullable), `None` → handled in emitRef. Mirrors the
+    // Dart backend: Option is a plain nullable at the value level.
+    def someArg(t: Term): Option[Term] = t match
+      case Apply(fn, List(x)) =>
+        stripTypeApply(fn) match
+          case Select(q, "apply") if q.symbol.exists && q.symbol.fullName.endsWith(".Some") => Some(x)
+          case _ => None
+      case _ => None
 
     def emitApply(t: Term): String =
       // await/async only lower at statement/tail level (see emitCps); anywhere
       // else (e.g. `f(await(g))`) is unsupported — flag it rather than emit
       // a broken `await.apply(...)` call.
       if isAwait(t).isDefined || unwrapAsync(t).isDefined then return todoAwait(t)
+      // `Some(x)` is a transparent nullable — emit just the value.
+      someArg(t) match
+        case Some(x) => return emitArgVal(x)
+        case None    =>
       emitStringInterp(t) match
         case Some(s) => return s
         case None    =>
@@ -266,16 +355,26 @@ class JsEmitter(
           if isListApply(fn) then
             return "[" + flattenVarargs(args).map(emitTerm).mkString(", ") + "]"
           caseApply(t.tpe) match
-            case Some(fields) if fn.symbol.name == "apply" || fn.symbol.name == "<init>" =>
-              val flat = flattenVarargs(args)
-              return "{" + fields.zip(flat).map((f, a) => s"$f: ${emitTerm(a)}").mkString(", ") + "}"
+            case Some(fields) if isCaseCtor(fn, t.tpe) =>
+              val flat = flattenVarargs(args).filterNot(isDefaultArg)
+              return "{" + fields.zip(flat).map((f, a) => s"$f: ${emitArgVal(a)}").mkString(", ") + "}"
             case _ =>
           fn match
+            // Widget / facade construction → runtime call with an options object.
+            case Select(New(tpt), _) if hasNative(tpt.tpe.typeSymbol) =>
+              s"${tpt.tpe.typeSymbol.name}(${emitFacadeArgs(args)})"
             case Select(New(tpt), _) if isUserClassSym(tpt.tpe.typeSymbol) =>
+              s"new ${tpt.tpe.typeSymbol.name}(${emitArgs(args)})"
+            // Any other construction (a builtin/unknown type in a dormant
+            // native-package demo) → valid `new Name(...)` JS.
+            case Select(New(tpt), _) =>
               s"new ${tpt.tpe.typeSymbol.name}(${emitArgs(args)})"
             // A `var` setter (`x.prop_=(v)`) → a plain JS assignment.
             case Select(recv, setter) if setter.endsWith("_=") && args.length == 1 =>
               s"${emitTerm(recv)}.${setter.dropRight(2)} = ${emitTerm(args.head)}"
+            // Collection index access `xs(i)` → `xs[i]`.
+            case Select(recv, "apply") if args.length == 1 && isCollType(recv) =>
+              s"${emitTerm(recv)}[${emitTerm(args.head)}]"
             // List append (`xs :+ x`) → `xs.concat([x])` (immutable, like Scala).
             case Select(recv, ":+" | "$colon$plus") =>
               s"${emitTerm(recv)}.concat([${emitTerm(args.head)}])"
@@ -286,11 +385,23 @@ class JsEmitter(
               val cb = args.headOption.flatMap(asClosure).map(emitClosure(_, forceUnit = true)).getOrElse(emitArgs(args))
               s"${emitTerm(recv)}.forEach($cb)"
             case Select(recv, "map")     => s"${emitTerm(recv)}.map(${emitArgs(args)})"
-            case _                       => s"${emitTerm(fn)}(${emitArgs(args)})"
+            // A callable facade OBJECT (`object runApp`) is invoked as
+            // `runApp.apply(x)` in Scala — drop the `.apply`, call it directly.
+            case Select(recv, "apply") if isFacadeCall(fn) =>
+              s"${emitTerm(recv)}(${emitFacadeArgs(args)})"
+            // A facade member call (widget factory, Theme.of, Navigator.of, …)
+            // uses the options-object convention; user calls stay positional.
+            case _ if isFacadeCall(fn) => s"${emitTerm(fn)}(${emitFacadeArgs(args)})"
+            case _                     => s"${emitTerm(fn)}(${emitArgs(args)})"
         case _ => emitTerm(t)
 
     def emitTerm(t0: Term): String =
       unwrap(t0) match
+        // Widget / facade construction → runtime call with an options object.
+        case Apply(Select(New(tpt), _), args) if hasNative(tpt.tpe.typeSymbol) =>
+          s"${tpt.tpe.typeSymbol.name}(${emitFacadeArgs(args)})"
+        case Apply(TypeApply(Select(New(tpt), _), _), args) if hasNative(tpt.tpe.typeSymbol) =>
+          s"${tpt.tpe.typeSymbol.name}(${emitFacadeArgs(args)})"
         // `new UserClass(args)` (incl. creator-application `Foo()` and the
         // zero-arg form) — matched before the generic Apply cases below.
         case Apply(Select(New(tpt), _), args) if isUserClassSym(tpt.tpe.typeSymbol) =>
@@ -305,6 +416,12 @@ class JsEmitter(
         case Apply(Select(q, "toString"), Nil) => s"String(${emitTerm(q)})"
         // `xs.size` → JS `.length` (Scala collections; a property, not a call).
         case Select(q, "size")               => s"${emitTerm(q)}.length"
+        // Unary operators (`!x`, `-x`, `~x`) — Scala spells them `x.unary_!`.
+        case Select(q, "unary_$bang" | "unary_!") => s"(!${emitTerm(q)})"
+        case Select(q, "unary_$minus" | "unary_-") => s"(-${emitTerm(q)})"
+        case Select(q, "unary_$tilde" | "unary_~") => s"(~${emitTerm(q)})"
+        // Numeric widenings are identity in JS (all numbers are doubles).
+        case Select(q, "toDouble" | "toInt" | "toLong" | "toFloat") => emitTerm(q)
         case Apply(sel @ Select(_, _), Nil)  => s"${emitTerm(sel)}()"
         case Apply(id @ Ident(_), Nil)       => s"${emitTerm(id)}()"
         case a: Apply                        => emitApply(a)
@@ -315,12 +432,17 @@ class JsEmitter(
             case Some(m) => s"$m.$name"
             case None    => s"${emitTerm(q)}.$name"
         case If(c, a, b)  => s"(${emitTerm(c)} ? ${emitTerm(a)} : ${emitTerm(b)})"
+        // A closure/lambda in value position → a JS function expression.
+        case Block(List(dd: DefDef), _: Closure) => emitClosure(dd)
+        // Expression-position arg-hoist block (a nested widget's args) — inline.
+        case Block(stats, e) if allValDefs(stats) =>
+          emitTempValBlock(stats.collect { case v: ValDef => v }, e)
         case Block(_, e)  => emitTerm(e)
         case other        => todo(other)
 
     // ── statements / bodies ─────────────────────────────────────────────────
     def emitStat(s: Statement): String = s match
-      case ValDef(name, _, Some(rhs)) => s"var $name = ${emitTerm(rhs)};"
+      case ValDef(name, _, Some(rhs)) => s"var ${jsSafe(name)} = ${emitTerm(rhs)};"
       case Assign(lhs, rhs)           => s"${emitTerm(lhs)} = ${emitTerm(rhs)};"
       case If(c, a, b)                => emitIfStat(c, a, b)
       case t: Term                    => s"${emitTerm(t)};"
@@ -339,7 +461,42 @@ class JsEmitter(
         case e if wantRet     => s"return ${emitTerm(e)};"
         case e                => s"${emitTerm(e)};"
 
+    def allValDefs(stats: List[Statement]): Boolean =
+      stats.nonEmpty && stats.forall { case _: ValDef => true; case _ => false }
+
+    // Scala hoists a call's named/default args into temp vals:
+    //   { val theme$1 = …; val key$1 = W.$default$1; …; W(key$1, …, {theme: theme$1}) }
+    // Inline the real ones back into the call by string substitution, and strip
+    // the omitted-default ones (the widget runtime supplies the defaults). This
+    // is what makes flutter.material widget construction render.
+    def emitTempValBlock(vals: List[ValDef], expr: Term): String =
+      def sub(in: String, name: String, value: String): String =
+        val re = "(?<![A-Za-z0-9_$])" + java.util.regex.Pattern.quote(name) + "(?![A-Za-z0-9_$])"
+        in.replaceAll(re, java.util.regex.Matcher.quoteReplacement(value))
+      val marker = "__SART_DEF__"
+      val (defaultVals, realVals) = vals.partition(_.rhs.exists(isDefaultArg))
+      var out = emitTerm(expr)
+      for vd <- defaultVals do out = sub(out, vd.name, marker)
+      // reverse: a later val's inlined RHS may still reference an earlier one.
+      for vd <- realVals.reverse do out = sub(out, vd.name, "(" + emitTerm(vd.rhs.get) + ")")
+      val id = "[A-Za-z_$][A-Za-z0-9_$]*"
+      out
+        .replaceAll(id + ": " + marker + ", ", "")
+        .replaceAll(", " + id + ": " + marker, "")
+        .replaceAll(marker + ", ", "")
+        .replaceAll(", " + marker, "")
+        .replaceAll("\\(" + marker + "\\)", "()")
+        .replaceAll(id + ": " + marker, "")
+        .replaceAll(marker, "null")
+
     def emitBody(t: Term, wantRet: Boolean): String = unwrap(t) match
+      // An all-ValDef block is Scala's arg-hoist (or pure val computation) —
+      // inline it into one expression, then return/emit that.
+      case Block(stats, expr) if allValDefs(stats) =>
+        val inlined = emitTempValBlock(stats.collect { case v: ValDef => v }, expr)
+        if wantRet && !isUnit(expr) then s"return $inlined;"
+        else if isUnit(expr) then inlined + ";"
+        else s"$inlined;"
       case Block(stats, expr) =>
         (stats.map(emitStat).filter(_.nonEmpty) :+ emitTrailing(expr, wantRet))
           .filter(_.nonEmpty).mkString(" ")
@@ -444,9 +601,13 @@ class JsEmitter(
       }
       cb.append(s"var $selfRef = this; ")
       cd.body.foreach {
+        // `val x` constructor params (ParamAccessor) have NO rhs — assign the
+        // ctor arg to the field (`self.x = x`). Must be matched without the
+        // `Some(rhs)` guard, which would skip them.
+        case vd: ValDef if userMember(vd.symbol) && vd.symbol.flags.is(Flags.ParamAccessor) =>
+          cb.append(s"$selfRef.${vd.name} = ${jsSafe(vd.name)}; ")
         case vd @ ValDef(name, _, Some(rhs)) if userMember(vd.symbol) =>
-          if vd.symbol.flags.is(Flags.ParamAccessor) then cb.append(s"$selfRef.$name = $name; ")
-          else cb.append(s"$selfRef.$name = ${emitTerm(rhs)}; ")
+          cb.append(s"$selfRef.$name = ${emitTerm(rhs)}; ")
         case t: Term =>
           val st = emitStat(t); if st.nonEmpty then cb.append(s"$st ")
         case _ => ()
@@ -520,25 +681,137 @@ class JsEmitter(
    *  async primitive the CPS lowering targets; Xhr returns one so
    *  `await(Xhr.get(u))` composes. */
   private def runtimeJs: String =
-    """// Sart web-lite host runtime (not bundled in app.js).
+    """// Sart web-lite runtime: a tiny Flutter-widget-on-DOM renderer (ES5, no
+      |// framework). Widget factories build styled DOM; StatefulWidget/State get
+      |// a build+setState lifecycle. The SAME flutter.material Scala renders here
+      |// and on Flutter proper. Styled by styles.css (deepPurple Material).
+      |'use strict';
+      |// ── async / misc (shared with the Dart backend's markers) ──
       |function Deferred() { this.cbs = []; this.done = false; this.val = undefined; }
       |Deferred.prototype.onComplete = function(f) { if (this.done) { f(this.val); } else { this.cbs.push(f); } };
       |Deferred.prototype.resolve = function(v) { this.done = true; this.val = v; for (var i = 0; i < this.cbs.length; i++) { this.cbs[i](this.val); } this.cbs = []; };
-      |var Xhr = { get: function(url) {
-      |  var d = new Deferred();
-      |  try {
-      |    var x = new XMLHttpRequest();
-      |    x.open("GET", url, true);
-      |    x.onreadystatechange = function() { if (x.readyState === 4) { d.resolve(x.responseText); } };
-      |    x.send();
-      |  } catch (e) { d.resolve(""); }
+      |var Xhr = { get: function(url) { var d = new Deferred(); try { var x = new XMLHttpRequest(); x.open("GET", url, true); x.onreadystatechange = function() { if (x.readyState === 4) { d.resolve(x.responseText); } }; x.send(); } catch (e) { d.resolve(""); } return d; } };
+      |var Random = function() { return { nextInt: function(b) { return Math.floor(Math.random() * b); } }; };
+      |var Duration = function(o) { o = o || {}; return { ms: (o.days||0)*864e5 + (o.hours||0)*36e5 + (o.minutes||0)*6e4 + (o.seconds||0)*1e3 + (o.milliseconds||0) }; };
+      |var Timer = { periodic: function(dur, cb) { var t = {}; t.id = setInterval(function() { cb(t); }, (dur && dur.ms) || 1000); t.cancel = function() { clearInterval(t.id); }; return t; } };
+      |
+      |// ── DOM helpers ──
+      |function _el(tag, cls) { var e = document.createElement(tag); if (cls) e.className = cls; return e; }
+      |function _txt(s) { return document.createTextNode(s == null ? "" : String(s)); }
+      |function _clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+      |var _ctx = {};
+      |// Normalise any widget to a DOM node: a DOM node passes through; a
+      |// StatefulWidget (has createState) gets a lifecycle host; a StatelessWidget
+      |// (has build) is rendered; a string/number becomes text.
+      |function _r(w) {
+      |  if (w == null) return _txt("");
+      |  if (w.nodeType) return w;
+      |  if (typeof w.createState === "function") return _mountStateful(w);
+      |  if (typeof w.build === "function") return _r(w.build(_ctx));
+      |  return _txt(w);
+      |}
+      |function _kids(list) { var f = document.createDocumentFragment(); if (list) for (var i = 0; i < list.length; i++) f.appendChild(_r(list[i])); return f; }
+      |function _mountStateful(w) {
+      |  var st = w.createState();
+      |  st.widget = w;
+      |  var host = _el("div", "sw-host");
+      |  st.setState = function(fn) { if (fn) fn(); _clear(host); host.appendChild(_r(st.build(_ctx))); };
+      |  host.appendChild(_r(st.build(_ctx)));
+      |  return host;
+      |}
+      |function runApp(w) { var app = document.getElementById("app"); _clear(app); _navStack = []; app.appendChild(_r(w)); }
+      |
+      |// ── theme / enums / tokens ──
+      |var Colors = { deepPurple: "#673ab7", white: "#ffffff", black: "#000000", grey: "#9e9e9e", red: "#f44336", blue: "#2196f3", green: "#4caf50", transparent: "transparent" };
+      |var Icons = { menu: "☰", add: "+", check: "✓", edit: "✎", close: "✕", play_arrow: "▶", pause: "⏸", star: "★", home: "⌂", settings: "⚙", search: "⚲", favorite: "♥", arrow_back: "←", chevron_right: "›" };
+      |var MainAxisAlignment = { start: "flex-start", center: "center", end: "flex-end", spaceBetween: "space-between", spaceAround: "space-around", spaceEvenly: "space-evenly" };
+      |var CrossAxisAlignment = { start: "flex-start", center: "center", end: "flex-end", stretch: "stretch" };
+      |var _scheme = { primary: "var(--primary)", onPrimary: "var(--on-primary)", primaryContainer: "var(--primary-container)", inversePrimary: "var(--inverse-primary)", surface: "var(--surface)", onSurface: "var(--on-surface)", secondary: "var(--secondary)" };
+      |var _textTheme = { headlineLarge: "t-headline-lg", headlineMedium: "t-headline-md", headlineSmall: "t-headline-sm", titleLarge: "t-title-lg", titleMedium: "t-title-md", bodyLarge: "t-body-lg", bodyMedium: "t-body-md", labelLarge: "t-label" };
+      |var ColorScheme = { fromSeed: function(o) { return _scheme; } };
+      |var ThemeData = function(o) { return { colorScheme: (o && o.colorScheme) || _scheme, textTheme: _textTheme }; };
+      |var Theme = { of: function(ctx) { return { colorScheme: _scheme, textTheme: _textTheme }; } };
+      |var MaterialApp = function(o) { return _r((o && o.home) || _el("div")); };
+      |
+      |// ── layout / display widgets ──
+      |function Scaffold(o) {
+      |  o = o || {};
+      |  var s = _el("div", "scaffold");
+      |  if (o.appBar) s.appendChild(_r(o.appBar));
+      |  var body = _el("div", "scaffold-body");
+      |  if (o.body) body.appendChild(_r(o.body));
+      |  s.appendChild(body);
+      |  if (o.floatingActionButton) { var f = _r(o.floatingActionButton); f.className += " fab-pos"; s.appendChild(f); }
+      |  return s;
+      |}
+      |function AppBar(o) {
+      |  o = o || {};
+      |  var bar = _el("div", "appbar");
+      |  if (o.backgroundColor) bar.style.background = o.backgroundColor;
+      |  if (_navStack.length > 0) { var b = _el("button", "appbar-back"); b.appendChild(_txt("←")); b.onclick = function() { _navPop(); }; bar.appendChild(b); }
+      |  var t = _el("div", "appbar-title"); if (o.title) t.appendChild(_r(o.title)); bar.appendChild(t);
+      |  return bar;
+      |}
+      |function Center(o) { var d = _el("div", "center"); if (o && o.child) d.appendChild(_r(o.child)); return d; }
+      |function Column(o) { o = o || {}; var d = _el("div", "column"); if (o.mainAxisAlignment) d.style.justifyContent = o.mainAxisAlignment; if (o.crossAxisAlignment) d.style.alignItems = o.crossAxisAlignment; d.appendChild(_kids(o.children)); return d; }
+      |function Row(o) { o = o || {}; var d = _el("div", "row"); if (o.mainAxisAlignment) d.style.justifyContent = o.mainAxisAlignment; if (o.crossAxisAlignment) d.style.alignItems = o.crossAxisAlignment; d.appendChild(_kids(o.children)); return d; }
+      |function Text(data, o) { var s = _el("span", "text"); if (o && o.style) s.className += " " + o.style; s.appendChild(_txt(data)); return s; }
+      |function Icon(icon) { var s = _el("span", "icon"); s.appendChild(_txt(icon)); return s; }
+      |function SizedBox(o) { o = o || {}; var d = _el("div", "sizedbox"); if (o.width != null) d.style.width = o.width + "px"; if (o.height != null) d.style.height = o.height + "px"; if (o.child) d.appendChild(_r(o.child)); return d; }
+      |function Padding(o) { o = o || {}; var d = _el("div"); if (o.padding != null) d.style.padding = o.padding; if (o.child) d.appendChild(_r(o.child)); return d; }
+      |function Card(o) { var d = _el("div", "card"); if (o && o.child) d.appendChild(_r(o.child)); return d; }
+      |function Expanded(o) { var d = _el("div", "expanded"); if (o && o.child) d.appendChild(_r(o.child)); return d; }
+      |function Container(o) {
+      |  o = o || {};
+      |  var d = _el("div", "container");
+      |  if (o.width != null) d.style.width = o.width + "px";
+      |  if (o.height != null) d.style.height = o.height + "px";
+      |  if (o.color) d.style.background = o.color;
+      |  if (o.padding != null) d.style.padding = o.padding;
+      |  if (o.decoration) { var dec = o.decoration; if (dec.color) d.style.background = dec.color; if (dec.borderRadius != null) d.style.borderRadius = dec.borderRadius; if (dec.boxShadow) d.style.boxShadow = dec.boxShadow; }
+      |  if (o.alignment === "center") { d.style.display = "flex"; d.style.alignItems = "center"; d.style.justifyContent = "center"; }
+      |  if (o.child) d.appendChild(_r(o.child));
       |  return d;
-      |} };
-      |var Random = { nextInt: function(bound) { return Math.floor(Math.random() * bound); } };
-      |var Timer = { periodic: function(ms, cb) { var t = { id: setInterval(cb, ms) }; t.cancel = function() { clearInterval(t.id); }; return t; } };
-      |// Bring the element with this id into view within its scroll container —
-      |// centered horizontally, no vertical jump. For D-pad focus on TV rails.
-      |var Viewport = { centerById: function(id) { var e = document.getElementById(id); if (e && e.scrollIntoView) { e.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); } } };
+      |}
+      |var EdgeInsets = { all: function(v) { return v + "px"; }, symmetric: function(o) { o = o || {}; return (o.vertical || 0) + "px " + (o.horizontal || 0) + "px"; }, only: function(o) { o = o || {}; return (o.top||0)+"px "+(o.right||0)+"px "+(o.bottom||0)+"px "+(o.left||0)+"px"; } };
+      |var BorderRadius = { circular: function(v) { return v + "px"; } };
+      |var BoxShadow = function(o) { o = o || {}; return "0 " + ((o.blurRadius||4)/2) + "px " + (o.blurRadius||4) + "px " + (o.color || "rgba(0,0,0,.2)"); };
+      |var BoxDecoration = function(o) { o = o || {}; var bs = o.boxShadow; if (bs && bs.length) bs = bs[0]; return { color: o.color, borderRadius: o.borderRadius, boxShadow: bs }; };
+      |var InputDecoration = function(o) { return o || {}; };
+      |var TextEditingController = function() { return { text: "" }; };
+      |function TextField(o) {
+      |  o = o || {};
+      |  var i = _el("input", "textfield"); i.type = "text";
+      |  if (o.decoration && o.decoration.labelText) i.placeholder = o.decoration.labelText;
+      |  if (o.controller) { i.value = o.controller.text || ""; i.oninput = function() { o.controller.text = i.value; }; }
+      |  return i;
+      |}
+      |function ElevatedButton(o) { o = o || {}; var b = _el("button", "btn btn-filled"); if (o.child) b.appendChild(_r(o.child)); if (o.onPressed) b.onclick = function() { o.onPressed(); }; return b; }
+      |ElevatedButton.icon = function(o) { o = o || {}; var b = _el("button", "btn btn-filled"); if (o.icon) b.appendChild(_r(o.icon)); if (o.label) b.appendChild(_r(o.label)); if (o.onPressed) b.onclick = function() { o.onPressed(); }; return b; };
+      |function TextButton(o) { o = o || {}; var b = _el("button", "btn btn-text"); if (o.child) b.appendChild(_r(o.child)); if (o.onPressed) b.onclick = function() { o.onPressed(); }; return b; }
+      |function IconButton(o) { o = o || {}; var b = _el("button", "icon-btn"); if (o.icon) b.appendChild(_r(o.icon)); if (o.onPressed) b.onclick = function() { o.onPressed(); }; return b; }
+      |function FloatingActionButton(o) { o = o || {}; var b = _el("button", "fab"); if (o.tooltip) b.title = o.tooltip; if (o.child) b.appendChild(_r(o.child)); if (o.onPressed) b.onclick = function() { o.onPressed(); }; return b; }
+      |var ListView = { builder: function(o) { o = o || {}; var d = _el("div", "listview"); var n = o.itemCount || 0; for (var i = 0; i < n; i++) { var w = o.itemBuilder(_ctx, i); if (w != null) d.appendChild(_r(w)); } return d; } };
+      |function ListTile(o) {
+      |  o = o || {};
+      |  var t = _el("div", "list-tile");
+      |  if (o.leading) { var l = _el("div", "lt-leading"); l.appendChild(_r(o.leading)); t.appendChild(l); }
+      |  var mid = _el("div", "lt-mid");
+      |  if (o.title) { var ti = _el("div", "lt-title"); ti.appendChild(_r(o.title)); mid.appendChild(ti); }
+      |  if (o.subtitle) { var su = _el("div", "lt-subtitle"); su.appendChild(_r(o.subtitle)); mid.appendChild(su); }
+      |  t.appendChild(mid);
+      |  if (o.trailing) { var tr = _el("div", "lt-trailing"); tr.appendChild(_r(o.trailing)); t.appendChild(tr); }
+      |  if (o.onTap) t.onclick = function() { o.onTap(); };
+      |  return t;
+      |}
+      |// ── navigation ──
+      |var _navStack = [];
+      |function _navPush(builder) { var app = document.getElementById("app"); _navStack.push(app.firstChild); var w = builder(_ctx); _clear(app); app.appendChild(_r(w)); }
+      |function _navPop() { if (!_navStack.length) return; var app = document.getElementById("app"); var prev = _navStack.pop(); _clear(app); app.appendChild(prev); }
+      |var MaterialPageRoute = function(o) { return { builder: (o && o.builder) }; };
+      |var Navigator = { of: function(ctx) { return { push: function(route) { _navPush(route.builder); }, pop: function() { _navPop(); } }; }, pop: function() { _navPop(); } };
+      |// Platform label (the @native PlatformName facade resolves here on web-lite).
+      |var PlatformName = { describe: function() { return "web (web-lite)"; } };
       |""".stripMargin
 
   /** Fallback host page (used when the app supplies no `web/` overlay). Links

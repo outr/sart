@@ -328,11 +328,16 @@ lazy val root = (project in file("."))
     // Web-lite backend: compile web-example and emit lean, dependency-free
     // ES5 (app.js + index.html) into out-js/ via `--target=js`. sart-web is
     // a compile-through library (its @native facades emit as verbatim JS).
+    // Compile the SAME `example/` Flutter app to ES5 JS via the web-lite
+    // backend (a Flutter-widget-on-DOM renderer). Deps are on the inspector
+    // classpath for type resolution, but are NOT passed as --library, so only
+    // example's own classes are emitted (the flutter.material widgets emit as
+    // runtime calls; native-package demos emit dormant with markers).
     sartEmitJs := {
-      (`web-example` / Compile / compile).value
-      val exClasses = (`web-example` / Compile / classDirectory).value
+      (example / Compile / compile).value
+      val exClasses = (example / Compile / classDirectory).value
       val conv      = fileConverter.value
-      val cp        = (`web-example` / Compile / fullClasspath).value
+      val cp        = (example / Compile / fullClasspath).value
         .map(e => conv.toPath(e.data).toAbsolutePath.toString)
         .mkString(java.io.File.pathSeparator)
       val runCp     = (compiler / Runtime / fullClasspath).value
@@ -341,18 +346,16 @@ lazy val root = (project in file("."))
       val outDir    = baseDirectory.value / "out-js"
       val log       = streams.value.log
       IO.createDirectory(outDir)
-      log.info(s"sart: emitting ES5 JS into $outDir")
+      log.info(s"sart: emitting ES5 JS (web-lite) from example/ into $outDir")
       val sourceRoot = baseDirectory.value.getAbsolutePath
-      val webClasses = (`sart-web` / Compile / classDirectory).value
       val rc = sys.process.Process(Seq(
         "java", "-cp", runCp, "sart.compiler.Main", "--target=js",
-        s"--library=${webClasses.getAbsolutePath}",
         exClasses.getAbsolutePath, cp, outDir.getAbsolutePath, sourceRoot
       )).!
       if (rc != 0) sys.error(s"sart.compiler.Main --target=js exited $rc")
-      // App-supplied web/ overlay (index.html, styles.css, assets) wins over
-      // the emitter's generated fallback — mirrors Flutter's web/ dir.
-      val overlay = (`web-example` / baseDirectory).value / "web"
+      // App-supplied web/ overlay (index.html, styles.css) wins over the
+      // emitter's generated fallback — mirrors Flutter's web/ dir.
+      val overlay = (example / baseDirectory).value / "web"
       if (overlay.exists()) {
         IO.copyDirectory(overlay, outDir, overwrite = true, preserveLastModified = true)
         log.info(s"sart: applied web/ overlay from $overlay")

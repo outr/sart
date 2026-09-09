@@ -1,0 +1,103 @@
+/* Sart web-lite — Material 3 (deepPurple seed) styling for the widget runtime.
+   The SAME example/ Flutter app renders here; these classes are what the
+   Flutter-widget-on-DOM runtime emits. No framework. */
+:root {
+  --primary: #6750A4; --on-primary: #FFFFFF; --primary-container: #EADDFF;
+  --on-primary-container: #21005D; --inverse-primary: #D0BCFF;
+  --surface: #FEF7FF; --surface-container: #F3EDF7; --on-surface: #1D1B20;
+  --on-surface-variant: #49454F; --outline: #79747E; --outline-variant: #CAC4D0;
+  --secondary: #625B71; --secondary-container: #E8DEF8; --shadow: rgba(0,0,0,.18);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: Roboto, system-ui, -apple-system, Segoe UI, sans-serif;
+  background: var(--surface); color: var(--on-surface); -webkit-font-smoothing: antialiased;
+}
+#app { min-height: 100%; }
+
+/* Scaffold / AppBar */
+.scaffold { display: flex; flex-direction: column; min-height: 100vh; }
+.appbar {
+  display: flex; align-items: center; gap: 8px; height: 64px; padding: 0 16px;
+  background: var(--inverse-primary); color: var(--on-surface);
+  box-shadow: 0 2px 4px var(--shadow); position: relative; z-index: 1; flex: 0 0 auto;
+}
+.appbar-title { font-size: 20px; font-weight: 500; }
+.appbar-back {
+  border: none; background: transparent; color: inherit; font-size: 22px;
+  cursor: pointer; padding: 6px 10px; border-radius: 50%; line-height: 1;
+}
+.appbar-back:hover { background: rgba(0,0,0,.08); }
+.scaffold-body { flex: 1 1 auto; position: relative; overflow: auto; }
+
+/* Layout */
+.center { display: flex; align-items: center; justify-content: center; min-height: 100%; padding: 16px; }
+.column { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 16px; }
+.row { display: flex; flex-direction: row; align-items: center; gap: 12px; }
+.expanded { flex: 1 1 auto; width: 100%; min-height: 0; }
+.sizedbox { flex: 0 0 auto; }
+.container { }
+
+/* Text + typography */
+.text { line-height: 1.4; }
+.t-headline-lg { font-size: 32px; font-weight: 400; }
+.t-headline-md { font-size: 28px; font-weight: 400; }
+.t-headline-sm { font-size: 24px; font-weight: 400; }
+.t-title-lg { font-size: 22px; font-weight: 500; }
+.t-title-md { font-size: 16px; font-weight: 500; }
+.t-body-lg { font-size: 16px; }
+.t-body-md { font-size: 14px; }
+.t-label { font-size: 14px; font-weight: 500; }
+.icon { font-size: 22px; line-height: 1; display: inline-block; }
+
+/* Card */
+.card {
+  background: var(--surface-container); border-radius: 12px; padding: 16px;
+  box-shadow: 0 1px 3px var(--shadow); max-width: 560px; width: 100%;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; border: none; cursor: pointer;
+  font-family: inherit; font-size: 14px; font-weight: 500; height: 40px; padding: 0 20px;
+  border-radius: 20px;
+}
+.btn-filled { background: var(--primary); color: var(--on-primary); }
+.btn-filled:hover { box-shadow: 0 1px 4px var(--shadow); filter: brightness(1.05); }
+.btn-text { background: transparent; color: var(--primary); }
+.btn-text:hover { background: var(--secondary-container); }
+.icon-btn { border: none; background: transparent; color: var(--on-surface-variant); cursor: pointer; font-size: 20px; padding: 8px; border-radius: 50%; }
+
+/* FAB */
+.fab {
+  display: inline-flex; align-items: center; justify-content: center; border: none;
+  cursor: pointer; width: 56px; height: 56px; border-radius: 16px;
+  background: var(--primary-container); color: var(--on-primary-container);
+  font-size: 24px; box-shadow: 0 3px 8px var(--shadow);
+}
+.fab:hover { filter: brightness(1.03); box-shadow: 0 5px 12px var(--shadow); }
+.fab-pos { position: absolute; right: 24px; bottom: 24px; }
+
+/* Lists */
+.listview { display: flex; flex-direction: column; }
+.list-tile {
+  display: flex; align-items: center; gap: 16px; padding: 12px 20px; cursor: pointer;
+  border-bottom: 1px solid var(--outline-variant);
+}
+.list-tile:hover { background: var(--surface-container); }
+.lt-leading { color: var(--on-surface-variant); display: flex; }
+.lt-mid { flex: 1 1 auto; min-width: 0; }
+.lt-title { font-size: 16px; }
+.lt-subtitle { font-size: 13px; color: var(--on-surface-variant); }
+.lt-trailing { color: var(--on-surface-variant); }
+
+/* Inputs */
+.textfield {
+  font-family: inherit; font-size: 16px; padding: 12px 14px; border-radius: 4px;
+  border: 1px solid var(--outline); background: var(--surface); color: var(--on-surface);
+  outline: none; width: 100%;
+}
+.textfield:focus { border-color: var(--primary); border-width: 2px; padding: 11px 13px; }
+
+.sw-host { display: block; }
