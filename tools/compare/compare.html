@@ -38,15 +38,26 @@
 </header>
 <main>
   <section class="pane" id="pane-flutter">
-    <div class="label">Flutter Web &mdash; /flutter/</div>
-    <iframe src="/flutter/" title="Flutter Web"></iframe>
+    <div class="label" id="label-flutter">Flutter Web</div>
+    <iframe id="if-flutter" title="Flutter Web"></iframe>
   </section>
   <section class="pane" id="pane-lite">
-    <div class="label">Sart web-lite &mdash; /lite/</div>
-    <iframe src="/lite/" title="web-lite"></iframe>
+    <div class="label" id="label-lite">Sart web-lite</div>
+    <iframe id="if-lite" title="web-lite"></iframe>
   </section>
 </main>
 <script>
+  // Each app is served on its own port (base port + 1 / + 2) so Flutter's
+  // absolute asset paths (<base href="/">) resolve at an origin root.
+  var base = parseInt(location.port || '8099', 10);
+  var host = location.hostname;
+  var flutterUrl = location.protocol + '//' + host + ':' + (base + 1) + '/';
+  var liteUrl = location.protocol + '//' + host + ':' + (base + 2) + '/';
+  document.getElementById('if-flutter').src = flutterUrl;
+  document.getElementById('if-lite').src = liteUrl;
+  document.getElementById('label-flutter').innerHTML = 'Flutter Web &mdash; :' + (base + 1);
+  document.getElementById('label-lite').innerHTML = 'Sart web-lite &mdash; :' + (base + 2);
+
   // Toggle which pane(s) are visible.
   var seg = document.getElementById('seg');
   var pf = document.getElementById('pane-flutter');
