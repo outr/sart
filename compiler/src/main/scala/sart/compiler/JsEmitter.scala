@@ -890,7 +890,15 @@ class JsEmitter(
       |// (has build) is rendered; a string/number becomes text.
       |function _r(w) {
       |  if (w == null) return _txt("");
-      |  if (w.nodeType) return w;
+      |  if (w.nodeType) {
+      |    // A <video> whose src was set while DETACHED plays but never paints
+      |    // (its compositing layer is orphaned). Once it's actually in the
+      |    // document, re-init it with load() so Chromium establishes the layer.
+      |    if (w.tagName === "VIDEO" && w.src) {
+      |      (function(vid){ function chk(){ if (vid.isConnected) { try { vid.load(); } catch (e) {} } else { requestAnimationFrame(chk); } } requestAnimationFrame(chk); })(w);
+      |    }
+      |    return w;
+      |  }
       |  if (typeof w.createState === "function") return _mountStateful(w);
       |  if (typeof w.build === "function") return _r(w.build(_ctx));
       |  return _txt(w);
@@ -900,9 +908,17 @@ class JsEmitter(
       |  var st = w.createState();
       |  st.widget = w;
       |  var host = _el("div", "sw-host");
-      |  st.setState = function(fn) { if (fn) fn(); _clear(host); host.appendChild(_r(st.build(_ctx))); };
+      |  var mounted = false;
+      |  // A synchronous setState during initState (e.g. an already-resolved
+      |  // Future's callback firing inline) must NOT render before the initial
+      |  // mount below — otherwise the subtree renders once here AND again below,
+      |  // duplicating it and orphaning shared nodes (the single <video> gets
+      |  // moved into the 2nd copy, leaving the 1st box empty). Just update state;
+      |  // the initial mount picks it up.
+      |  st.setState = function(fn) { if (fn) fn(); if (!mounted) return; _clear(host); host.appendChild(_r(st.build(_ctx))); };
       |  if (typeof st.initState === "function") { try { st.initState(); } catch (e) {} }
       |  host.appendChild(_r(st.build(_ctx)));
+      |  mounted = true;
       |  return host;
       |}
       |function runApp(w) { var app = document.getElementById("app"); _clear(app); _navStack = []; app.appendChild(_r(w)); }
