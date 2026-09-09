@@ -57,6 +57,9 @@ object JsonParser:
         isAbstract      = bool(o, "abstract"),
         typeParams      = strList(o.members.getOrElse("typeParams", JArray(Nil))),
         ancestors       = strList(o.members.getOrElse("ancestors", JArray(Nil))),
+        ancestorArgs    = o.members.get("ancestorArgs") match
+          case Some(JObject(m)) => m.map { case (k, v) => k -> strList(v) }
+          case _                => Map.empty,
         ctors           = arr(o, "constructors").map(toCtor),
         staticFields    = arr(o, "staticFields").map(toStaticField),
         staticMethods   = arr(o, "staticMethods").map(toMethod),

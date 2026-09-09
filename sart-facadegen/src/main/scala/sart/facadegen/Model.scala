@@ -37,6 +37,10 @@ case class ClassInfo(
   isAbstract: Boolean,
   typeParams: List[String],
   ancestors: List[String],       // nearest-first chain of supertypes
+  // Concrete type arguments an ancestor is applied with, by ancestor name
+  // (PopupMenuDivider -> PopupMenuEntry -> List("Never")); absent when the
+  // ancestor is not generic.
+  ancestorArgs: Map[String, List[String]] = Map.empty,
   ctors: List[Ctor],
   staticFields: List[StaticField],
   staticMethods: List[Method],

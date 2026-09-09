@@ -73,8 +73,7 @@ object FacadeWriter:
     // renderClass) — lets override-elision walk the transitive chain.
     val chosenParent: Map[String, Option[String]] =
       keptClasses.map { c =>
-        c.name -> c.ancestors.find(a => safeParents.contains(a) &&
-          (ctx.arityOf(a) == 0 || ctx.arityOf(a) == c.typeParams.size))
+        c.name -> c.ancestors.find(a => safeParents.contains(a) && parentArityFits(ctx, c, a))
       }.toMap
     // Does the parent chain starting at `parent` provide `name`? Kept
     // parents are checked against their real members and recurse upward;
@@ -149,12 +148,17 @@ object FacadeWriter:
     // type params — rendered as `P[T…]` on the assumption (near-universal
     // in Flutter/pub code: PopupMenuItem<T> extends PopupMenuEntry<T>,
     // WidgetStatePropertyAll<T> implements WidgetStateProperty<T>) that
-    // the params pass through in order.
-    val parentName = cls.ancestors.find(a => safeParents.contains(a) &&
-      (ctx.arityOf(a) == 0 || ctx.arityOf(a) == cls.typeParams.size))
+    // the params pass through in order — or when the class applies it with
+    // concrete arguments (PopupMenuDivider extends PopupMenuEntry<Never>),
+    // which are rendered as given.
+    val parentName = cls.ancestors.find(a => safeParents.contains(a) && parentArityFits(ctx, cls, a))
     val parent = parentName
       .map { a =>
-        val args   = if ctx.arityOf(a) == 0 then "" else cls.typeParams.mkString("[", ", ", "]")
+        val args =
+          if ctx.arityOf(a) == 0 then ""
+          else concreteParentArgs(ctx, cls, a) match
+            case Some(concrete) => concrete.map(ctx.scalaType(_, tparams)).mkString("[", ", ", "]")
+            case None           => cls.typeParams.mkString("[", ", ", "]")
         val parens = if parenParents.contains(a) then "()" else ""
         a + args + parens
       }
@@ -296,6 +300,20 @@ object FacadeWriter:
     n.nonEmpty && !n.contains('$') && !n.startsWith("_") && !jvmReserved.contains(n)
 
   // ── Types ────────────────────────────────────────────────────────────
+
+  /** The concrete type arguments `cls` applies ancestor `a` with, when it
+   *  supplies exactly the ancestor's arity (PopupMenuEntry<Never>).
+   */
+  private def concreteParentArgs(ctx: Ctx, cls: ClassInfo, a: String): Option[List[String]] =
+    cls.ancestorArgs.get(a).filter(_.size == ctx.arityOf(a))
+
+  /** Can `a` be rendered as `cls`'s Scala parent? A non-generic ancestor
+   *  always; a generic one when its arity passes through from the class's
+   *  own type parameters, or when the class applies it with concrete
+   *  arguments.
+   */
+  private def parentArityFits(ctx: Ctx, cls: ClassInfo, a: String): Boolean =
+    ctx.arityOf(a) == 0 || ctx.arityOf(a) == cls.typeParams.size || concreteParentArgs(ctx, cls, a).nonEmpty
 
   /** Type-mapping context: knows which names have facades and how to
    *  collapse the ones that don't.

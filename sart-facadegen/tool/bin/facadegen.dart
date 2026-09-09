@@ -193,9 +193,18 @@ Map<String, Object?>? _describeExtensionStatics(ExtensionElement2 ext) {
 
 Map<String, Object?> _describeClass(ClassElement2 cls) {
   final ancestors = <String>[];
+  // Concrete type arguments a supertype is applied with (PopupMenuDivider
+  // extends PopupMenuEntry<Never>), so the facade can keep a generic parent
+  // whose arity differs from this class's own type parameters.
+  final ancestorArgs = <String, List<String>>{};
   for (final t in cls.allSupertypes) {
     final n = t.element3.name3;
-    if (n != null && !n.startsWith('_')) ancestors.add(n);
+    if (n != null && !n.startsWith('_')) {
+      ancestors.add(n);
+      if (t.typeArguments.isNotEmpty) {
+        ancestorArgs[n] = t.typeArguments.map(_typeStr).toList();
+      }
+    }
   }
 
   bool superHas(String memberName) => cls.allSupertypes.any((t) =>
@@ -298,6 +307,7 @@ Map<String, Object?> _describeClass(ClassElement2 cls) {
     'typeParams':
         cls.typeParameters2.map((tp) => tp.name3).whereType<String>().toList(),
     'ancestors': ancestors,
+    'ancestorArgs': ancestorArgs,
     'constructors': constructors,
     'staticFields': staticFields,
     'staticMethods': staticMethods,

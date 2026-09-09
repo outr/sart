@@ -13053,14 +13053,14 @@ abstract class PopupMenuEntry[T](
 @native
 @DartImport("package:flutter/material.dart")
 class PopupMenuDivider(
-  val key: Key = native.value,
-  val height: Double = native.value,
+  override val key: Key = native.value,
+  override val height: Double = native.value,
   val thickness: Double = native.value,
   val indent: Double = native.value,
   val endIndent: Double = native.value,
   val radius: BorderRadiusGeometry = native.value,
   val color: Color = native.value
-) extends StatefulWidget
+) extends PopupMenuEntry[Nothing]()
 
 @native
 @DartImport("package:flutter/material.dart")
