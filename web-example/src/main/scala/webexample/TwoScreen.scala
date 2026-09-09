@@ -15,36 +15,40 @@ object App:
     root = document.getElementById(id)
     show(Counter())
 
+  /** Point the router at an existing element (used by the launcher, which
+   *  hosts the app content in its own pane). */
+  def useRoot(e: Element): Unit =
+    root = e
+
 class ScreenA extends Component:
   override def render(): Element =
-    val root = document.createElement("div")
-    val title = document.createElement("h1")
+    val card = document.createElement("div")
+    card.className = "card"
+    val title = document.createElement("div")
+    title.className = "title"
     title.setAttribute("id", "title")
     title.textContent = "Home"
-    root.appendChild(title)
-    val btn = document.createElement("button")
+    card.appendChild(title)
+    val btn = Ui.filledButton("Go to detail", () => App.show(ScreenB()))
     btn.setAttribute("id", "go")
-    btn.textContent = "Go to detail"
-    btn.addEventListener("click", e => App.show(ScreenB()))
-    root.appendChild(btn)
-    root
+    card.appendChild(btn)
+    Ui.scaffold("Sart Two-screen", card)
 
 class ScreenB extends Component:
   override def render(): Element =
-    val root = document.createElement("div")
-    val title = document.createElement("h1")
+    val card = document.createElement("div")
+    card.className = "card"
+    val title = document.createElement("div")
+    title.className = "title"
     title.setAttribute("id", "title")
     title.textContent = "Detail"
-    root.appendChild(title)
-    val msg = document.createElement("p")
+    card.appendChild(title)
+    val msg = document.createElement("div")
+    msg.className = "body-text"
     msg.setAttribute("id", "msg")
     msg.textContent = "You made it!"
-    root.appendChild(msg)
-    val back = document.createElement("button")
+    card.appendChild(msg)
+    val back = Ui.textButton("Back", () => App.show(ScreenA()))
     back.setAttribute("id", "back")
-    back.textContent = "Back"
-    back.addEventListener("click", e => App.show(ScreenA()))
-    root.appendChild(back)
-    root
-
-@main def main(): Unit = App.mount("app")
+    card.appendChild(back)
+    Ui.scaffold("Sart Two-screen", card)

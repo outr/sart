@@ -2,9 +2,9 @@ package webexample
 
 import sart.web.*
 
-/** Dice demo — a Roll button picks `Random.nextInt(6) + 1`, appends it to a
- *  history `List[Int]`, and renders the latest roll, the count, and the
- *  history. */
+/** Dice demo — a filled Roll button picks `Random.nextInt(6) + 1`, appends it
+ *  to a history `List[Int]`, and renders the latest roll, the count, and the
+ *  history in a card. */
 class Dice extends Component:
   private var history: List[Int] = List()
   private var last: Int = 0
@@ -15,26 +15,33 @@ class Dice extends Component:
     setState()
 
   override def render(): Element =
-    val root = document.createElement("div")
-    val cur = document.createElement("p")
+    val card = document.createElement("div")
+    card.className = "card"
+
+    val cur = document.createElement("div")
+    cur.className = "headline"
     cur.setAttribute("id", "last")
     cur.textContent = "Last: " + last.toString
-    root.appendChild(cur)
-    val count = document.createElement("p")
+    card.appendChild(cur)
+
+    val count = document.createElement("div")
+    count.className = "body-text"
     count.setAttribute("id", "count")
     count.textContent = "Rolls: " + history.size.toString
-    root.appendChild(count)
-    val btn = document.createElement("button")
+    card.appendChild(count)
+
+    val btn = Ui.filledButton("Roll", () => roll())
     btn.setAttribute("id", "roll")
-    btn.textContent = "Roll"
-    btn.addEventListener("click", e => roll())
-    root.appendChild(btn)
+    card.appendChild(btn)
+
     val list = document.createElement("ul")
+    list.className = "plainlist"
     list.setAttribute("id", "history")
     history.foreach { h =>
       val li = document.createElement("li")
       li.textContent = h.toString
       list.appendChild(li)
     }
-    root.appendChild(list)
-    root
+    card.appendChild(list)
+
+    Ui.scaffold("Sart Dice", card)

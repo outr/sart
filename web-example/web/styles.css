@@ -1,0 +1,199 @@
+/* Sart web-lite — a lean, hand-written Material-3-flavored theme (no framework).
+   Scheme seeded from Flutter's ColorScheme.fromSeed(Colors.deepPurple). */
+:root {
+  --primary: #6750A4;
+  --on-primary: #FFFFFF;
+  --primary-container: #EADDFF;
+  --on-primary-container: #21005D;
+  --inverse-primary: #D0BCFF;
+  --secondary-container: #E8DEF8;
+  --on-secondary-container: #1D192B;
+  --surface: #FEF7FF;
+  --surface-container: #F3EDF7;
+  --surface-variant: #E7E0EC;
+  --on-surface: #1D1B20;
+  --on-surface-variant: #49454F;
+  --outline: #79747E;
+  --outline-variant: #CAC4D0;
+  --error: #B3261E;
+  --elev1: 0 1px 2px rgba(0,0,0,.30), 0 1px 3px 1px rgba(0,0,0,.15);
+  --elev2: 0 1px 2px rgba(0,0,0,.30), 0 2px 6px 2px rgba(0,0,0,.15);
+  --elev3: 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.30);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Roboto", system-ui, -apple-system, Segoe UI, sans-serif;
+  color: var(--on-surface);
+  background: var(--surface);
+}
+
+/* ── App bar ─────────────────────────────────────────────────────────────── */
+.appbar {
+  display: flex;
+  align-items: center;
+  height: 64px;
+  padding: 0 16px;
+  background: var(--inverse-primary);
+  color: var(--on-surface);
+  box-shadow: var(--elev2);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.appbar-title {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: .15px;
+}
+
+/* ── Scaffold ────────────────────────────────────────────────────────────── */
+.scaffold {
+  position: relative;
+  min-height: 100vh;
+  background: var(--surface);
+}
+.body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 32px 16px 96px;
+}
+
+/* ── Typography ──────────────────────────────────────────────────────────── */
+.headline { font-size: 45px; font-weight: 400; line-height: 1.1; margin: 8px 0; }
+.title    { font-size: 22px; font-weight: 500; margin: 4px 0; }
+.body-text{ font-size: 16px; font-weight: 400; color: var(--on-surface-variant); margin: 2px 0; }
+.label    { font-size: 14px; font-weight: 500; letter-spacing: .1px; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: .1px;
+  height: 40px;
+  padding: 0 24px;
+  border-radius: 20px;
+  transition: box-shadow .15s, background .15s, filter .15s;
+}
+.btn-filled { background: var(--primary); color: var(--on-primary); box-shadow: var(--elev1); }
+.btn-filled:hover { filter: brightness(1.08); box-shadow: var(--elev2); }
+.btn-filled:active { filter: brightness(.95); }
+.btn-text { background: transparent; color: var(--primary); padding: 0 12px; }
+.btn-text:hover { background: rgba(103,80,164,.08); }
+
+/* Floating action button */
+.fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 56px;
+  height: 56px;
+  border: none;
+  cursor: pointer;
+  border-radius: 16px;
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+  font-size: 28px;
+  line-height: 56px;
+  box-shadow: var(--elev3);
+  transition: filter .15s;
+}
+.fab:hover { filter: brightness(1.05); }
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface-container);
+  border-radius: 12px;
+  box-shadow: var(--elev1);
+  padding: 24px 28px;
+  min-width: 280px;
+  max-width: 560px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── List / tiles ────────────────────────────────────────────────────────── */
+.list {
+  width: 100%;
+  max-width: 560px;
+  background: var(--surface);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--elev1);
+}
+.list-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 20px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--outline-variant);
+  transition: background .12s;
+}
+.list-tile:last-child { border-bottom: none; }
+.list-tile:hover { background: var(--secondary-container); }
+.list-tile-title { font-size: 16px; font-weight: 500; }
+.list-tile-sub { font-size: 13px; color: var(--on-surface-variant); }
+
+/* Plain ul lists (todos, dice history) rendered as tiles */
+ul.plainlist { list-style: none; margin: 8px 0 0; padding: 0; width: 100%; max-width: 560px; }
+ul.plainlist li {
+  padding: 12px 16px;
+  background: var(--surface-container);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 15px;
+}
+
+/* ── Text field ──────────────────────────────────────────────────────────── */
+.textfield {
+  font-family: inherit;
+  font-size: 16px;
+  height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--outline);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--on-surface);
+  outline: none;
+  min-width: 240px;
+}
+.textfield:focus { border: 2px solid var(--primary); padding: 0 15px; }
+
+/* ── Row (button groups) ─────────────────────────────────────────────────── */
+.row { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; }
+
+/* ── Launcher nav ────────────────────────────────────────────────────────── */
+.nav {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--surface-container);
+  border-bottom: 1px solid var(--outline-variant);
+  overflow-x: auto;
+}
+.nav .navbtn {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--primary);
+  white-space: nowrap;
+}
+.nav .navbtn:hover { background: var(--secondary-container); }

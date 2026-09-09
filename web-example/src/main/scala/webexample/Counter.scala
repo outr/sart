@@ -2,8 +2,9 @@ package webexample
 
 import sart.web.*
 
-/** Counter demo — the web-lite port of the Flutter counter. A `Component`
- *  holding an `Int` var; the button increments it and re-renders. */
+/** Counter demo — the web-lite port of the Flutter counter: a Material scaffold
+ *  with an app bar, a card showing the count, and a `+` floating action button
+ *  that increments and re-renders. */
 class Counter extends Component:
   private var count: Int = 0
 
@@ -12,14 +13,14 @@ class Counter extends Component:
     setState()
 
   override def render(): Element =
-    val root = document.createElement("div")
-    val label = document.createElement("p")
-    label.setAttribute("id", "count")
-    label.textContent = "Count: " + count.toString
-    root.appendChild(label)
-    val btn = document.createElement("button")
-    btn.setAttribute("id", "inc")
-    btn.textContent = "+"
-    btn.addEventListener("click", e => increment())
-    root.appendChild(btn)
-    root
+    val card = document.createElement("div")
+    card.className = "card"
+    card.appendChild(Ui.text("body-text", "You have pushed the button this many times:"))
+    val n = document.createElement("div")
+    n.className = "headline"
+    n.setAttribute("id", "count")
+    n.textContent = "Count: " + count.toString
+    card.appendChild(n)
+    val f = Ui.fab("+", () => increment())
+    f.setAttribute("id", "inc")
+    Ui.scaffoldFab("Sart Counter", card, f)

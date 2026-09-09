@@ -349,6 +349,13 @@ lazy val root = (project in file("."))
         exClasses.getAbsolutePath, cp, outDir.getAbsolutePath, sourceRoot
       )).!
       if (rc != 0) sys.error(s"sart.compiler.Main --target=js exited $rc")
+      // App-supplied web/ overlay (index.html, styles.css, assets) wins over
+      // the emitter's generated fallback — mirrors Flutter's web/ dir.
+      val overlay = (`web-example` / baseDirectory).value / "web"
+      if (overlay.exists()) {
+        IO.copyDirectory(overlay, outDir, overwrite = true, preserveLastModified = true)
+        log.info(s"sart: applied web/ overlay from $overlay")
+      }
       val appJs = outDir / "app.js"
       if (appJs.exists()) log.info(s"sart: wrote ${IO.readBytes(appJs).length} bytes to $appJs")
     },

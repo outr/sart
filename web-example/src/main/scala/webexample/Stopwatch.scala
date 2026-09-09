@@ -25,19 +25,22 @@ class Stopwatch extends Component:
       setState()
 
   override def render(): Element =
-    val root = document.createElement("div")
-    val label = document.createElement("p")
+    val card = document.createElement("div")
+    card.className = "card"
+
+    val label = document.createElement("div")
+    label.className = "headline"
     label.setAttribute("id", "elapsed")
     label.textContent = "Elapsed: " + seconds.toString + "s"
-    root.appendChild(label)
-    val startBtn = document.createElement("button")
+    card.appendChild(label)
+
+    val row = Ui.row()
+    val startBtn = Ui.filledButton("Start", () => start())
     startBtn.setAttribute("id", "start")
-    startBtn.textContent = "Start"
-    startBtn.addEventListener("click", e => start())
-    root.appendChild(startBtn)
-    val stopBtn = document.createElement("button")
+    row.appendChild(startBtn)
+    val stopBtn = Ui.textButton("Stop", () => stop())
     stopBtn.setAttribute("id", "stop")
-    stopBtn.textContent = "Stop"
-    stopBtn.addEventListener("click", e => stop())
-    root.appendChild(stopBtn)
-    root
+    row.appendChild(stopBtn)
+    card.appendChild(row)
+
+    Ui.scaffold("Sart Stopwatch", card)

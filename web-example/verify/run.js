@@ -52,7 +52,9 @@ const Random = { nextInt: function(b) { return 2 % b; } };
 const order = [];
 const Xhr = { get: function(url) { order.push(url); var d = new Deferred(); setTimeout(function() { d.resolve('tok-' + order.length); }, 5); return d; } };
 
-const sandbox = { document, localStorage, Xhr, Deferred, Timer, Random, String, Math, XMLHttpRequest: function() {}, setTimeout, console };
+// Launcher reads location.hash at load (deep-link routing); stub it empty.
+const location = { hash: '' };
+const sandbox = { document, localStorage, Xhr, Deferred, Timer, Random, location, String, Math, XMLHttpRequest: function() {}, setTimeout, console };
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(process.argv[2]), 'utf8'), sandbox);
 

@@ -511,38 +511,42 @@ class JsEmitter(
   def writeOutput(): Unit =
     Files.createDirectories(outDir)
     Files.writeString(outDir.resolve("app.js"), out.toString, StandardCharsets.UTF_8)
+    Files.writeString(outDir.resolve("sart-runtime.js"), runtimeJs, StandardCharsets.UTF_8)
     Files.writeString(outDir.resolve("index.html"), indexHtml, StandardCharsets.UTF_8)
 
-  /** A minimal host page: a mount point, the tiny callback-XHR host helper
-   *  (NOT part of the app bundle), then the emitted app. Everything here is
-   *  plain ES5. */
+  /** The tiny host helpers — a separate file so a styled `index.html` overlay
+   *  can reuse them without duplicating. NOT part of the app bundle; plain ES5;
+   *  no Promise (works on old engines — webOS 3 / Tizen 2.3). Deferred is the
+   *  async primitive the CPS lowering targets; Xhr returns one so
+   *  `await(Xhr.get(u))` composes. */
+  private def runtimeJs: String =
+    """// Sart web-lite host runtime (not bundled in app.js).
+      |function Deferred() { this.cbs = []; this.done = false; this.val = undefined; }
+      |Deferred.prototype.onComplete = function(f) { if (this.done) { f(this.val); } else { this.cbs.push(f); } };
+      |Deferred.prototype.resolve = function(v) { this.done = true; this.val = v; for (var i = 0; i < this.cbs.length; i++) { this.cbs[i](this.val); } this.cbs = []; };
+      |var Xhr = { get: function(url) {
+      |  var d = new Deferred();
+      |  try {
+      |    var x = new XMLHttpRequest();
+      |    x.open("GET", url, true);
+      |    x.onreadystatechange = function() { if (x.readyState === 4) { d.resolve(x.responseText); } };
+      |    x.send();
+      |  } catch (e) { d.resolve(""); }
+      |  return d;
+      |} };
+      |var Random = { nextInt: function(bound) { return Math.floor(Math.random() * bound); } };
+      |var Timer = { periodic: function(ms, cb) { var t = { id: setInterval(cb, ms) }; t.cancel = function() { clearInterval(t.id); }; return t; } };
+      |""".stripMargin
+
+  /** Fallback host page (used when the app supplies no `web/` overlay). Links
+   *  the runtime + an optional `styles.css`, then the emitted app. */
   private def indexHtml: String =
     s"""<!doctype html>
        |<html>
-       |<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>$projectName</title></head>
+       |<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>$projectName</title><link rel="stylesheet" href="styles.css"></head>
        |<body>
        |<div id="app"></div>
-       |<script>
-       |// Host helpers (NOT bundled in app.js). Deferred is the tiny async
-       |// primitive the CPS lowering targets — no Promise, works on old engines
-       |// (webOS 3 / Tizen 2.3). Xhr returns a Deferred so `await(Xhr.get(u))`
-       |// composes.
-       |function Deferred() { this.cbs = []; this.done = false; this.val = undefined; }
-       |Deferred.prototype.onComplete = function(f) { if (this.done) { f(this.val); } else { this.cbs.push(f); } };
-       |Deferred.prototype.resolve = function(v) { this.done = true; this.val = v; for (var i = 0; i < this.cbs.length; i++) { this.cbs[i](this.val); } this.cbs = []; };
-       |var Xhr = { get: function(url) {
-       |  var d = new Deferred();
-       |  try {
-       |    var x = new XMLHttpRequest();
-       |    x.open("GET", url, true);
-       |    x.onreadystatechange = function() { if (x.readyState === 4) { d.resolve(x.responseText); } };
-       |    x.send();
-       |  } catch (e) { d.resolve(""); }
-       |  return d;
-       |} };
-       |var Random = { nextInt: function(bound) { return Math.floor(Math.random() * bound); } };
-       |var Timer = { periodic: function(ms, cb) { var t = { id: setInterval(cb, ms) }; t.cancel = function() { clearInterval(t.id); }; return t; } };
-       |</script>
+       |<script src="sart-runtime.js"></script>
        |<script src="app.js"></script>
        |</body>
        |</html>
