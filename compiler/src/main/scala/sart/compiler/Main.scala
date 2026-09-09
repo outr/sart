@@ -27,6 +27,11 @@ object Main:
   def main(args: Array[String]): Unit =
     val (flags, positional) = args.toList.partition(_.startsWith("--"))
     val strict = flags.contains("--strict")
+    // Which backend to emit. `dart` (default) → DartEmitter/Flutter;
+    // `js` → JsEmitter, the lean ES5 web-lite backend.
+    val target = flags.collectFirst {
+      case f if f.startsWith("--target=") => f.stripPrefix("--target=")
+    }.getOrElse("dart")
     val libraries = flags.collect { case f if f.startsWith("--library=") => f.stripPrefix("--library=") }
     val wireMappings = flags.collect { case f if f.startsWith("--wire-mapping=") => f.stripPrefix("--wire-mapping=") }
       .flatMap { m => m.split("=", 2) match { case Array(a, b) => Some(a -> b); case _ => None } }.toMap
@@ -57,21 +62,33 @@ object Main:
     if libraries.nonEmpty then
       println(s"Compiling through ${libJars.size} library jar(s) and ${libDirs.size} project dir(s)")
 
-    val emitter = new DartEmitter(outDir, sourceRoot, projectName, projectDesc, wireMappings)
+    // Emit through the selected backend. Both extend the tasty-inspector
+    // `Inspector` and expose `writeOutput()` + `unsupported`, so the
+    // inspect → write → strict-check flow is shared.
+    val (emitter, label) = target match
+      case "js"    => (new JsEmitter(outDir, sourceRoot, projectName), "JS")
+      case "dart"  => (new DartEmitter(outDir, sourceRoot, projectName, projectDesc, wireMappings), "Dart")
+      case other   =>
+        System.err.println(s"sart: unknown --target=$other (expected 'dart' or 'js')")
+        System.exit(2); return
+
     val ok = TastyInspector.inspectAllTastyFiles(tastyFiles, jars, classpath)(emitter)
     if !ok then
       System.err.println("TASTy inspection failed")
       System.exit(1)
 
-    emitter.writeOutput()
-    println(s"Wrote Dart output to ${outDir.toAbsolutePath}")
+    val unsupported = emitter match
+      case e: DartEmitter => e.writeOutput(); e.unsupported
+      case e: JsEmitter   => e.writeOutput(); e.unsupported
+      case _              => Nil
+    println(s"Wrote $label output to ${outDir.toAbsolutePath}")
 
-    if strict && emitter.unsupported.nonEmpty then
+    if strict && unsupported.nonEmpty then
       // Strict mode: every unsupported tree is a build failure, reported
       // at the Scala member it came from — a compile error, not a Dart
       // analyzer surprise later.
-      System.err.println(s"sart: --strict: ${emitter.unsupported.size} unsupported construct(s):")
-      emitter.unsupported.foreach(g => System.err.println(s"  $g"))
+      System.err.println(s"sart: --strict: ${unsupported.size} unsupported construct(s):")
+      unsupported.foreach(g => System.err.println(s"  $g"))
       System.exit(3)
 
   private def findTastyFiles(root: Path): List[String] =

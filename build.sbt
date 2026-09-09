@@ -41,6 +41,7 @@ ThisBuild / publishMavenStyle := true
 // Flutter-Linux pipeline. The task keys are defined at the top level so
 // they're usable from both the root project and the command line.
 @transient val sartEmit          = taskKey[Unit]("Compile the example and emit Dart into out/")
+@transient val sartEmitJs        = taskKey[Unit]("Compile web-example and emit lean ES5 JS into out-js/ (web-lite backend)")
 @transient val sartLinux         = taskKey[File]("Build a native Linux bundle from the emitted Dart")
 @transient val sartRun           = taskKey[Unit]("Build and launch the generated Linux app")
 @transient val sartGoldenVerify  = taskKey[Unit]("Emit Dart and diff it against the checked-in golden files")
@@ -179,6 +180,27 @@ lazy val `sart-webview` = (project in file("sart-webview"))
     Compile / scalacOptions ++= Seq("-Yretain-trees")
   )
 
+// The web-lite backend's DOM facade layer: minimal @native facades for the
+// browser DOM (document/Element/KeyEvent), localStorage, and a callback-XHR
+// helper. Compiled to nothing itself — the JsEmitter emits calls to it as
+// plain ES5. NOT a Flutter dependency.
+lazy val `sart-web` = (project in file("sart-web"))
+  .dependsOn(`sart-dart`, `sart-stdlib`)
+  .settings(
+    name := "sart-web",
+    Compile / scalacOptions ++= Seq("-Yretain-trees")
+  )
+
+// A small web app authored against sart-web, emitted to tiny ES5 by the
+// web-lite backend (`sartEmitJs`). Proof/example for the JS target — no
+// Flutter here.
+lazy val `web-example` = (project in file("web-example"))
+  .dependsOn(`sart-web`, `sart-stdlib`)
+  .settings(
+    name := "sart-web-example",
+    Compile / scalacOptions ++= Seq("-Yretain-trees")
+  )
+
 lazy val example = (project in file("example"))
   .dependsOn(`flutter-facades`, `sart-stdlib`, `sart-player`, `sart-tv`, `sart-image`, `sart-qr`, `sart-lottie`, `sart-webview`)
   .settings(
@@ -224,7 +246,7 @@ lazy val `sart-facadegen` = (project in file("sart-facadegen"))
   )
 
 lazy val root = (project in file("."))
-  .aggregate(`sart-dart`, `sart-stdlib`, `flutter-facades`, `sart-player`, `sart-tv`, `sart-image`, `sart-qr`, `sart-lottie`, `sart-webview`, example, compiler, `sart-facadegen`)
+  .aggregate(`sart-dart`, `sart-stdlib`, `flutter-facades`, `sart-player`, `sart-tv`, `sart-image`, `sart-qr`, `sart-lottie`, `sart-webview`, `sart-web`, `web-example`, example, compiler, `sart-facadegen`)
   .settings(
     name := "sart",
 
@@ -300,6 +322,35 @@ lazy val root = (project in file("."))
             log.warn("dart not on PATH; skipping auto-format")
         }
       }
+    },
+
+    // Web-lite backend: compile web-example and emit lean, dependency-free
+    // ES5 (app.js + index.html) into out-js/ via `--target=js`. sart-web is
+    // a compile-through library (its @native facades emit as verbatim JS).
+    sartEmitJs := {
+      (`web-example` / Compile / compile).value
+      val exClasses = (`web-example` / Compile / classDirectory).value
+      val conv      = fileConverter.value
+      val cp        = (`web-example` / Compile / fullClasspath).value
+        .map(e => conv.toPath(e.data).toAbsolutePath.toString)
+        .mkString(java.io.File.pathSeparator)
+      val runCp     = (compiler / Runtime / fullClasspath).value
+        .map(e => conv.toPath(e.data).toAbsolutePath.toString)
+        .mkString(java.io.File.pathSeparator)
+      val outDir    = baseDirectory.value / "out-js"
+      val log       = streams.value.log
+      IO.createDirectory(outDir)
+      log.info(s"sart: emitting ES5 JS into $outDir")
+      val sourceRoot = baseDirectory.value.getAbsolutePath
+      val webClasses = (`sart-web` / Compile / classDirectory).value
+      val rc = sys.process.Process(Seq(
+        "java", "-cp", runCp, "sart.compiler.Main", "--target=js",
+        s"--library=${webClasses.getAbsolutePath}",
+        exClasses.getAbsolutePath, cp, outDir.getAbsolutePath, sourceRoot
+      )).!
+      if (rc != 0) sys.error(s"sart.compiler.Main --target=js exited $rc")
+      val appJs = outDir / "app.js"
+      if (appJs.exists()) log.info(s"sart: wrote ${IO.readBytes(appJs).length} bytes to $appJs")
     },
 
     // Platform tasks share scaffold + build logic via helpers below.
