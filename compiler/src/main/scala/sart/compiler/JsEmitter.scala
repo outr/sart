@@ -135,6 +135,45 @@ class JsEmitter(
       "&&" -> "&&", "||" -> "||"
     )
 
+    // ── async markers (shared with the Dart backend) ────────────────────────
+    // `sart.dart.await.apply(f)` and `sart.dart.async.apply(body)`, with or
+    // without the elided type argument. Detected by the object's FQN so the
+    // SAME Scala async code compiles to both backends.
+    def sartObj(q: Term, fqn: String): Boolean =
+      q.symbol.exists && q.symbol.fullName == fqn
+
+    def isAwait(t: Term): Option[Term] = unwrap(t) match
+      case Apply(TypeApply(Select(q, "apply"), _), List(f)) if sartObj(q, "sart.dart.await") => Some(f)
+      case Apply(Select(q, "apply"), List(f))               if sartObj(q, "sart.dart.await") => Some(f)
+      case _ => None
+
+    def unwrapAsync(t: Term): Option[Term] = unwrap(t) match
+      case Apply(TypeApply(Select(q, "apply"), _), List(b)) if sartObj(q, "sart.dart.async") => Some(b)
+      case Apply(Select(q, "apply"), List(b))               if sartObj(q, "sart.dart.async") => Some(b)
+      case _ => None
+
+    // True if `tree` awaits in its OWN body — stops at def/closure boundaries
+    // and at nested `async { … }` blocks (whose awaits belong to that block),
+    // mirroring DartEmitter's containsAwait.
+    def containsAwait(tree: Tree): Boolean =
+      val acc = new TreeAccumulator[Boolean]:
+        def foldTree(found: Boolean, t: Tree)(owner: Symbol): Boolean =
+          if found then true else t match
+            case _: DefDef                              => found
+            case tm: Term if unwrapAsync(tm).isDefined  => found
+            case tm: Term if isAwait(tm).isDefined      => true
+            case _                                      => foldOverTree(found, t)(owner)
+      acc.foldTree(false, tree)(Symbol.spliceOwner)
+
+    var deferredCounter = 0
+    def freshDeferred(): String =
+      val n = s"__d$deferredCounter"; deferredCounter += 1; n
+
+    def todoAwait(s: Tree): String =
+      val label = s.getClass.getSimpleName
+      todos += s"unsupported: await in $label (only straight-line/tail await supported)"
+      s"/*?await-in-$label*/"
+
     // ── expression emission ────────────────────────────────────────────────
     def emitRef(sym: Symbol, name: String): String =
       if name == "Nil" then "[]"
@@ -182,6 +221,10 @@ class JsEmitter(
       ).mkString(", ")
 
     def emitApply(t: Term): String =
+      // await/async only lower at statement/tail level (see emitCps); anywhere
+      // else (e.g. `f(await(g))`) is unsupported — flag it rather than emit
+      // a broken `await.apply(...)` call.
+      if isAwait(t).isDefined || unwrapAsync(t).isDefined then return todoAwait(t)
       emitStringInterp(t) match
         case Some(s) => return s
         case None    =>
@@ -252,6 +295,50 @@ class JsEmitter(
           .filter(_.nonEmpty).mkString(" ")
       case other => emitTrailing(other, wantRet)
 
+    // ── async CPS lowering ──────────────────────────────────────────────────
+    // Lower an `async`/await body to nested callbacks (no Promise). Each
+    // `await(f)` splits the continuation: the rest of the body becomes
+    // `f.onComplete(function(bind){ … })`. `resolveVar` is the enclosing
+    // method's `Deferred`, resolved at the tail; None = fire-and-forget.
+    // Straight-line and tail awaits only — an await inside a loop or a
+    // non-tail branch is flagged unsupported (via emitStat's containsAwait
+    // guard), never miscompiled.
+    def emitCps(body: Term, resolveVar: Option[String]): String =
+      unwrap(body) match
+        case Block(stats, expr) => emitCpsSeq(stats, expr, resolveVar)
+        case other              => emitCpsTail(other, resolveVar)
+
+    def emitCpsSeq(stats: List[Statement], tail: Term, resolveVar: Option[String]): String =
+      stats match
+        case Nil => emitCpsTail(tail, resolveVar)
+        case ValDef(name, _, Some(rhs)) :: rest if isAwait(rhs).isDefined =>
+          s"${emitTerm(isAwait(rhs).get)}.onComplete(function($name) { ${emitCpsSeq(rest, tail, resolveVar)} });"
+        case (t: Term) :: rest if isAwait(t).isDefined =>
+          s"${emitTerm(isAwait(t).get)}.onComplete(function() { ${emitCpsSeq(rest, tail, resolveVar)} });"
+        case (s: Statement) :: rest =>
+          val stmt = if containsAwait(s) then todoAwait(s) else emitStat(s)
+          val more = emitCpsSeq(rest, tail, resolveVar)
+          if stmt.isEmpty then more else if more.isEmpty then stmt else s"$stmt $more"
+
+    def emitCpsTail(tail0: Term, resolveVar: Option[String]): String =
+      val tail = unwrap(tail0)
+      tail match
+        case Block(stats, expr) => emitCpsSeq(stats, expr, resolveVar)
+        case _ => isAwait(tail) match
+          case Some(f) => resolveVar match
+            case Some(d) => s"${emitTerm(f)}.onComplete(function(__v) { $d.resolve(__v); });"
+            case None    => s"${emitTerm(f)}.onComplete(function() {});"
+          case None => resolveVar match
+            case Some(d) =>
+              val unitTail = isUnit(tail) || tail.tpe =:= TypeRepr.of[Unit]
+              if unitTail then
+                val st = emitStat(tail)
+                if st.isEmpty then s"$d.resolve(undefined);" else s"$st $d.resolve(undefined);"
+              else if containsAwait(tail) then todoAwait(tail)
+              else s"$d.resolve(${emitTerm(tail)});"
+            case None =>
+              if containsAwait(tail) then todoAwait(tail) else emitStat(tail)
+
     // ── module (object → JS namespace) ──────────────────────────────────────
     def emitModule(cd: ClassDef): Unit =
       currentModule = cd.symbol
@@ -264,8 +351,15 @@ class JsEmitter(
             if userMember(dd.symbol) && name != "<init>" && !name.endsWith("_=")
                && hasTermClause(pcs) =>
           val params  = termParamNames(pcs)
-          val wantRet = !(dd.returnTpt.tpe =:= TypeRepr.of[Unit])
-          out.append(s"$mn.$name = function(${params.mkString(", ")}) { ${emitBody(rhs, wantRet)} };\n")
+          val asyncBody = unwrapAsync(rhs)
+          if asyncBody.isDefined || containsAwait(rhs) then
+            // Async method: return a Deferred the CPS chain resolves.
+            val d   = freshDeferred()
+            val cps = emitCps(asyncBody.getOrElse(rhs), Some(d))
+            out.append(s"$mn.$name = function(${params.mkString(", ")}) { var $d = new Deferred(); $cps return $d; };\n")
+          else
+            val wantRet = !(dd.returnTpt.tpe =:= TypeRepr.of[Unit])
+            out.append(s"$mn.$name = function(${params.mkString(", ")}) { ${emitBody(rhs, wantRet)} };\n")
         case _ => ()
       }
       currentModule = Symbol.noSymbol
@@ -294,7 +388,12 @@ class JsEmitter(
     // 3. emit the @main entry call(s) last
     for tasty <- tastys do collectMains(tasty.ast)
     for dd <- mains; body <- dd.rhs do
-      val js = emitBody(body, false)
+      val asyncBody = unwrapAsync(body)
+      // A `@main` needs no return value, so an async entry is fire-and-forget
+      // (no Deferred): just run the CPS chain.
+      val js =
+        if asyncBody.isDefined || containsAwait(body) then emitCps(asyncBody.getOrElse(body), None)
+        else emitBody(body, false)
       if js.nonEmpty then out.append(js).append('\n')
 
   // ── output ─────────────────────────────────────────────────────────────
@@ -313,19 +412,22 @@ class JsEmitter(
        |<body>
        |<div id="app"></div>
        |<script>
-       |// Host helper (not bundled): callback-shaped XHR for old engines
-       |// (webOS 3 / Tizen 2.3: no fetch, unreliable Promises).
-       |var Xhr = { get: function(url, onOk, onErr) {
+       |// Host helpers (NOT bundled in app.js). Deferred is the tiny async
+       |// primitive the CPS lowering targets — no Promise, works on old engines
+       |// (webOS 3 / Tizen 2.3). Xhr returns a Deferred so `await(Xhr.get(u))`
+       |// composes.
+       |function Deferred() { this.cbs = []; this.done = false; this.val = undefined; }
+       |Deferred.prototype.onComplete = function(f) { if (this.done) { f(this.val); } else { this.cbs.push(f); } };
+       |Deferred.prototype.resolve = function(v) { this.done = true; this.val = v; for (var i = 0; i < this.cbs.length; i++) { this.cbs[i](this.val); } this.cbs = []; };
+       |var Xhr = { get: function(url) {
+       |  var d = new Deferred();
        |  try {
        |    var x = new XMLHttpRequest();
        |    x.open("GET", url, true);
-       |    x.onreadystatechange = function() {
-       |      if (x.readyState === 4) {
-       |        if (x.status >= 200 && x.status < 300) { onOk(x.responseText); } else { onErr(); }
-       |      }
-       |    };
+       |    x.onreadystatechange = function() { if (x.readyState === 4) { d.resolve(x.responseText); } };
        |    x.send();
-       |  } catch (e) { onErr(); }
+       |  } catch (e) { d.resolve(""); }
+       |  return d;
        |} };
        |</script>
        |<script src="app.js"></script>

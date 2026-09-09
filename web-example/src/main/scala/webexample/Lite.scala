@@ -1,12 +1,14 @@
 package webexample
 
 import sart.web.*
+import sart.dart.{async, await}
+import scala.concurrent.Future
 
 /** A real slice of a NaboTV-Lite-style web app, animation-free and
  *  render-on-change: a Card model, a rail renderer that builds DOM nodes, a
- *  D-pad key handler, an XHR fetch (callback-style) that renders on response,
- *  and a localStorage token read at startup. Compiled to tiny ES5 by Sart's
- *  web-lite backend (`--target=js`). */
+ *  D-pad key handler, and a two-step async startup written in direct
+ *  `async`/`await` style (a token fetch feeding a rails fetch) that the
+ *  web-lite backend lowers to callback-passing ES5 for old engines. */
 case class Card(id: Int, title: String, posterPath: String)
 
 object Lite:
@@ -41,19 +43,26 @@ object Lite:
     if e.keyCode == 39 then focus = focus + 1
     else if e.keyCode == 37 then focus = focus - 1
 
-  def start(): Unit =
-    val token: String = localStorage.getItem("nabo.token")
-    document.getElementById("app").addEventListener("keydown", e => onKey(e))
-    Xhr.get(
-      "/api/rails",
-      resp =>
-        val cards: List[Card] = List(
-          Card(1, "Alpha", "/a.jpg"),
-          Card(2, "Beta", "/b.jpg"),
-          Card(3, "Gamma", "/c.jpg")
-        )
-        renderRail("Continue Watching", cards),
-      () => renderRail("Error", Nil)
-    )
+  /** Composed async method: awaits its own future, resolving with the value —
+   *  proves await works across method boundaries (loadToken → start). */
+  def loadToken(): Future[String] = async {
+    await(Xhr.get("/token"))
+  }
 
-@main def main(): Unit = Lite.start()
+  /** Direct-style async startup: register input synchronously, then two
+   *  sequential awaits (the token feeds the rails URL), then render. */
+  def start(): Future[Unit] = async {
+    document.getElementById("app").addEventListener("keydown", e => onKey(e))
+    val token = await(loadToken())
+    await(Xhr.get("/api/rails?t=" + token))
+    val cards: List[Card] = List(
+      Card(1, "Alpha", "/a.jpg"),
+      Card(2, "Beta", "/b.jpg"),
+      Card(3, "Gamma", "/c.jpg")
+    )
+    renderRail("Continue Watching", cards)
+  }
+
+@main def main(): Unit =
+  Lite.start()
+  ()
