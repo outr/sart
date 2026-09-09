@@ -1044,7 +1044,12 @@ class JsEmitter(
       |
       |// ── sart-player (VideoPlayer over <video>; YouTube over <iframe>) ──
       |function _mkVideoPlayer() {
-      |  var v = _el("video", "video"); v.controls = true; v.setAttribute("playsinline", ""); v.style.width = "100%"; v.style.height = "100%"; v.style.background = "#000";
+      |  var v = _el("video", "video"); v.controls = true; v.setAttribute("playsinline", ""); v.style.width = "100%"; v.style.height = "100%"; v.style.objectFit = "contain"; v.style.background = "#000";
+      |  // Force a normal composited layer: without this Chromium renders the
+      |  // video as a hardware UNDERLAY behind the page and "hole-punches" through
+      |  // the (opaque) page background, which fails here — the box shows white
+      |  // while the video actually plays. translateZ(0) paints it in-page.
+      |  v.style.transform = "translateZ(0)";
       |  return {
       |    _v: v,
       |    setSource: function(url, a, b) { v.src = url; var d = new Deferred(); d.resolve(undefined); return d; },
