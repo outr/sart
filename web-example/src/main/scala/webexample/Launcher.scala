@@ -13,6 +13,7 @@ class Launcher extends Component:
     else if name == "dice" then App.show(Dice())
     else if name == "stopwatch" then App.show(Stopwatch())
     else if name == "two" then App.show(ScreenA())
+    else if name == "media" then App.show(Lite())
     else App.show(Counter())
 
   private def navButton(label: String, name: String): Element =
@@ -32,6 +33,7 @@ class Launcher extends Component:
     nav.appendChild(navButton("Dice", "dice"))
     nav.appendChild(navButton("Stopwatch", "stopwatch"))
     nav.appendChild(navButton("Two-screen", "two"))
+    nav.appendChild(navButton("Media", "media"))
 
     val content = document.createElement("div")
     content.setAttribute("id", "content")
@@ -47,6 +49,7 @@ class Launcher extends Component:
     else if h == "#dice" then open("dice")
     else if h == "#stopwatch" then open("stopwatch")
     else if h == "#two" then open("two")
+    else if h == "#media" then open("media")
     else open("counter")
 
     root

@@ -10,3 +10,4 @@ object document:
   def getElementById(id: String): Element = native.value
   def createElement(tag: String): Element = native.value
   def createTextNode(text: String): Element = native.value
+  def addEventListener(event: String, handler: KeyEvent => Unit): Unit = native.value

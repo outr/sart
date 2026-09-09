@@ -148,7 +148,7 @@ group = 'Two-screen';
 group = 'Lite-async';
 roots['app'] = new El('#app');
 order.length = 0;
-sandbox.Lite.start();
+sandbox.LiteAsync.start();
 check(order.length === 1 && order[0] === '/token', 'first await fires /token, unresolved');
 check(tagCount(roots['app'], 'div') === 0, 'rail not rendered before awaits resolve');
 setTimeout(function() {

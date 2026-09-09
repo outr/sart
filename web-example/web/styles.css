@@ -197,3 +197,56 @@ ul.plainlist li {
   white-space: nowrap;
 }
 .nav .navbtn:hover { background: var(--secondary-container); }
+
+/* ── Media rail (Lite demo) ───────────────────────────────────────────── */
+.rail {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 8px 0;
+}
+.rail-title {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--on-surface);
+  padding: 0 4px 12px;
+}
+.rail-row {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 4px;
+}
+.poster {
+  flex: 0 0 auto;
+  width: 180px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-container);
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  transition: transform .12s ease, box-shadow .12s ease, outline-color .12s ease;
+  outline: 3px solid transparent;
+}
+.poster img {
+  display: block;
+  width: 180px;
+  height: 260px;
+  object-fit: cover;
+}
+.poster-label {
+  padding: 10px 12px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--on-surface);
+}
+.poster.focused {
+  transform: scale(1.05);
+  outline-color: var(--primary);
+  box-shadow: 0 6px 18px rgba(103,80,164,.4);
+}
+.rail-hint {
+  text-align: center;
+  color: var(--on-surface-variant, #49454F);
+  font-size: 13px;
+  padding: 20px 0 8px;
+}
