@@ -215,7 +215,10 @@ ul.plainlist li {
   display: flex;
   gap: 16px;
   overflow-x: auto;
-  padding: 4px;
+  /* Room for the focused poster's scale(1.05) + 3px outline: overflow-x:auto
+     also clips the y-axis, so without this the highlight is cut off top/left
+     and a stray vertical scrollbar appears. */
+  padding: 20px;
 }
 .poster {
   flex: 0 0 auto;
