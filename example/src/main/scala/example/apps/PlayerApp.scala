@@ -23,7 +23,11 @@ class PlayerAppState extends State[PlayerApp]:
 
   private def load(): Unit =
     player = VideoPlayer.create()
-    await(player.setSource("sample.mp4"))
+    // A small public sample clip (range-served video/mp4) so the demo plays on
+    // both backends without a bundled asset.
+    await(player.setSource(
+      "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4"
+    ))
     setState(() => ready = true)
 
   override def dispose(): Unit =

@@ -1047,7 +1047,7 @@ class JsEmitter(
       |  var v = _el("video", "video"); v.controls = true; v.setAttribute("playsinline", ""); v.style.width = "100%"; v.style.height = "100%"; v.style.background = "#000";
       |  return {
       |    _v: v,
-      |    setSource: function(url, a, b) { v.src = (url && url.indexOf("http") === 0) ? url : "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"; var d = new Deferred(); d.resolve(undefined); return d; },
+      |    setSource: function(url, a, b) { v.src = url; var d = new Deferred(); d.resolve(undefined); return d; },
       |    view: function() { return v; }, play: function() { try { v.play(); } catch (e) {} }, pause: function() { v.pause(); },
       |    seek: function(s) { v.currentTime = s; }, setVolume: function(x) { v.volume = x; }, setLooping: function(x) { v.loop = x; },
       |    position: function() { return v.currentTime; }, duration: function() { return v.duration || 0; }, paused: function() { return v.paused; },

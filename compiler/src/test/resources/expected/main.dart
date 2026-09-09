@@ -556,20 +556,22 @@ class PlayerAppState extends State<PlayerApp> {
   /// Source: example/src/main/scala/example/apps/PlayerApp.scala:24
   void load() async {
     player = VideoPlayer.create();
-    (await player.setSource('sample.mp4'));
+    (await player.setSource(
+      'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4',
+    ));
     setState(() {
       ready = true;
     });
   }
 
-  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:29
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:33
   @override
   void dispose() {
     player.dispose();
     super.dispose();
   }
 
-  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:33
+  /// Source: example/src/main/scala/example/apps/PlayerApp.scala:37
   @override
   Widget build(BuildContext context) {
     return Scaffold(
