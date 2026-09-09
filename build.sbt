@@ -158,8 +158,18 @@ lazy val `sart-qr` = (project in file("sart-qr"))
     Compile / scalacOptions ++= Seq("-Yretain-trees")
   )
 
+// Lottie vector-animation widget facade: Lottie.asset / Lottie.network, for
+// the animated weather glyphs on the TV clock. Own module (no tree-shaking)
+// so lottie only reaches apps that use it.
+lazy val `sart-lottie` = (project in file("sart-lottie"))
+  .dependsOn(`sart-dart`, `sart-stdlib`, `flutter-facades`)
+  .settings(
+    name := "sart-lottie",
+    Compile / scalacOptions ++= Seq("-Yretain-trees")
+  )
+
 lazy val example = (project in file("example"))
-  .dependsOn(`flutter-facades`, `sart-stdlib`, `sart-player`, `sart-tv`, `sart-image`, `sart-qr`)
+  .dependsOn(`flutter-facades`, `sart-stdlib`, `sart-player`, `sart-tv`, `sart-image`, `sart-qr`, `sart-lottie`)
   .settings(
     name := "sart-example",
     // Keep TASTy around so the compiler can read it.
@@ -203,7 +213,7 @@ lazy val `sart-facadegen` = (project in file("sart-facadegen"))
   )
 
 lazy val root = (project in file("."))
-  .aggregate(`sart-dart`, `sart-stdlib`, `flutter-facades`, `sart-player`, `sart-tv`, `sart-image`, `sart-qr`, example, compiler, `sart-facadegen`)
+  .aggregate(`sart-dart`, `sart-stdlib`, `flutter-facades`, `sart-player`, `sart-tv`, `sart-image`, `sart-qr`, `sart-lottie`, example, compiler, `sart-facadegen`)
   .settings(
     name := "sart",
 
@@ -243,11 +253,13 @@ lazy val root = (project in file("."))
       val tvClasses     = (`sart-tv` / Compile / classDirectory).value
       val imageClasses  = (`sart-image` / Compile / classDirectory).value
       val qrClasses     = (`sart-qr` / Compile / classDirectory).value
+      val lottieClasses = (`sart-lottie` / Compile / classDirectory).value
       val libArgs = Seq(
         s"--library=${playerClasses.getAbsolutePath}",
         s"--library=${tvClasses.getAbsolutePath}",
         s"--library=${imageClasses.getAbsolutePath}",
-        s"--library=${qrClasses.getAbsolutePath}"
+        s"--library=${qrClasses.getAbsolutePath}",
+        s"--library=${lottieClasses.getAbsolutePath}"
       )
       val rc = sys.process.Process(Seq(
         "java", "-cp", runCp, "sart.compiler.Main"
@@ -541,6 +553,7 @@ lazy val root = (project in file("."))
       (`sart-tv` / publishLocal).value
       (`sart-image` / publishLocal).value
       (`sart-qr` / publishLocal).value
+      (`sart-lottie` / publishLocal).value
       (compiler / publishLocal).value
 
       // sbt-sart/ is its own sbt build (cross-built: Scala 2.12 → sbt 1.x,

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:lottie/lottie.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'platform/platform_name.dart';
@@ -73,6 +74,7 @@ class LauncherHome extends StatelessWidget {
     Demo('YouTube', 'youtube_player_iframe backend', (ctx) => YtApp()),
     Demo('Images', 'cached_network_image posters', (ctx) => ImageApp()),
     Demo('QR', 'qr_flutter pairing code', (ctx) => QrApp()),
+    Demo('Lottie', 'lottie vector animation', (ctx) => LottieApp()),
     Demo('TV', 'Remote/D-pad, focus, lifecycle', (ctx) => TvApp()),
     Demo('Showcase', 'Kitchen-sink feature demo', (ctx) => ShowcaseApp()),
     Demo('Counter', 'Classic Flutter counter', (ctx) => MyHomePage('Counter')),
@@ -82,7 +84,7 @@ class LauncherHome extends StatelessWidget {
     Demo('Two-screen', 'Navigator.push demo', (ctx) => HomeScreen()),
   ];
 
-  /// Source: example/src/main/scala/example/LauncherApp.scala:46
+  /// Source: example/src/main/scala/example/LauncherApp.scala:47
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -492,6 +494,36 @@ class ImageApp extends StatelessWidget {
           spacing: 12.0,
           runSpacing: 12.0,
           children: urls.map((url) => poster(url)).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+/// Source: example/src/main/scala/example/apps/LottieApp.scala:11
+class LottieApp extends StatelessWidget {
+  /// Source: example/src/main/scala/example/apps/LottieApp.scala:12
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Sart Lottie')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 240.0,
+              height: 240.0,
+              child: Lottie.network(
+                'https://lottie.host/2c8e8b3c-0b3f-4a3e-8e2a-9f7c0d6c1a5b/q2Y9m3Xk7d.json',
+                repeat: true,
+                fit: BoxFit.contain,
+                errorBuilder: (_$1, _$2, _$3) => Icon(Icons.cloud, size: 96.0),
+              ),
+            ),
+            SizedBox(height: 20.0),
+            Text('Looping vector animation'),
+          ],
         ),
       ),
     );
