@@ -328,6 +328,34 @@ class JsEmitter(
       val s = t.tpe.dealias.typeSymbol
       s.exists && s.fullName.startsWith("scala.collection.")
 
+    // A Scala/sart Option value → lowered to a plain nullable, so its ops
+    // (fold/map/foreach/getOrElse/isDefined/…) become null-checks in JS.
+    def isOptionType(t: Term): Boolean =
+      val s = t.tpe.widen.dealias.typeSymbol
+      s.exists && (s.fullName == "scala.Option" || s.fullName == "sart.stdlib.Option")
+
+    // Apply an argument (usually a closure `x => …`) to an already-emitted JS
+    // receiver expression: `(function(x){…})(recvJs)`. `unitCtx` suppresses a
+    // trailing `return` for Unit-bodied callbacks (e.g. Option.foreach).
+    def applyClosureTo(arg: Term, recvJs: String, unitCtx: Boolean): String =
+      asClosure(arg) match
+        case Some(dd) => s"(${emitClosure(dd, forceUnit = unitCtx)})($recvJs)"
+        case None     => s"(${emitTerm(arg)})($recvJs)"
+
+    // `opt.fold(ifEmpty)(f)` (two arg clauses, a leading type-arg on `fold`):
+    // returns (receiver, ifEmpty, f) when `receiver` is an Option.
+    def optionFold(x: Term): Option[(Term, Term, Term)] =
+      def peel(y: Term): Term = y match { case TypeApply(z, _) => peel(z); case _ => y }
+      x match
+        case Apply(inner, List(f)) =>
+          peel(inner) match
+            case Apply(sel, List(ifEmpty)) =>
+              peel(sel) match
+                case Select(recv, "fold") if isOptionType(recv) => Some((recv, ifEmpty, f))
+                case _ => None
+            case _ => None
+        case _ => None
+
     // `Some(x)` → `x` (nullable), `None` → handled in emitRef. Mirrors the
     // Dart backend: Option is a plain nullable at the value level.
     def someArg(t: Term): Option[Term] = t match
@@ -349,6 +377,11 @@ class JsEmitter(
       emitStringInterp(t) match
         case Some(s) => return s
         case None    =>
+      // `opt.fold(ifEmpty)(f)` → single-eval IIFE null-check.
+      optionFold(t) match
+        case Some((recv, ifEmpty, f)) =>
+          return s"(function(_o) { return _o == null ? ${emitArgVal(ifEmpty)} : ${applyClosureTo(f, "_o", false)}; })(${emitTerm(recv)})"
+        case None =>
       t match
         case Apply(fn0, args) =>
           val fn = stripTypeApply(fn0)
@@ -380,6 +413,14 @@ class JsEmitter(
               s"${emitTerm(recv)}.concat([${emitTerm(args.head)}])"
             case Select(recv, op) if binOps.contains(op) && args.length == 1 =>
               s"(${emitTerm(recv)} ${binOps(op)} ${emitTerm(args.head)})"
+            // Option ops → null-checks (single-eval IIFE). Must precede the
+            // collection foreach/map below, since Option lowers to a nullable.
+            case Select(recv, "foreach") if isOptionType(recv) =>
+              s"(function(_o) { if (_o != null) { ${applyClosureTo(args.head, "_o", true)}; } })(${emitTerm(recv)})"
+            case Select(recv, "map") if isOptionType(recv) =>
+              s"(function(_o) { return _o == null ? null : ${applyClosureTo(args.head, "_o", false)}; })(${emitTerm(recv)})"
+            case Select(recv, "getOrElse") if isOptionType(recv) =>
+              s"(function(_o) { return _o == null ? ${emitArgVal(args.head)} : _o; })(${emitTerm(recv)})"
             case Select(recv, "foreach") =>
               // a foreach body is Unit-context — don't emit a `return`
               val cb = args.headOption.flatMap(asClosure).map(emitClosure(_, forceUnit = true)).getOrElse(emitArgs(args))
@@ -416,6 +457,15 @@ class JsEmitter(
         case Apply(Select(q, "toString"), Nil) => s"String(${emitTerm(q)})"
         // `xs.size` → JS `.length` (Scala collections; a property, not a call).
         case Select(q, "size")               => s"${emitTerm(q)}.length"
+        // Collection last/head as Option → last-or-null / head-or-null.
+        case Select(q, "lastOption") if isCollType(q) =>
+          s"(function(_a) { return _a.length > 0 ? _a[_a.length - 1] : null; })(${emitTerm(q)})"
+        case Select(q, "headOption") if isCollType(q) =>
+          s"(function(_a) { return _a.length > 0 ? _a[0] : null; })(${emitTerm(q)})"
+        // Option getters → null-checks (Option is a plain nullable in JS).
+        case Select(q, "isDefined" | "nonEmpty") if isOptionType(q) => s"(${emitTerm(q)} != null)"
+        case Select(q, "isEmpty") if isOptionType(q)                => s"(${emitTerm(q)} == null)"
+        case Select(q, "get") if isOptionType(q)                    => emitTerm(q)
         // Unary operators (`!x`, `-x`, `~x`) — Scala spells them `x.unary_!`.
         case Select(q, "unary_$bang" | "unary_!") => s"(!${emitTerm(q)})"
         case Select(q, "unary_$minus" | "unary_-") => s"(-${emitTerm(q)})"
@@ -427,10 +477,18 @@ class JsEmitter(
         case a: Apply                        => emitApply(a)
         case TypeApply(fn, _)                => emitTerm(fn)
         case sel @ Select(q, name) =>
-          if inCurrentClass(sel.symbol.owner) then s"$selfRef.$name"
+          // A paren-less USER method (getter like `latestRoll`) is emitted as a
+          // zero-arg prototype function, so a paren-less reference must invoke
+          // it (`self.latestRoll()`); a plain field/val stays bare.
+          val s = sel.symbol
+          val parenlessCall =
+            s.exists && s.isDefDef && s.flags.is(Flags.Method) && !s.flags.is(Flags.FieldAccessor)
+              && s.paramSymss.flatten.forall(_.isType) && isUserClassSym(s.owner)
+          val call = if parenlessCall then "()" else ""
+          if inCurrentClass(sel.symbol.owner) then s"$selfRef.$name$call"
           else moduleNames.get(sel.symbol.owner) match
-            case Some(m) => s"$m.$name"
-            case None    => s"${emitTerm(q)}.$name"
+            case Some(m) => s"$m.$name$call"
+            case None    => s"${emitTerm(q)}.$name$call"
         case If(c, a, b)  => s"(${emitTerm(c)} ? ${emitTerm(a)} : ${emitTerm(b)})"
         // A closure/lambda in value position → a JS function expression.
         case Block(List(dd: DefDef), _: Closure) => emitClosure(dd)
@@ -464,6 +522,13 @@ class JsEmitter(
     def allValDefs(stats: List[Statement]): Boolean =
       stats.nonEmpty && stats.forall { case _: ValDef => true; case _ => false }
 
+    // A block's trailing expr that is really a STATEMENT (not a value to
+    // inline): an assignment, or a nested statement block/if. Such a block is
+    // a statement sequence, not an arg-hoist.
+    def isStmtExpr(t: Term): Boolean = unwrap(t) match
+      case _: Assign => true
+      case _         => false
+
     // Scala hoists a call's named/default args into temp vals:
     //   { val theme$1 = …; val key$1 = W.$default$1; …; W(key$1, …, {theme: theme$1}) }
     // Inline the real ones back into the call by string substitution, and strip
@@ -491,8 +556,12 @@ class JsEmitter(
 
     def emitBody(t: Term, wantRet: Boolean): String = unwrap(t) match
       // An all-ValDef block is Scala's arg-hoist (or pure val computation) —
-      // inline it into one expression, then return/emit that.
-      case Block(stats, expr) if allValDefs(stats) =>
+      // inline it into one expression, then return/emit that. But NOT when the
+      // trailing expr is a statement (an Assign like `history = history :+ x`):
+      // that's a real statement sequence (e.g. a setState closure body), and
+      // inlining would drop the vars and emit the Assign as an (unsupported)
+      // expression — take the normal statement path instead.
+      case Block(stats, expr) if allValDefs(stats) && !isStmtExpr(expr) =>
         val inlined = emitTempValBlock(stats.collect { case v: ValDef => v }, expr)
         if wantRet && !isUnit(expr) then s"return $inlined;"
         else if isUnit(expr) then inlined + ";"
@@ -618,10 +687,14 @@ class JsEmitter(
         out.append(s"$cn.prototype.constructor = $cn;\n")
       }
 
-      // methods (abstract defs — no rhs — are provided by subclasses; skip)
+      // methods (abstract defs — no rhs — are provided by subclasses; skip).
+      // Includes paren-less user defs (getters like `latestRoll`) — emitted as
+      // zero-arg prototype functions — but NOT field accessors (the `val`/`var`
+      // getter/setter pairs, which would collide with the ctor-assigned field).
       cd.body.foreach {
-        case dd @ DefDef(name, pcs, _, Some(_))
-            if userMember(dd.symbol) && name != "<init>" && !name.endsWith("_=") && hasTermClause(pcs) =>
+        case dd @ DefDef(name, _, _, Some(_))
+            if userMember(dd.symbol) && name != "<init>" && !name.endsWith("_=")
+               && !dd.symbol.flags.is(Flags.FieldAccessor) =>
           emitClassMethod(cn, dd)
         case _ => ()
       }
