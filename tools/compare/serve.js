@@ -50,7 +50,14 @@ function dirBytes(dir) {
 function serveFile(res, file) {
   fs.readFile(file, (err, buf) => {
     if (err) { res.writeHead(404, { 'content-type': 'text/plain' }); res.end('404: ' + file); return; }
-    res.writeHead(200, { 'content-type': mimeOf(file) });
+    // No caching — these bundles get re-emitted constantly during dev, and a
+    // stale cached app.js/sart-runtime.js is indistinguishable from a bug.
+    res.writeHead(200, {
+      'content-type': mimeOf(file),
+      'cache-control': 'no-store, no-cache, must-revalidate',
+      'pragma': 'no-cache',
+      'expires': '0'
+    });
     res.end(buf);
   });
 }
